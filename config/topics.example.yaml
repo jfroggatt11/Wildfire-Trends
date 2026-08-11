@@ -1,0 +1,38 @@
+schema_version: 1
+
+topics:
+  climate_change:
+    label: Climate change
+    enabled: true
+    description: General public and media language about anthropogenic climate change.
+    queries:
+      - id: climate_change_phrase
+        expression: '"climate change"'
+      - id: global_warming_phrase
+        expression: '"global warming"'
+      - id: climate_crisis_phrase
+        expression: '"climate crisis"'
+    exclude_terms: []
+    languages:
+      - English
+    geographies: []
+
+  electric_vehicles:
+    label: Electric vehicles
+    enabled: true
+    queries:
+      - id: electric_vehicle_singular
+        expression: '"electric vehicle"'
+      - id: electric_vehicle_plural
+        expression: '"electric vehicles"'
+      - expression: '"electric car"'
+      - expression: '"electric cars"'
+    notes: Query ids omitted above are generated deterministically from the expression.
+
+  public_transport:
+    label: Public transport
+    enabled: false
+    queries:
+      - '"public transport"'
+      - '"public transit"'
+
