@@ -132,8 +132,10 @@ def build_parser() -> argparse.ArgumentParser:
     trends.add_argument(
         "--country-batch-size",
         type=_country_batch_size,
-        default=7,
-        help="countries per native country-share request (1-7; default: 7)",
+        help=(
+            "force explicit country batches of this size (1-7); by default one "
+            "global request returns the country breakdown"
+        ),
     )
     trends.add_argument("--window-days", type=int, default=366)
     trends.add_argument(
@@ -363,9 +365,15 @@ def _collect_trends(args: argparse.Namespace) -> int:
             "window(s) for within-country normalization."
         )
     else:
+        query_scope = (
+            f"explicit batches of {args.country_batch_size}"
+            if args.country_batch_size is not None
+            else "one global country breakdown per topic window"
+        )
         print(
             "Country attention shares are returned natively by GDELT; "
-            "matched_count remains null unless raw-count data is also collected."
+            f"using {query_scope}. matched_count remains null unless raw-count "
+            "data is also collected."
         )
     estimated_minutes = len(windows) * options["request_interval_seconds"] / 60
     print(

@@ -19,20 +19,23 @@ means an article matching two expressions in the same topic is counted once by G
 Topics are independent: an article can count in both `clean_energy` and
 `climate_change`, so topic counts must not be summed as mutually exclusive categories.
 
-The default collector uses GDELT `TimelineSourceCountry`. Countries are explicitly
-filtered in batches of at most seven, and GDELT returns a separate series for each
-country. Each value is the percentage of all monitored media originating in that
-country that matched the topic. The stored fraction is:
+The default collector uses GDELT `TimelineSourceCountry`. One global topic request
+returns separate series for source countries with matching coverage; the collector
+selects the configured countries and fills an omitted country series with zero. Each
+value is the percentage of all monitored media originating in that country that
+matched the topic. The stored fraction is:
 
 ```text
 country_attention_share = reported_percentage / 100
 ```
 
 The native country mode does not expose raw matched or denominator counts, so those
-fields remain null. If a country-filtered response omits an entire requested country
-series, the collector records zero for that country and marks
-`series_omitted_as_zero` in metadata. If GDELT returns a country series but omits an
-expected day, the window fails rather than inventing a value.
+fields remain null. If a global response omits an entire configured country series,
+the collector records zero for that country and marks `series_omitted_as_zero` in
+metadata. GDELT's unlabeled source-country series is ignored. If GDELT returns a
+country series but omits an expected day, the window fails rather than inventing a
+value. `--country-batch-size 7` retains explicit country-filtered requests as a
+validation and recovery path.
 
 ## Denominators
 
@@ -79,6 +82,9 @@ the run state or manifest is `complete` and that all planned windows succeeded.
 - Machine translation can change query recall and precision across languages.
 - The bundled 197-country catalog is syntactically validated, but every entry has not
   yet been proven against a live GDELT query.
+- A missing series in the global country breakdown is interpreted as zero matching
+  coverage. Researchers needing to distinguish zero matches from no monitored media
+  should collect raw country baselines for the affected panel.
 - A five-year range is planned as bounded annual requests, but live API acceptance of
   every country and historical window is not guaranteed.
 - The public DOC API has variable shared capacity. Failed and interrupted windows must

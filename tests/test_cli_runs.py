@@ -177,6 +177,7 @@ def test_collect_trends_plan_only_creates_frozen_resumable_work(tmp_path, capsys
     output = capsys.readouterr().out
     assert "2 planned window(s)" in output
     assert "mode=country-share" in output
+    assert "one global country breakdown" in output
     assert "matched_count remains null" in output
     states = RunStore(data_dir).list()
     assert len(states) == 1
@@ -184,6 +185,10 @@ def test_collect_trends_plan_only_creates_frozen_resumable_work(tmp_path, capsys
     assert states[0].country_config_snapshot_path is not None
     assert states[0].source == "gdelt_source_country"
     assert len(states[0].resumable_windows()) == 2
+    assert all(
+        window.query.geographies == []
+        for window in states[0].resumable_windows()
+    )
 
 
 def test_collect_trends_raw_mode_retains_count_and_baseline_plan(tmp_path, capsys):

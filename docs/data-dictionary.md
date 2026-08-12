@@ -21,7 +21,7 @@ Path:
 | `global_attention_share` | float/null | `matched_count / global_monitored_count`. |
 | `country_attention_share` | float/null | Native GDELT country percentage divided by 100, or the equivalent raw-count ratio. |
 | `collected_at` | UTC timestamp | Retrieval time for this provider response. |
-| `metadata_json` | JSON string | Query details, series label, geography label, and normalization scopes. |
+| `metadata_json` | JSON string | Query details, series label, geography label, query scope, response series count, and normalization scopes. |
 
 ## Country coverage baselines
 

@@ -66,11 +66,13 @@ climate-attention collect-trends \
   --end 2026-08-11
 ```
 
-Omit `--countries` to plan every enabled country in the world catalog. Omit
-`--topics` to use every enabled topic. The default `country-share` mode places up to
-seven explicitly selected countries in each GDELT `TimelineSourceCountry` request.
-Each work unit covers at most 366 days and is independently resumable. Change the
-limits with `--country-batch-size` and `--window-days` only after live validation.
+Omit `--countries` to retain every enabled country in the world catalog. Omit
+`--topics` to use every enabled topic. The default `country-share` mode makes one
+global GDELT `TimelineSourceCountry` request per topic and time window, then selects
+the requested country series from that response. Each work unit covers at most 366
+days and is independently resumable. Use `--country-batch-size 7` to force explicit
+country-filtered batches for an audit or fallback; change `--window-days` only after
+live validation.
 
 Each output row contains:
 
@@ -107,10 +109,10 @@ country shares to merge without creating duplicate daily rows.
 A whole-world run is intentionally slow. Live testing showed that GDELT's available
 capacity is variable: requests may be rejected even more than a minute apart, while
 later retries can succeed. The conservative default is 65 seconds plus exponential
-backoff. With four themes, 197 countries, five annual windows, and batches of seven,
-the default plan has 580 requests and takes at least 10.5 hours before response
-latency and retries. The equivalent all-country raw-count plan has 4,925 requests and
-takes at least 89 hours. It is safe to
+backoff. With four themes and five annual windows, the default global country plan
+has 20 requests and takes at least 21.7 minutes before response latency and retries.
+The equivalent all-country raw-count plan has 4,925 requests and takes at least 89
+hours. It is safe to
 interrupt and resume, but the public DOC API is best used for selected study
 countries; a complete world backfill will ultimately benefit from GDELT's bulk
 datasets. GDELT's [June 2026 guidance](https://blog.gdeltproject.org/using-the-new-web-ngrams-dataset-to-find-relevant-coverage/)

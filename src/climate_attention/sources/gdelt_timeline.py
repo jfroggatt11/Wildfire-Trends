@@ -38,6 +38,10 @@ LOGGER = logging.getLogger(__name__)
 COUNTRY_COVERAGE_TOPIC_ID = "__country_coverage__"
 COUNTRY_COVERAGE_QUERY_ID = "country_coverage"
 SOURCE_COUNTRY_QUERY_ID = "topic_combined"
+GDELT_COUNTRY_LABEL_ALIASES = {
+    "bosniaherzegovina": "bosniaandherzegovina",
+    "slovakrepublic": "slovakia",
+}
 TimelineObservation = DailyTrend | DailyCountryCoverage
 
 TrendWindowSink = Callable[
@@ -74,16 +78,20 @@ def compile_source_country_queries(
     topics: list[Topic],
     countries: list[Country],
     *,
-    batch_size: int = 7,
+    batch_size: int | None = None,
 ) -> list[Query]:
-    """Compile topic queries with explicit, bounded source-country OR batches."""
-    if not 1 <= batch_size <= 7:
+    """Compile global country-breakdown queries or explicit fallback batches."""
+    if batch_size is not None and not 1 <= batch_size <= 7:
         raise ValueError("source-country batch size must be between 1 and 7")
     ordered_countries = sorted(countries, key=lambda country: country.id)
-    batches = [
-        ordered_countries[index : index + batch_size]
-        for index in range(0, len(ordered_countries), batch_size)
-    ]
+    batches = (
+        [[]]
+        if batch_size is None
+        else [
+            ordered_countries[index : index + batch_size]
+            for index in range(0, len(ordered_countries), batch_size)
+        ]
+    )
     compiled: list[Query] = []
     for topic in topics:
         expression = _combined_topic_expression(topic)
@@ -188,9 +196,9 @@ def plan_source_country_windows(
     countries: list[Country],
     *,
     window_days: int = 366,
-    batch_size: int = 7,
+    batch_size: int | None = None,
 ) -> list[GDELTWindow]:
-    """Plan native within-country attention requests in small country batches."""
+    """Plan native country attention, globally by default or in fallback batches."""
     if window_days < 8:
         raise ValueError("timeline window must be at least 8 days for daily resolution")
     windows: list[GDELTWindow] = []
@@ -383,10 +391,15 @@ def parse_source_country_response(
     collected_at: datetime,
     country_labels: dict[str, str],
 ) -> list[DailyTrend]:
-    """Parse native within-country attention percentages for an explicit batch."""
-    expected_countries = window.query.geographies
+    """Parse native within-country percentages from a global or batched response."""
+    explicit_batch = bool(window.query.geographies)
+    expected_countries = (
+        window.query.geographies
+        if explicit_batch
+        else sorted(country_labels)
+    )
     if not expected_countries:
-        raise ValueError("source-country timeline requires explicit geographies")
+        raise ValueError("source-country timeline requires configured geographies")
     timelines = payload.get("timeline")
     if not isinstance(timelines, list):
         raise GDELTResponseError("GDELT timeline response is missing a 'timeline' list")
@@ -410,9 +423,15 @@ def parse_source_country_response(
         series_label = series.get("series")
         if not isinstance(series_label, str) or not series_label.strip():
             raise GDELTResponseError("GDELT source-country series has no label")
-        country_id = label_keys.get(_source_country_series_key(series_label))
+        series_key = _source_country_series_key(series_label)
+        country_id = label_keys.get(series_key)
         if country_id is None:
-            unexpected.append(series_label)
+            alias_id = GDELT_COUNTRY_LABEL_ALIASES.get(series_key)
+            if alias_id in expected_countries:
+                country_id = alias_id
+        if country_id is None:
+            if explicit_batch:
+                unexpected.append(series_label)
             continue
         if country_id in series_by_country:
             raise GDELTResponseError(
@@ -477,6 +496,10 @@ def parse_source_country_response(
                 "geography_label": country_labels.get(country_id, country_id),
                 "reported_percentage": percentage,
                 "series_omitted_as_zero": series is None,
+                "country_query_scope": (
+                    "explicit_batch" if explicit_batch else "global_breakdown"
+                ),
+                "response_series_count": len(timelines),
                 "country_normalization_scope": (
                     "source_country_gdelt_monitored_articles"
                 ),

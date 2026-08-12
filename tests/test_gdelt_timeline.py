@@ -112,7 +112,22 @@ def test_source_country_queries_batch_explicit_countries():
     )
 
 
-def test_source_country_planner_reduces_world_request_count():
+def test_source_country_planner_uses_one_global_query_per_time_window():
+    topic = Topic(
+        id="climate", label="Climate", queries=[QuerySpec(expression="climate")]
+    )
+    request = CollectionRequest(
+        start=date(2021, 8, 12), end=date(2026, 8, 11), topics=[topic]
+    )
+    countries = [Country(id=f"country{i}", label=f"Country {i}") for i in range(197)]
+    windows = plan_source_country_windows(request, countries)
+
+    assert len(windows) == 5
+    assert all(window.query.geographies == [] for window in windows)
+    assert all("sourcecountry:" not in build_timeline_query(window) for window in windows)
+
+
+def test_source_country_planner_retains_explicit_batch_fallback():
     topic = Topic(
         id="climate", label="Climate", queries=[QuerySpec(expression="climate")]
     )
@@ -227,6 +242,63 @@ def test_parse_source_country_percentage_and_omitted_zero_series():
     assert len({trend.record_id for trend in trends}) == 16
 
 
+def test_parse_global_source_country_selects_configured_series_and_fills_zeros():
+    query = Query(
+        topic_id="climate",
+        query_id="topic_combined",
+        expression="climate",
+    )
+    window = GDELTWindow(
+        query=query,
+        start=datetime(2024, 1, 1, tzinfo=timezone.utc),
+        end=datetime.combine(date(2024, 1, 8), time.max, tzinfo=timezone.utc),
+    )
+    payload = _source_country_payload()
+    payload["timeline"].extend(
+        [
+            {
+                "series": "Slovak Republic Volume Intensity",
+                "data": [
+                    {"date": f"202401{day:02d}T000000Z", "value": 2.0}
+                    for day in range(1, 9)
+                ],
+            },
+            {
+                "series": " Volume Intensity",
+                "data": [
+                    {"date": f"202401{day:02d}T000000Z", "value": 1.0}
+                    for day in range(1, 9)
+                ],
+            },
+        ]
+    )
+
+    trends = parse_source_country_response(
+        payload,
+        window,
+        datetime(2024, 2, 1, tzinfo=timezone.utc),
+        {"italy": "Italy", "malta": "Malta", "slovakia": "Slovakia"},
+    )
+
+    assert len(trends) == 24
+    assert {trend.geography for trend in trends} == {"italy", "malta", "slovakia"}
+    assert all(
+        trend.metadata["country_query_scope"] == "global_breakdown"
+        for trend in trends
+    )
+    assert all(trend.metadata["response_series_count"] == 3 for trend in trends)
+    assert all(
+        trend.country_attention_share == 0
+        for trend in trends
+        if trend.geography == "malta"
+    )
+    assert all(
+        trend.country_attention_share == pytest.approx(0.02)
+        for trend in trends
+        if trend.geography == "slovakia"
+    )
+
+
 def test_missing_day_fails_explicitly():
     payload = _payload()
     payload["timeline"][0]["data"].pop()
@@ -295,7 +367,7 @@ def test_timeline_provider_collects_operator_only_country_baseline():
     assert calls[0].url.params["query"] == "sourcecountry:italy"
 
 
-def test_source_country_provider_uses_native_mode():
+def test_source_country_provider_uses_global_native_mode():
     calls = []
 
     def handler(request: httpx.Request):
@@ -306,7 +378,6 @@ def test_source_country_provider_uses_native_mode():
         topic_id="climate",
         query_id="topic_combined",
         expression="climate",
-        geographies=["italy"],
     )
     window = GDELTWindow(
         query=query,
@@ -322,7 +393,7 @@ def test_source_country_provider_uses_native_mode():
 
     assert len(result.trends) == 8
     assert calls[0].url.params["mode"] == "timelinesourcecountry"
-    assert calls[0].url.params["query"] == "climate sourcecountry:italy"
+    assert calls[0].url.params["query"] == "climate"
 
 
 def test_timeline_http_failure_is_explicit():

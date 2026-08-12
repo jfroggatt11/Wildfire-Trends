@@ -18,8 +18,10 @@ climate-attention collect-trends \
   --end 2026-08-10
 ```
 
-The default plan has one topic request containing all three explicitly filtered
-countries. The default 65-second pacing is a minimum, not a guarantee of acceptance.
+The default plan has one global topic request; the collector retains the three
+selected country series from the response. The default 65-second pacing is a minimum,
+not a guarantee of acceptance. Add `--country-batch-size 3` to perform the same pilot
+with an explicit three-country filter for comparison.
 Use `--trend-mode raw-counts` when the pilot specifically needs article counts and
 denominators; that equivalent plan has three baseline and three topic requests.
 
