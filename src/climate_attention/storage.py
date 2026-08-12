@@ -13,7 +13,7 @@ from typing import Any
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from .models import AttentionRecord, DailyAttention
+from .models import AttentionRecord, DailyAttention, DailyTrend
 
 
 RECORD_SCHEMA = pa.schema(
@@ -45,6 +45,24 @@ DAILY_SCHEMA = pa.schema(
         ("geography", pa.string()),
         ("language", pa.string()),
         ("count", pa.int64()),
+    ]
+)
+
+TREND_SCHEMA = pa.schema(
+    [
+        ("record_id", pa.string()),
+        ("date", pa.date32()),
+        ("source", pa.string()),
+        ("topic_id", pa.string()),
+        ("query_id", pa.string()),
+        ("query_expression", pa.string()),
+        ("geography", pa.string()),
+        ("language", pa.string()),
+        ("matched_count", pa.int64()),
+        ("monitored_count", pa.int64()),
+        ("attention_share", pa.float64()),
+        ("collected_at", pa.timestamp("us", tz="UTC")),
+        ("metadata_json", pa.string()),
     ]
 )
 
@@ -156,6 +174,64 @@ class LocalParquetStorage(AttentionStorage):
         os.replace(temporary, path)
         return path
 
+    def write_trends(self, trends: list[DailyTrend]) -> int:
+        """Upsert canonical provider aggregates by stable daily record id."""
+        groups: dict[tuple[str, str, str | None, str | None], list[DailyTrend]] = (
+            defaultdict(list)
+        )
+        for trend in trends:
+            groups[
+                (trend.source, trend.topic_id, trend.geography, trend.language)
+            ].append(trend)
+        added = 0
+        for (source, topic_id, geography, language), incoming in groups.items():
+            path = self._trend_path(source, topic_id, geography, language)
+            existing = self._read_trend_file(path) if path.exists() else []
+            by_id = {trend.record_id: trend for trend in existing}
+            before = len(by_id)
+            by_id.update({trend.record_id: trend for trend in incoming})
+            added += len(by_id) - before
+            rows = [_trend_to_row(trend) for trend in by_id.values()]
+            _atomic_parquet_write(
+                path, pa.Table.from_pylist(rows, schema=TREND_SCHEMA)
+            )
+        return added
+
+    def read_trends(
+        self,
+        *,
+        source: str | None = None,
+        start: date | None = None,
+        end: date | None = None,
+        topics: set[str] | None = None,
+        geographies: set[str] | None = None,
+    ) -> list[DailyTrend]:
+        base = self.root / "trends"
+        paths = (
+            (base / f"source={source}").rglob("daily.parquet")
+            if source
+            else base.rglob("daily.parquet")
+        )
+        trends: list[DailyTrend] = []
+        for path in sorted(paths):
+            trends.extend(self._read_trend_file(path))
+        return sorted(
+            (
+                trend
+                for trend in trends
+                if (start is None or trend.date >= start)
+                and (end is None or trend.date <= end)
+                and (topics is None or trend.topic_id in topics)
+                and (geographies is None or trend.geography in geographies)
+            ),
+            key=lambda trend: (
+                trend.date,
+                trend.topic_id,
+                trend.geography or "",
+                trend.language or "",
+            ),
+        )
+
     def _record_path(
         self, source: str, day: date, topic_id: str, query_id: str
     ) -> Path:
@@ -169,6 +245,23 @@ class LocalParquetStorage(AttentionStorage):
             / "records.parquet"
         )
 
+    def _trend_path(
+        self,
+        source: str,
+        topic_id: str,
+        geography: str | None,
+        language: str | None,
+    ) -> Path:
+        return (
+            self.root
+            / "trends"
+            / f"source={source}"
+            / f"topic_id={topic_id}"
+            / f"geography={geography or 'all'}"
+            / f"language={language or 'all'}"
+            / "daily.parquet"
+        )
+
     @staticmethod
     def _read_record_file(path: Path) -> list[AttentionRecord]:
         rows = pq.read_table(path).to_pylist()
@@ -177,6 +270,15 @@ class LocalParquetStorage(AttentionStorage):
             row["metadata"] = json.loads(row.pop("metadata_json"))
             records.append(AttentionRecord.model_validate(row))
         return records
+
+    @staticmethod
+    def _read_trend_file(path: Path) -> list[DailyTrend]:
+        rows = pq.read_table(path).to_pylist()
+        trends: list[DailyTrend] = []
+        for row in rows:
+            row["metadata"] = json.loads(row.pop("metadata_json"))
+            trends.append(DailyTrend.model_validate(row))
+        return trends
 
 
 def _record_to_row(record: AttentionRecord) -> dict[str, Any]:
@@ -187,9 +289,16 @@ def _record_to_row(record: AttentionRecord) -> dict[str, Any]:
     return row
 
 
+def _trend_to_row(trend: DailyTrend) -> dict[str, Any]:
+    row = trend.model_dump(exclude={"metadata"})
+    row["metadata_json"] = json.dumps(
+        trend.metadata, ensure_ascii=False, sort_keys=True, default=str
+    )
+    return row
+
+
 def _atomic_parquet_write(path: Path, table: pa.Table) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(".parquet.tmp")
     pq.write_table(table, temporary, compression="zstd")
     os.replace(temporary, path)
-

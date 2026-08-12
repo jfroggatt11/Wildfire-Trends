@@ -5,7 +5,9 @@ __pycache__/
 *.egg-info/
 .coverage
 data/raw/
+data/trends/
 data/processed/
 data/manifests/
 data/api_responses/
+data/runs/
 data/test_runs/

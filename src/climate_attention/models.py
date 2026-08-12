@@ -221,13 +221,40 @@ class DailyAttention(StrictModel):
     count: int = Field(ge=0)
 
 
+class DailyTrend(StrictModel):
+    """An authoritative provider aggregate for one day and configured dimension."""
+
+    record_id: str
+    date: date
+    source: str
+    topic_id: str
+    query_id: str
+    query_expression: str
+    geography: str | None = None
+    language: str | None = None
+    matched_count: int = Field(ge=0)
+    monitored_count: int | None = Field(default=None, ge=0)
+    attention_share: float | None = Field(default=None, ge=0)
+    collected_at: datetime = Field(default_factory=utc_now)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("collected_at")
+    @classmethod
+    def collection_timestamp_must_be_aware(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("collection timestamp must include a timezone")
+        return value.astimezone(timezone.utc)
+
+
 class RequestLog(StrictModel):
+    window_id: str | None = None
+    parent_window_id: str | None = None
     query_id: str
     topic_id: str
     start: datetime
     end: datetime
-    status: Literal["success", "failed"]
-    attempts: int = Field(ge=1)
+    status: Literal["success", "failed", "split"]
+    attempts: int = Field(ge=0)
     records_returned: int = Field(ge=0)
     http_status: int | None = None
     error: str | None = None
@@ -235,4 +262,9 @@ class RequestLog(StrictModel):
 
 class ProviderResult(StrictModel):
     records: list[AttentionRecord] = Field(default_factory=list)
+    requests: list[RequestLog] = Field(default_factory=list)
+
+
+class TrendProviderResult(StrictModel):
+    trends: list[DailyTrend] = Field(default_factory=list)
     requests: list[RequestLog] = Field(default_factory=list)

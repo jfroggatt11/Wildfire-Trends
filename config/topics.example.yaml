@@ -29,6 +29,36 @@ topics:
       - expression: '"electric cars"'
     notes: Query ids omitted above are generated deterministically from the expression.
 
+  clean_energy:
+    label: Clean energy
+    enabled: true
+    description: Renewable and low-carbon energy technologies and deployment.
+    queries:
+      - id: clean_energy_phrase
+        expression: '"clean energy"'
+      - id: renewable_energy_phrase
+        expression: '"renewable energy"'
+      - id: solar_power_phrase
+        expression: '"solar power"'
+      - id: wind_power_phrase
+        expression: '"wind power"'
+
+  clean_transport:
+    label: Clean transport
+    enabled: true
+    description: Low-carbon mobility, modal shift, and transport decarbonisation.
+    queries:
+      - id: clean_transport_phrase
+        expression: '"clean transport"'
+      - id: sustainable_transport_phrase
+        expression: '"sustainable transport"'
+      - id: transport_decarbonisation_uk
+        expression: '"transport decarbonisation"'
+      - id: transport_decarbonization_us
+        expression: '"transport decarbonization"'
+      - id: transport_emissions_phrase
+        expression: '"transport emissions"'
+
   public_transport:
     label: Public transport
     enabled: false

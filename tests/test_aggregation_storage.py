@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 
 from climate_attention.aggregation import aggregate_daily
 from climate_attention.storage import LocalParquetStorage
+from climate_attention.models import DailyTrend
 
 
 def test_aggregation_deduplicates_and_groups(record_factory):
@@ -54,3 +55,26 @@ def test_storage_date_filter(tmp_path, record_factory):
     )
     assert [record.record_id for record in result] == ["later"]
 
+
+def test_trend_storage_round_trip_and_upsert(tmp_path):
+    storage = LocalParquetStorage(tmp_path / "data")
+    trend = DailyTrend(
+        record_id="trend-1",
+        date=datetime(2024, 1, 2).date(),
+        source="gdelt",
+        topic_id="climate",
+        query_id="topic_combined",
+        query_expression="climate",
+        geography="italy",
+        matched_count=10,
+        monitored_count=100,
+        attention_share=0.1,
+        collected_at=datetime(2024, 2, 1, tzinfo=timezone.utc),
+        metadata={"geography_label": "Italy"},
+    )
+    assert storage.write_trends([trend]) == 1
+    assert storage.write_trends([trend]) == 0
+    restored = storage.read_trends(
+        source="gdelt", topics={"climate"}, geographies={"italy"}
+    )
+    assert restored == [trend]

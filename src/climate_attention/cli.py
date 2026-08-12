@@ -1,8 +1,9 @@
-"""Command-line interface for collection and aggregation."""
+"""Command-line interface for collection, run management, and aggregation."""
 
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import sys
 from datetime import date, datetime, timezone
@@ -10,15 +11,14 @@ from pathlib import Path
 from uuid import uuid4
 
 from .aggregation import aggregate_daily
-from .config import ConfigError, load_config
-from .manifest import build_manifest
+from .config import ConfigError, config_hash, load_config, load_country_config
+from .manifest import build_manifest, build_run_manifest
 from .models import CollectionRequest, ProviderResult
-from .sources import (
-    GDELTProvider,
-    GoogleTrendsProvider,
-    ProviderCollectionError,
-    ProviderUnavailableError,
-)
+from .run_state import CollectionRunState, RunStore
+from .sources import GoogleTrendsProvider, ProviderUnavailableError
+from .sources.base import ProviderCollectionError
+from .sources.gdelt import GDELTProvider, plan_gdelt_windows
+from .sources.gdelt_timeline import GDELTTimelineProvider, plan_timeline_windows
 from .storage import LocalParquetStorage
 
 
@@ -32,6 +32,34 @@ def _iso_date(value: str) -> date:
         raise argparse.ArgumentTypeError(
             f"{value!r} is not a valid date (expected YYYY-MM-DD)"
         ) from exc
+
+
+def _positive_float(value: str) -> float:
+    parsed = float(value)
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("value must be greater than zero")
+    return parsed
+
+
+def _nonnegative_float(value: str) -> float:
+    parsed = float(value)
+    if parsed < 0:
+        raise argparse.ArgumentTypeError("value must be zero or greater")
+    return parsed
+
+
+def _nonnegative_int(value: str) -> int:
+    parsed = int(value)
+    if parsed < 0:
+        raise argparse.ArgumentTypeError("value must be zero or greater")
+    return parsed
+
+
+def _add_runtime_options(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--timeout", type=_positive_float)
+    parser.add_argument("--max-retries", type=_nonnegative_int)
+    parser.add_argument("--request-interval", type=_nonnegative_float)
+    parser.add_argument("--backoff-seconds", type=_nonnegative_float)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -48,25 +76,61 @@ def build_parser() -> argparse.ArgumentParser:
 
     validate = subparsers.add_parser("validate-config", help="validate topic YAML")
     validate.add_argument("--config", type=Path, required=True)
-
-    collect = subparsers.add_parser("collect", help="collect data from one provider")
-    collect.add_argument(
-        "--source",
-        required=True,
-        choices=("gdelt", "google-trends", "google_trends"),
+    validate_countries = subparsers.add_parser(
+        "validate-countries", help="validate source-country YAML"
     )
-    collect.add_argument("--config", type=Path, default=Path("config/topics.yaml"))
-    collect.add_argument("--start", type=_iso_date, required=True)
-    collect.add_argument("--end", type=_iso_date, required=True)
+    validate_countries.add_argument("--config", type=Path, required=True)
+
+    collect = subparsers.add_parser("collect", help="start or resume collection")
+    collect.add_argument(
+        "--source", choices=("gdelt", "google-trends", "google_trends")
+    )
+    collect.add_argument("--config", type=Path)
+    collect.add_argument("--start", type=_iso_date)
+    collect.add_argument("--end", type=_iso_date)
     collect.add_argument("--topics", nargs="+", help="only collect these topic ids")
     collect.add_argument("--data-dir", type=Path, default=Path("data"))
-    collect.add_argument("--timeout", type=float, default=30.0)
-    collect.add_argument("--max-retries", type=int, default=3)
+    collect.add_argument(
+        "--resume", metavar="RUN_ID", help="resume this run's unfinished windows"
+    )
+    _add_runtime_options(collect)
+
+    trends = subparsers.add_parser(
+        "collect-trends",
+        help="collect canonical daily GDELT counts by topic and source country",
+    )
+    trends.add_argument("--config", type=Path, required=True)
+    trends.add_argument("--countries-config", type=Path, required=True)
+    trends.add_argument("--start", type=_iso_date, required=True)
+    trends.add_argument("--end", type=_iso_date, required=True)
+    trends.add_argument("--topics", nargs="+", help="only collect these topic ids")
+    trends.add_argument(
+        "--countries", nargs="+", help="only collect these configured country ids"
+    )
+    trends.add_argument("--window-days", type=int, default=366)
+    trends.add_argument(
+        "--plan-only", action="store_true", help="create checkpoints without HTTP requests"
+    )
+    trends.add_argument("--data-dir", type=Path, default=Path("data"))
+    _add_runtime_options(trends)
 
     aggregate = subparsers.add_parser(
         "aggregate", aliases=["rebuild-aggregates"], help="rebuild daily Parquet"
     )
     aggregate.add_argument("--data-dir", type=Path, default=Path("data"))
+
+    runs = subparsers.add_parser("runs", help="inspect and retry durable runs")
+    run_commands = runs.add_subparsers(dest="runs_command", required=True)
+    runs_list = run_commands.add_parser("list", help="list collection runs")
+    runs_list.add_argument("--data-dir", type=Path, default=Path("data"))
+    runs_inspect = run_commands.add_parser("inspect", help="inspect one run")
+    runs_inspect.add_argument("run_id")
+    runs_inspect.add_argument("--data-dir", type=Path, default=Path("data"))
+    runs_inspect.add_argument("--json", action="store_true", dest="as_json")
+    runs_retry = run_commands.add_parser("retry", help="retry unfinished windows")
+    runs_retry.add_argument("run_id")
+    runs_retry.add_argument("--data-dir", type=Path, default=Path("data"))
+    _add_runtime_options(runs_retry)
     return parser
 
 
@@ -80,10 +144,16 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "validate-config":
             return _validate_config(args.config)
+        if args.command == "validate-countries":
+            return _validate_countries(args.config)
         if args.command == "collect":
             return _collect(args)
+        if args.command == "collect-trends":
+            return _collect_trends(args)
         if args.command in {"aggregate", "rebuild-aggregates"}:
             return _aggregate(args.data_dir)
+        if args.command == "runs":
+            return _runs(args)
     except (ConfigError, ValueError) as exc:
         LOGGER.error("%s", exc)
         return 2
@@ -102,69 +172,379 @@ def _validate_config(path: Path) -> int:
     return 0
 
 
+def _validate_countries(path: Path) -> int:
+    config = load_country_config(path)
+    enabled = config.enabled_countries()
+    print(
+        f"Valid country configuration: {len(config.countries)} country/countries, "
+        f"{len(enabled)} enabled."
+    )
+    return 0
+
+
+def _runtime_options(args: argparse.Namespace, base: dict | None = None) -> dict:
+    options = dict(base or {})
+    defaults = {
+        "timeout": 30.0,
+        "max_retries": 3,
+        "request_interval_seconds": 6.0,
+        "backoff_seconds": 30.0,
+    }
+    names = {
+        "timeout": "timeout",
+        "max_retries": "max_retries",
+        "request_interval": "request_interval_seconds",
+        "backoff_seconds": "backoff_seconds",
+    }
+    for argument, option in names.items():
+        value = getattr(args, argument, None)
+        if value is not None:
+            options[option] = value
+        elif option not in options:
+            options[option] = defaults[option]
+    return options
+
+
 def _collect(args: argparse.Namespace) -> int:
-    config = load_config(args.config)
+    if args.resume:
+        incompatible = [
+            name
+            for name in ("source", "config", "start", "end", "topics")
+            if getattr(args, name) not in (None, [])
+        ]
+        if incompatible:
+            raise ValueError(
+                "--resume uses the frozen run definition; do not also pass "
+                + ", ".join(f"--{name}" for name in incompatible)
+            )
+        explicit = {
+            key: value
+            for key, value in {
+                "timeout": args.timeout,
+                "max_retries": args.max_retries,
+                "request_interval_seconds": args.request_interval,
+                "backoff_seconds": args.backoff_seconds,
+            }.items()
+            if value is not None
+        }
+        return _resume_run(args.resume, args.data_dir, explicit)
+
+    source = (args.source or "gdelt").replace("-", "_")
+    config_path = args.config or Path("config/topics.yaml")
+    if args.start is None or args.end is None:
+        raise ValueError("new collection requires --start and --end")
+    config = load_config(config_path)
     selected = set(args.topics) if args.topics else None
     topics = config.enabled_topics(selected)
     request = CollectionRequest(start=args.start, end=args.end, topics=topics)
-    storage = LocalParquetStorage(args.data_dir)
+
+    if source != "gdelt":
+        return _collect_unavailable_provider(
+            source, config_path, request, LocalParquetStorage(args.data_dir)
+        )
+
     started_at = datetime.now(timezone.utc)
     run_id = f"{started_at.strftime('%Y%m%dT%H%M%SZ')}-{uuid4().hex[:8]}"
-    source = args.source.replace("-", "_")
-
-    if source == "gdelt":
-        provider = GDELTProvider(
-            timeout=args.timeout,
-            max_retries=args.max_retries,
-            response_sink=lambda envelope: storage.append_api_response(
-                "gdelt", run_id, envelope
-            ),
-        )
-    else:
-        provider = GoogleTrendsProvider()
-
-    result = ProviderResult()
-    status = "success"
-    error: str | None = None
-    try:
-        with provider:
-            result = provider.collect(request)
-    except ProviderCollectionError as exc:
-        result = exc.result
-        status = "failed"
-        error = str(exc)
-    except ProviderUnavailableError as exc:
-        status = "failed"
-        error = str(exc)
-
-    added = storage.write_records(result.records)
-    manifest = build_manifest(
+    options = _runtime_options(args)
+    store = RunStore(args.data_dir)
+    state = store.create(
         run_id=run_id,
         source=source,
-        status=status,
-        started_at=started_at,
-        start=args.start,
-        end=args.end,
-        config_path=args.config,
+        start=request.start,
+        end=request.end,
+        config_path=config_path,
+        config_sha256=config_hash(config_path),
         topics=topics,
-        result=result,
-        records_newly_stored=added,
-        error=error,
+        provider_options=options,
+        windows=plan_gdelt_windows(request),
     )
-    manifest_path = storage.write_manifest(run_id, manifest)
+    print(f"Created run {run_id} with {len(state.windows)} planned window(s).")
+    return _execute_gdelt_run(state, args.data_dir, store)
 
-    if status == "failed":
-        LOGGER.error("Collection failed: %s", error)
-        LOGGER.error("Failure manifest: %s", manifest_path)
-        return 1
 
-    observations = aggregate_daily(storage.read_records())
-    aggregate_path = storage.write_daily(observations)
+def _resume_run(
+    run_id: str, data_dir: Path, option_overrides: dict | None = None
+) -> int:
+    store = RunStore(data_dir)
+    state = store.load(run_id)
+    if state.source not in {"gdelt", "gdelt_timeline"}:
+        raise ValueError(f"run {run_id} uses unsupported resumable source {state.source!r}")
+    if option_overrides:
+        # Only explicitly supplied retry options should override the frozen values.
+        state.provider_options.update(option_overrides)
+        store.save(state)
+    if state.source == "gdelt_timeline":
+        return _execute_timeline_run(state, data_dir, store)
+    return _execute_gdelt_run(state, data_dir, store)
+
+
+def _collect_trends(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    country_config = load_country_config(args.countries_config)
+    topics = config.enabled_topics(set(args.topics) if args.topics else None)
+    countries = country_config.enabled_countries(
+        set(args.countries) if args.countries else None
+    )
+    request = CollectionRequest(start=args.start, end=args.end, topics=topics)
+    windows = plan_timeline_windows(
+        request, countries, window_days=args.window_days
+    )
+    started_at = datetime.now(timezone.utc)
+    run_id = f"{started_at.strftime('%Y%m%dT%H%M%SZ')}-{uuid4().hex[:8]}"
+    options = _runtime_options(args)
+    if args.request_interval is None:
+        options["request_interval_seconds"] = 10.0
+    options["country_labels"] = {
+        country.id: country.label for country in countries
+    }
+    store = RunStore(args.data_dir)
+    state = store.create(
+        run_id=run_id,
+        source="gdelt_timeline",
+        start=request.start,
+        end=request.end,
+        config_path=args.config,
+        config_sha256=config_hash(args.config),
+        country_config_path=args.countries_config,
+        country_config_sha256=config_hash(args.countries_config),
+        topics=topics,
+        provider_options=options,
+        windows=windows,
+    )
     print(
-        f"Collected {len(result.records)} record(s); {added} new. "
-        f"Manifest: {manifest_path}. Daily aggregates: {aggregate_path}."
+        f"Created trend run {run_id}: {len(topics)} topic(s), "
+        f"{len(countries)} country/countries, {len(windows)} planned window(s)."
     )
+    estimated_minutes = len(windows) * options["request_interval_seconds"] / 60
+    print(
+        f"Minimum pacing time: approximately {estimated_minutes:.1f} minutes, "
+        "excluding response latency and retries."
+    )
+    if args.plan_only:
+        print(f"Plan saved. Start it with: climate-attention runs retry {run_id}")
+        return 0
+    return _execute_timeline_run(state, args.data_dir, store)
+
+
+def _execute_gdelt_run(
+    state: CollectionRunState, data_dir: Path, store: RunStore
+) -> int:
+    storage = LocalParquetStorage(data_dir)
+    pending = state.resumable_windows()
+    if not pending and state.is_complete():
+        print(f"Run {state.run_id} is already complete; no requests were repeated.")
+        return 0
+    if not pending:
+        raise ValueError(f"run {state.run_id} has no resumable windows")
+
+    state.mark_started()
+    store.save(state)
+
+    def checkpoint(event, window, log, records, children):
+        if event == "success" and records:
+            state.records_newly_stored += storage.write_records(records)
+        state.apply_window_event(event, window, log, children)
+        store.save(state)
+
+    provider = GDELTProvider(
+        **state.provider_options,
+        response_sink=lambda envelope: storage.append_api_response(
+            "gdelt", state.run_id, envelope
+        ),
+        window_sink=checkpoint,
+    )
+    error: str | None = None
+    exit_code = 0
+    try:
+        with provider:
+            provider.collect_windows(pending)
+        if state.is_complete():
+            state.mark_finished("complete")
+        else:
+            error = "collection ended with unfinished windows"
+            state.mark_finished("failed", error)
+            exit_code = 1
+    except ProviderCollectionError as exc:
+        error = str(exc)
+        state.mark_finished("failed", error)
+        exit_code = 1
+    except KeyboardInterrupt:
+        error = "collection interrupted by user; the active window remains resumable"
+        state.mark_finished("interrupted", error)
+        exit_code = 130
+    except Exception as exc:  # preserve state even for unexpected provider failures
+        error = f"unexpected collection failure: {exc}"
+        state.mark_finished("failed", error)
+        exit_code = 1
+
+    store.save(state)
+    manifest_path = storage.write_manifest(state.run_id, build_run_manifest(state))
+    records = storage.read_records()
+    aggregate_path = storage.write_daily(aggregate_daily(records))
+    counts = state.status_counts()
+    if exit_code:
+        LOGGER.error("Run %s %s: %s", state.run_id, state.status, error)
+        LOGGER.error("Resume with: climate-attention runs retry %s", state.run_id)
+    else:
+        print(
+            f"Run {state.run_id} complete: {state.records_newly_stored} new record(s)."
+        )
+    print(
+        f"Windows: {counts}. Manifest: {manifest_path}. "
+        f"Daily aggregates: {aggregate_path}."
+    )
+    return exit_code
+
+
+def _execute_timeline_run(
+    state: CollectionRunState, data_dir: Path, store: RunStore
+) -> int:
+    storage = LocalParquetStorage(data_dir)
+    pending = state.resumable_windows()
+    if not pending and state.is_complete():
+        print(f"Run {state.run_id} is already complete; no requests were repeated.")
+        return 0
+    if not pending:
+        raise ValueError(f"run {state.run_id} has no resumable windows")
+    state.mark_started()
+    store.save(state)
+
+    def checkpoint(event, window, log, trends, children):
+        if event == "success" and trends:
+            state.records_newly_stored += storage.write_trends(trends)
+        state.apply_window_event(event, window, log, children)
+        store.save(state)
+
+    provider = GDELTTimelineProvider(
+        **state.provider_options,
+        response_sink=lambda envelope: storage.append_api_response(
+            "gdelt_timeline", state.run_id, envelope
+        ),
+        timeline_sink=checkpoint,
+    )
+    error: str | None = None
+    exit_code = 0
+    try:
+        with provider:
+            provider.collect_windows(pending)
+        if state.is_complete():
+            state.mark_finished("complete")
+        else:
+            error = "trend collection ended with unfinished windows"
+            state.mark_finished("failed", error)
+            exit_code = 1
+    except ProviderCollectionError as exc:
+        error = str(exc)
+        state.mark_finished("failed", error)
+        exit_code = 1
+    except KeyboardInterrupt:
+        error = "trend collection interrupted; the active window remains resumable"
+        state.mark_finished("interrupted", error)
+        exit_code = 130
+    except Exception as exc:
+        error = f"unexpected trend collection failure: {exc}"
+        state.mark_finished("failed", error)
+        exit_code = 1
+
+    store.save(state)
+    manifest_path = storage.write_manifest(state.run_id, build_run_manifest(state))
+    counts = state.status_counts()
+    if exit_code:
+        LOGGER.error("Trend run %s %s: %s", state.run_id, state.status, error)
+        LOGGER.error("Resume with: climate-attention runs retry %s", state.run_id)
+    else:
+        print(
+            f"Trend run {state.run_id} complete: "
+            f"{state.records_newly_stored} new daily point(s)."
+        )
+    print(
+        f"Windows: {counts}. Manifest: {manifest_path}. "
+        f"Trend dataset: {storage.root / 'trends'}."
+    )
+    return exit_code
+
+
+def _collect_unavailable_provider(
+    source: str,
+    config_path: Path,
+    request: CollectionRequest,
+    storage: LocalParquetStorage,
+) -> int:
+    started_at = datetime.now(timezone.utc)
+    run_id = f"{started_at.strftime('%Y%m%dT%H%M%SZ')}-{uuid4().hex[:8]}"
+    provider = GoogleTrendsProvider()
+    result = ProviderResult()
+    try:
+        provider.collect(request)
+    except ProviderUnavailableError as exc:
+        manifest = build_manifest(
+            run_id=run_id,
+            source=source,
+            status="failed",
+            started_at=started_at,
+            start=request.start,
+            end=request.end,
+            config_path=config_path,
+            topics=request.topics,
+            result=result,
+            records_newly_stored=0,
+            error=str(exc),
+        )
+        path = storage.write_manifest(run_id, manifest)
+        LOGGER.error("Collection failed: %s", exc)
+        LOGGER.error("Failure manifest: %s", path)
+        return 1
     return 0
+
+
+def _runs(args: argparse.Namespace) -> int:
+    store = RunStore(args.data_dir)
+    if args.runs_command == "list":
+        states = store.list()
+        if not states:
+            print("No durable collection runs found.")
+            return 0
+        print("RUN ID                         STATUS       SOURCE          WINDOWS (ok/fail/pending)  RANGE")
+        for state in states:
+            counts = state.status_counts()
+            pending = counts["pending"] + counts["running"]
+            print(
+                f"{state.run_id:<30} {state.status:<12} {state.source:<15} "
+                f"{counts['success']}/{counts['failed']}/{pending:<18} "
+                f"{state.requested_start}..{state.requested_end}"
+            )
+        return 0
+    if args.runs_command == "inspect":
+        state = store.load(args.run_id)
+        if args.as_json:
+            print(json.dumps(state.model_dump(mode="json"), indent=2, sort_keys=True))
+        else:
+            print(f"Run:       {state.run_id}")
+            print(f"Status:    {state.status}")
+            print(f"Source:    {state.source}")
+            print(f"Range:     {state.requested_start} to {state.requested_end}")
+            print(f"Config:    {state.config_snapshot_path}")
+            if state.country_config_snapshot_path:
+                print(f"Countries: {state.country_config_snapshot_path}")
+            print(f"Windows:   {state.status_counts()}")
+            print(f"New rows:  {state.records_newly_stored}")
+            if state.error:
+                print(f"Error:     {state.error}")
+            print(f"State:     {store.state_path(state.run_id)}")
+        return 0
+    if args.runs_command == "retry":
+        explicit = {
+            key: value
+            for key, value in {
+                "timeout": args.timeout,
+                "max_retries": args.max_retries,
+                "request_interval_seconds": args.request_interval,
+                "backoff_seconds": args.backoff_seconds,
+            }.items()
+            if value is not None
+        }
+        return _resume_run(args.run_id, args.data_dir, explicit)
+    raise ValueError(f"unknown runs command: {args.runs_command}")
 
 
 def _aggregate(data_dir: Path) -> int:
@@ -178,4 +558,3 @@ def _aggregate(data_dir: Path) -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-

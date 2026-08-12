@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from climate_attention.config import ConfigError, load_config
+from climate_attention.config import ConfigError, load_config, load_country_config
 from climate_attention.models import Query
 
 
@@ -98,3 +98,15 @@ def test_unknown_schema_version_is_rejected(tmp_path):
     )
     with pytest.raises(ConfigError, match="schema_version"):
         load_config(path)
+
+
+def test_country_config_parsing_and_selection(tmp_path):
+    path = tmp_path / "countries.yaml"
+    path.write_text(
+        "countries:\n  italy: Italy\n  france:\n    label: France\n    enabled: false\n",
+        encoding="utf-8",
+    )
+    config = load_country_config(path)
+    assert [country.id for country in config.enabled_countries()] == ["italy"]
+    with pytest.raises(ValueError, match="unknown country"):
+        config.enabled_countries({"missing"})
