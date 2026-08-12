@@ -78,6 +78,7 @@ def build_run_manifest(state: CollectionRunState) -> dict[str, Any]:
         "gdelt_timeline",
         "gdelt_source_country",
         "google_trends_unofficial",
+        "gdelt_ngrams",
     }:
         query_values = {
             (

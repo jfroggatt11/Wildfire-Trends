@@ -122,12 +122,60 @@ break collection. Frozen configs, run state, package version, scaling metadata, 
 response envelopes must be retained, and an official API should replace this source
 when access is available.
 
+## GDELT Web NGrams validation source
+
+Web NGrams 3.0 is a URL-level index over original-language article text from January
+2020 onward. The collector reconstructs each configured literal phrase from the
+`pre`, `ngram`, and `post` context fields and deduplicates all matching alternatives
+to one URL per topic and day. It does not count phrase occurrences as articles.
+
+Country attribution uses GDELT's multilingual April 2015 domain-country table.
+Ambiguous domains are discarded, the longest matching domain suffix wins for
+subdomains, and URLs without a mapping are excluded. This catalogue is both old and
+incomplete; metadata therefore records the share of all matching URLs that received
+any unambiguous country assignment. Selected-country coverage cannot by itself
+recover the country distribution of unmapped URLs.
+
+The default NGram measure is a country-day article count:
+
+```text
+matched_count = distinct matching NGram URLs attributed to the country
+```
+
+The affordable pilot filters the table's clustered `ngram` column using exact,
+unpunctuated lower- and title-case anchor forms, then verifies the full configured
+phrase against its context. This misses uppercase and some punctuation-adjacent
+forms and therefore requires a later sensitivity analysis.
+
+An optional `--include-denominator` mode also finds the distinct set of GAL URLs
+assigned to the same country and day:
+
+```text
+country_attention_share = distinct matching NGram URLs / distinct mapped GAL URLs
+```
+
+The resulting optional share resembles but does not reproduce
+`TimelineSourceCountry`. The API uses GDELT's
+current internal source-country assignments and searches English machine-translated
+coverage. NGrams search the original text and use a historical externalized country
+map. Literal English phrases will therefore undercount non-English coverage. Initial
+validation must compare paired daily shapes, missingness and zero rates—not demand
+identical levels. A production global NGram taxonomy will require validated
+original-language phrases or another multilingual classification strategy.
+
+All BigQuery jobs use parameterized SQL, a non-billable dry run, an explicit billing
+project and a hard `maximum_bytes_billed` cap. Query byte estimates and completed job
+statistics are retained in response envelopes and row metadata. Denominator mode is
+not the default because scanning GAL can dominate cost; estimate it independently.
+
 ## Source documentation
 
 - [GDELT DOC 2.0 API documentation](https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/)
 - [GDELT raw result counts announcement](https://blog.gdeltproject.org/gdelt-2-0-api-now-supports-raw-result-counts/)
 - [GDELT rate limiting and Web NGrams guidance](https://blog.gdeltproject.org/ukraine-api-rate-limiting-web-ngrams-3-0/)
 - [GDELT's June 2026 non-consumptive NGrams guidance](https://blog.gdeltproject.org/using-the-new-web-ngrams-dataset-to-find-relevant-coverage/)
+- [GDELT Web NGrams 3.0 dataset](https://blog.gdeltproject.org/announcing-the-new-web-news-ngrams-3-0-dataset/)
+- [GDELT domain-country segmentation example](https://blog.gdeltproject.org/using-web-ngrams-3-0-custom-media-catalogs-to-segment-by-country-state-ownership-partisanship-or-other-attributes/)
 - [Google Trends data normalization](https://support.google.com/trends/answer/4365533?hl=en-GB)
 - [Google Trends search terms and topics](https://support.google.com/trends/answer/17309543)
 - [Google Trends API alpha](https://developers.google.com/search/apis/trends)

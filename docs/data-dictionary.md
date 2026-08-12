@@ -9,7 +9,7 @@ Path:
 | --- | --- | --- |
 | `record_id` | string | Deterministic identity for provider, topic, query, dimension, and date. |
 | `date` | date | Provider observation date. GDELT is daily; Google resolution is recorded in metadata. |
-| `source` | string | Provider identifier: `gdelt` or `google_trends_unofficial`. |
+| `source` | string | Provider identifier: `gdelt`, `gdelt_ngrams`, or `google_trends_unofficial`. |
 | `topic_id` | string | Stable configured conceptual topic id. |
 | `query_id` | string | `topic_combined` for canonical topic trends. |
 | `query_expression` | string | Exact combined expression sent with provider filters. |
@@ -29,6 +29,15 @@ null. Metadata includes the provider geo, requested range, actual time resolutio
 partial-point flag, and `scaling_group_id`. Record identity includes that group, so
 overlapping ranges with different normalization contexts are not silently merged.
 Indexes from different scaling groups are not raw-level comparable.
+
+For `gdelt_ngrams`, `matched_count` is the number of distinct URLs matching any
+configured literal phrase for the topic, country, and date. The default counts-only
+mode leaves `country_monitored_count` and `country_attention_share` null. With the
+optional denominator mode, `country_monitored_count` is the number of distinct URLs
+in GDELT's GAL table attributed to the country that day, and
+`country_attention_share` is their ratio. Metadata records phrases, anchor-variant
+policy, BigQuery job and byte details, URL deduplication, attribution rate, and
+country-map limitations.
 
 ## Country coverage baselines
 

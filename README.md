@@ -11,6 +11,8 @@ GDELT `TimelineSourceCountry` aggregates are the canonical comparable trend inpu
 optional `TimelineVolRaw` requests add exact counts for selected validation panels.
 Article-list records remain useful for auditing spikes and future classification, but
 their 250-result API limit makes them unsuitable as the authoritative count.
+The BigQuery-backed Web NGrams mode provides a scalable, distinct-URL comparison
+series and is being validated before it replaces any canonical API measure.
 
 ## Installation
 
@@ -148,6 +150,82 @@ This source is an operational stand-in, not a stable official API. Google can ch
 or block its web endpoints, results are sampled and normalized, and reproducibility
 requires archiving manifests and raw response envelopes. Prefer the official Google
 Trends API when project access becomes available.
+
+## Collecting GDELT Web NGrams through BigQuery
+
+Install the optional SDK and authenticate Application Default Credentials:
+
+```bash
+python -m pip install -e '.[bigquery,dev]'
+gcloud auth application-default login
+gcloud auth application-default set-quota-project YOUR_RESEARCH_PROJECT
+```
+
+Use a dedicated research or BigQuery sandbox project—not an unrelated production
+project. First request non-billable dry-run estimates:
+
+```bash
+climate-attention estimate-ngrams \
+  --config config/topics.example.yaml \
+  --countries-config config/countries.world.yaml \
+  --topics climate_change clean_energy clean_transport electric_vehicles \
+  --countries italy unitedkingdom unitedstates india brazil \
+  --start 2026-01-01 \
+  --end 2026-08-11 \
+  --billing-project YOUR_RESEARCH_PROJECT
+```
+
+Only after reviewing those estimates, execute with a hard per-job limit slightly
+above the reported largest job:
+
+```bash
+climate-attention collect-ngrams \
+  --config config/topics.example.yaml \
+  --countries-config config/countries.world.yaml \
+  --topics climate_change clean_energy clean_transport electric_vehicles \
+  --countries italy unitedkingdom unitedstates india brazil \
+  --start 2026-01-01 \
+  --end 2026-08-11 \
+  --billing-project YOUR_RESEARCH_PROJECT \
+  --maximum-gb-billed MAX_GB_PER_JOB \
+  --data-dir data
+```
+
+Every job is dry-run again immediately before execution and is rejected if its
+estimate exceeds the frozen cap. The default query is counts-only: it reconstructs
+configured literal phrases from NGram context and counts each matching URL once per
+topic, country, and day. It joins URLs to GDELT's
+`domainsbycountry_alllangs_april2015` table by longest domain suffix. Ambiguous and
+unmapped domains are excluded, and an overall matched-URL attribution rate is
+retained in metadata.
+
+The pilot uses exact unpunctuated lower- and title-case anchor tokens so BigQuery can
+prune the clustered `ngram` table. This intentionally misses some capitalization and
+punctuation forms; treat that as a sensitivity test before production. Adding
+`--include-denominator` scans the much larger Article List (`gal`) table and derives
+`country_attention_share`, but is optional and can be dramatically more expensive.
+Always estimate that mode separately.
+
+This is not semantically identical to the DOC API. NGrams search original-language
+article text while the DOC API searches GDELT's English machine translations. The
+domain-country table is also a 2015 snapshot. Treat the NGrams output as a candidate
+measure until the matched-panel comparison is satisfactory:
+
+```bash
+climate-attention compare-sources \
+  --left-source gdelt \
+  --right-source gdelt_ngrams \
+  --topics climate_change clean_energy clean_transport electric_vehicles \
+  --countries italy unitedkingdom unitedstates india brazil \
+  --start 2026-01-01 \
+  --end 2026-08-11 \
+  --data-dir data
+```
+
+By default the comparison relates the API's `country_attention_share` to the NGram
+`matched_count`. The CSV records the selected metrics, paired-day coverage, means,
+zero-day counts, and Pearson correlation for each topic-country series. Use explicit
+`--left-metric` and `--right-metric` options for other valid comparisons.
 
 A whole-world run is intentionally slow. Live testing showed that GDELT's available
 capacity is variable: requests may be rejected even more than a minute apart, while

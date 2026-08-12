@@ -21,6 +21,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8,<9"]
+bigquery = ["google-cloud-bigquery>=3.38,<4"]
 
 [project.scripts]
 climate-attention = "climate_attention.cli:main"

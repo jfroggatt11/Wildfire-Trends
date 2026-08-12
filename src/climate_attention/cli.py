@@ -12,11 +12,12 @@ from uuid import uuid4
 
 from .aggregation import aggregate_daily
 from .config import ConfigError, config_hash, load_config, load_country_config
+from .comparison import compare_trends, write_comparisons
 from .manifest import build_run_manifest
 from .models import CollectionRequest, DailyCountryCoverage, DailyTrend
 from .run_state import CollectionRunState, RunStore
 from .sources import GoogleTrendsUnofficialProvider
-from .sources.base import ProviderCollectionError
+from .sources.base import ProviderCollectionError, ProviderError
 from .sources.gdelt import GDELTProvider, plan_gdelt_windows
 from .sources.gdelt_timeline import (
     COUNTRY_COVERAGE_TOPIC_ID,
@@ -24,6 +25,12 @@ from .sources.gdelt_timeline import (
     GDELTTimelineProvider,
     plan_source_country_windows,
     plan_timeline_windows,
+)
+from .sources.gdelt_ngrams import (
+    GDELTNGramsProvider,
+    GoogleBigQueryExecutor,
+    estimate_ngram_windows,
+    plan_ngram_windows,
 )
 from .sources.google_trends import plan_google_trends_windows
 from .storage import LocalParquetStorage
@@ -175,6 +182,80 @@ def build_parser() -> argparse.ArgumentParser:
     google_trends.add_argument("--data-dir", type=Path, default=Path("data"))
     _add_runtime_options(google_trends)
 
+    ngrams = subparsers.add_parser(
+        "collect-ngrams",
+        help="collect distinct-URL GDELT Web NGrams trends through BigQuery",
+    )
+    ngrams.add_argument("--config", type=Path, required=True)
+    ngrams.add_argument("--countries-config", type=Path, required=True)
+    ngrams.add_argument("--start", type=_iso_date, required=True)
+    ngrams.add_argument("--end", type=_iso_date, required=True)
+    ngrams.add_argument("--topics", nargs="+", help="only collect these topic ids")
+    ngrams.add_argument(
+        "--countries", nargs="+", help="only collect these configured country ids"
+    )
+    ngrams.add_argument("--window-days", type=int, default=366)
+    ngrams.add_argument(
+        "--billing-project",
+        required=True,
+        help="explicit Google Cloud project used for BigQuery billing",
+    )
+    ngrams.add_argument("--location", default="US")
+    ngrams.add_argument(
+        "--include-denominator",
+        action="store_true",
+        help="also scan GAL for country denominators (potentially very expensive)",
+    )
+    ngrams.add_argument(
+        "--maximum-gb-billed",
+        type=_positive_float,
+        required=True,
+        help="hard per-window BigQuery byte cap",
+    )
+    ngrams.add_argument(
+        "--plan-only", action="store_true", help="save the workload without BigQuery calls"
+    )
+    ngrams.add_argument("--data-dir", type=Path, default=Path("data"))
+
+    estimate_ngrams = subparsers.add_parser(
+        "estimate-ngrams", help="dry-run GDELT NGrams queries and print byte estimates"
+    )
+    estimate_ngrams.add_argument("--config", type=Path, required=True)
+    estimate_ngrams.add_argument("--countries-config", type=Path, required=True)
+    estimate_ngrams.add_argument("--start", type=_iso_date, required=True)
+    estimate_ngrams.add_argument("--end", type=_iso_date, required=True)
+    estimate_ngrams.add_argument("--topics", nargs="+")
+    estimate_ngrams.add_argument("--countries", nargs="+")
+    estimate_ngrams.add_argument("--window-days", type=int, default=366)
+    estimate_ngrams.add_argument("--billing-project", required=True)
+    estimate_ngrams.add_argument("--location", default="US")
+    estimate_ngrams.add_argument(
+        "--include-denominator",
+        action="store_true",
+        help="include the optional GAL denominator scan in estimates",
+    )
+
+    compare = subparsers.add_parser(
+        "compare-sources", help="compare paired daily metrics from two sources"
+    )
+    compare.add_argument("--left-source", default="gdelt")
+    compare.add_argument("--right-source", default="gdelt_ngrams")
+    metric_choices = ("matched_count", "country_attention_share", "attention_index")
+    compare.add_argument(
+        "--left-metric", choices=metric_choices, default="country_attention_share"
+    )
+    compare.add_argument(
+        "--right-metric", choices=metric_choices, default="matched_count"
+    )
+    compare.add_argument("--start", type=_iso_date, required=True)
+    compare.add_argument("--end", type=_iso_date, required=True)
+    compare.add_argument("--topics", nargs="+")
+    compare.add_argument("--countries", nargs="+")
+    compare.add_argument("--data-dir", type=Path, default=Path("data"))
+    compare.add_argument(
+        "--output", type=Path
+    )
+
     aggregate = subparsers.add_parser(
         "aggregate", aliases=["rebuild-aggregates"], help="rebuild daily Parquet"
     )
@@ -213,11 +294,17 @@ def main(argv: list[str] | None = None) -> int:
             return _collect_trends(args)
         if args.command == "collect-google-trends":
             return _collect_google_trends(args)
+        if args.command == "collect-ngrams":
+            return _collect_ngrams(args)
+        if args.command == "estimate-ngrams":
+            return _estimate_ngrams(args)
+        if args.command == "compare-sources":
+            return _compare_sources(args)
         if args.command in {"aggregate", "rebuild-aggregates"}:
             return _aggregate(args.data_dir)
         if args.command == "runs":
             return _runs(args)
-    except (ConfigError, ValueError) as exc:
+    except (ConfigError, ValueError, ProviderError) as exc:
         LOGGER.error("%s", exc)
         return 2
     parser.error(f"unknown command: {args.command}")
@@ -336,6 +423,7 @@ def _resume_run(
         "gdelt_timeline",
         "gdelt_source_country",
         "google_trends_unofficial",
+        "gdelt_ngrams",
     }:
         raise ValueError(f"run {run_id} uses unsupported resumable source {state.source!r}")
     if option_overrides:
@@ -346,6 +434,7 @@ def _resume_run(
         "gdelt_timeline",
         "gdelt_source_country",
         "google_trends_unofficial",
+        "gdelt_ngrams",
     }:
         return _execute_timeline_run(state, data_dir, store)
     return _execute_gdelt_run(state, data_dir, store)
@@ -495,6 +584,127 @@ def _collect_google_trends(args: argparse.Namespace) -> int:
     return _execute_timeline_run(state, args.data_dir, store)
 
 
+def _collect_ngrams(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    country_config = load_country_config(args.countries_config)
+    topics = config.enabled_topics(set(args.topics) if args.topics else None)
+    countries = country_config.enabled_countries(
+        set(args.countries) if args.countries else None
+    )
+    request = CollectionRequest(start=args.start, end=args.end, topics=topics)
+    windows, phrases = plan_ngram_windows(request, window_days=args.window_days)
+    maximum_bytes = int(args.maximum_gb_billed * 1_000_000_000)
+    options = {
+        "billing_project": args.billing_project,
+        "location": args.location,
+        "maximum_bytes_billed": maximum_bytes,
+        "country_labels": {
+            country.id: country.label for country in countries
+        },
+        "topic_phrases": phrases,
+        "include_denominator": args.include_denominator,
+    }
+    started_at = datetime.now(timezone.utc)
+    run_id = f"{started_at.strftime('%Y%m%dT%H%M%SZ')}-{uuid4().hex[:8]}"
+    store = RunStore(args.data_dir)
+    state = store.create(
+        run_id=run_id,
+        source="gdelt_ngrams",
+        start=request.start,
+        end=request.end,
+        config_path=args.config,
+        config_sha256=config_hash(args.config),
+        country_config_path=args.countries_config,
+        country_config_sha256=config_hash(args.countries_config),
+        topics=topics,
+        provider_options=options,
+        windows=windows,
+    )
+    print(
+        f"Created GDELT NGrams run {run_id}: {len(topics)} topic(s), "
+        f"{len(countries)} country/countries, {len(windows)} BigQuery job(s)."
+    )
+    print(
+        "Each job is dry-run first and cannot exceed the configured per-job "
+        f"cap of {maximum_bytes / 1_000_000_000:.3f} GB."
+    )
+    denominator = "with GAL denominators" if args.include_denominator else "counts only"
+    print(
+        "Counts are distinct URLs; country attribution uses GDELT's April 2015 "
+        f"domain map, with ambiguous and unmapped domains excluded ({denominator})."
+    )
+    if args.plan_only:
+        print(f"Plan saved. Start it with: climate-attention runs retry {run_id}")
+        return 0
+    return _execute_timeline_run(state, args.data_dir, store)
+
+
+def _estimate_ngrams(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    country_config = load_country_config(args.countries_config)
+    topics = config.enabled_topics(set(args.topics) if args.topics else None)
+    countries = country_config.enabled_countries(
+        set(args.countries) if args.countries else None
+    )
+    request = CollectionRequest(start=args.start, end=args.end, topics=topics)
+    windows, phrases = plan_ngram_windows(request, window_days=args.window_days)
+    labels = {country.id: country.label for country in countries}
+    executor = GoogleBigQueryExecutor(
+        project=args.billing_project, location=args.location
+    )
+    estimates = estimate_ngram_windows(
+        windows,
+        executor=executor,
+        country_labels=labels,
+        phrases_by_topic=phrases,
+        include_denominator=args.include_denominator,
+    )
+    for estimate in estimates:
+        gb = estimate["estimated_bytes_processed"] / 1_000_000_000
+        print(
+            f"{estimate['topic_id']}: {estimate['start']}..{estimate['end']} "
+            f"{gb:.3f} GB"
+        )
+    total = sum(item["estimated_bytes_processed"] for item in estimates)
+    maximum = max(
+        (item["estimated_bytes_processed"] for item in estimates), default=0
+    )
+    print(
+        f"Dry-run total across {len(estimates)} job(s): "
+        f"{total / 1_000_000_000:.3f} GB; largest job: "
+        f"{maximum / 1_000_000_000:.3f} GB."
+    )
+    print("Dry runs do not process data or incur query charges.")
+    return 0
+
+
+def _compare_sources(args: argparse.Namespace) -> int:
+    if args.end < args.start:
+        raise ValueError("end date must be on or after start date")
+    storage = LocalParquetStorage(args.data_dir)
+    topics = set(args.topics) if args.topics else None
+    countries = set(args.countries) if args.countries else None
+    trends = storage.read_trends(
+        start=args.start,
+        end=args.end,
+        topics=topics,
+        geographies=countries,
+    )
+    comparisons = compare_trends(
+        trends,
+        left_source=args.left_source,
+        right_source=args.right_source,
+        left_metric=args.left_metric,
+        right_metric=args.right_metric,
+    )
+    output = args.output or args.data_dir / "comparisons/source_comparison.csv"
+    path = write_comparisons(output, comparisons)
+    print(f"Wrote {len(comparisons)} paired source comparison(s) to {path}.")
+    if not comparisons:
+        print("No dimensions had non-null selected metrics in both sources.")
+    return 0
+
+
 def _execute_gdelt_run(
     state: CollectionRunState, data_dir: Path, store: RunStore
 ) -> int:
@@ -597,6 +807,8 @@ def _execute_timeline_run(
 
     if state.source == "google_trends_unofficial":
         provider_class = GoogleTrendsUnofficialProvider
+    elif state.source == "gdelt_ngrams":
+        provider_class = GDELTNGramsProvider
     elif state.source == "gdelt_source_country":
         provider_class = GDELTSourceCountryProvider
     else:

@@ -265,3 +265,47 @@ def test_collect_google_trends_plan_only_is_country_scoped_and_resumable(
     assert state.provider_options["country_geos"] == {"italy": "IT"}
     assert state.provider_options["request_interval_seconds"] == 30.0
     assert len(state.resumable_windows()) == 1
+
+
+def test_collect_ngrams_plan_only_freezes_billing_cap_and_queries(tmp_path, capsys):
+    topics = tmp_path / "topics.yaml"
+    topics.write_text(
+        "topics:\n  climate:\n    label: Climate\n"
+        "    queries: ['\"climate change\"']\n",
+        encoding="utf-8",
+    )
+    countries = tmp_path / "countries.yaml"
+    countries.write_text("countries:\n  italy: Italy\n", encoding="utf-8")
+    data_dir = tmp_path / "data"
+
+    assert main(
+        [
+            "collect-ngrams",
+            "--config",
+            str(topics),
+            "--countries-config",
+            str(countries),
+            "--start",
+            "2026-01-01",
+            "--end",
+            "2026-01-31",
+            "--billing-project",
+            "research-project",
+            "--maximum-gb-billed",
+            "2.5",
+            "--plan-only",
+            "--data-dir",
+            str(data_dir),
+        ]
+    ) == 0
+
+    output = capsys.readouterr().out
+    assert "1 BigQuery job(s)" in output
+    state = RunStore(data_dir).list()[0]
+    assert state.source == "gdelt_ngrams"
+    assert state.provider_options["billing_project"] == "research-project"
+    assert state.provider_options["maximum_bytes_billed"] == 2_500_000_000
+    assert state.provider_options["topic_phrases"] == {
+        "climate": ["climate change"]
+    }
+    assert state.provider_options["include_denominator"] is False

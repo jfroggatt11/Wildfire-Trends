@@ -57,12 +57,61 @@ climate-attention runs retry <run-id> \
 
 Retries use the frozen configs and skip successful windows. Do not start several
 collectors against the public GDELT API in parallel. For thousands of requests,
-prefer a selected-country design or plan a future bulk-data implementation.
+prefer a selected-country design or the BigQuery NGrams comparison adapter.
 GDELT's June 2026 guidance asks researchers to use its downloadable non-consumptive
-NGrams data while the legacy search infrastructure is migrated. That dataset is a
-promising future high-volume adapter, but it is not interchangeable with the DOC
-timeline API because country attribution and historical availability must first be
-validated.
+NGrams data while the legacy search infrastructure is migrated. The implemented
+adapter is not interchangeable with the DOC timeline API; its country attribution
+and original-language matching must first be validated.
+
+## Matched API and BigQuery overnight validation
+
+Run both collectors over identical dates, topics, and selected countries. The API
+still makes one global request per topic; country selection controls retained output.
+Use a long interval because GDELT's legacy search capacity is currently constrained:
+
+```bash
+caffeinate -i climate-attention collect-trends \
+  --config config/topics.example.yaml \
+  --countries-config config/countries.world.yaml \
+  --topics climate_change clean_energy clean_transport electric_vehicles \
+  --countries italy unitedkingdom unitedstates india brazil \
+  --start 2026-01-01 \
+  --end 2026-08-11 \
+  --trend-mode country-share \
+  --request-interval 600 \
+  --backoff-seconds 1800 \
+  --max-retries 4 \
+  --timeout 60 \
+  --data-dir data
+```
+
+In another terminal, authenticate against a dedicated research project and estimate
+the four NGram jobs before execution:
+
+```bash
+gcloud auth application-default login
+gcloud auth application-default set-quota-project YOUR_RESEARCH_PROJECT
+
+climate-attention estimate-ngrams \
+  --config config/topics.example.yaml \
+  --countries-config config/countries.world.yaml \
+  --topics climate_change clean_energy clean_transport electric_vehicles \
+  --countries italy unitedkingdom unitedstates india brazil \
+  --start 2026-01-01 \
+  --end 2026-08-11 \
+  --billing-project YOUR_RESEARCH_PROJECT
+```
+
+Set `--maximum-gb-billed` slightly above the largest reported job, not an arbitrary
+large allowance, and then run `collect-ngrams` with the same arguments. BigQuery jobs
+do not need pacing; the byte cap controls exposure. Finally run `compare-sources` as
+shown in the README. Its default metrics are API `country_attention_share` and NGram
+`matched_count`; the NGram denominator is omitted to avoid an expensive GAL scan.
+If a normalized NGram share is required, add `--include-denominator` to a fresh
+estimate and collection rather than assuming the counts-only estimate applies. Do
+not interpret correlation alone as validity: inspect country mapping coverage,
+zero-day rates, spikes, anchor-token sensitivity, and differences caused by
+original-language versus translated search.
 
 ## Verify completeness
 
