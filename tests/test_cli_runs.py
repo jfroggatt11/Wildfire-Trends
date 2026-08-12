@@ -221,3 +221,47 @@ def test_collect_trends_raw_mode_retains_count_and_baseline_plan(tmp_path, capsy
     output = capsys.readouterr().out
     assert "4 planned window(s)" in output
     assert "2 country-coverage baseline window(s)" in output
+
+
+def test_collect_google_trends_plan_only_is_country_scoped_and_resumable(
+    tmp_path, capsys
+):
+    topics = tmp_path / "topics.yaml"
+    topics.write_text(
+        "topics:\n  climate:\n    label: Climate\n"
+        "    queries:\n      - id: climate_phrase\n"
+        "        expression: '\"climate change\"'\n",
+        encoding="utf-8",
+    )
+    countries = tmp_path / "countries.yaml"
+    countries.write_text(
+        "countries:\n  italy:\n    label: Italy\n    google_geo: IT\n",
+        encoding="utf-8",
+    )
+    data_dir = tmp_path / "data"
+
+    assert main(
+        [
+            "collect-google-trends",
+            "--config",
+            str(topics),
+            "--countries-config",
+            str(countries),
+            "--start",
+            "2024-01-01",
+            "--end",
+            "2024-01-31",
+            "--plan-only",
+            "--data-dir",
+            str(data_dir),
+        ]
+    ) == 0
+
+    output = capsys.readouterr().out
+    assert "1 planned request(s)" in output
+    assert "separate 0-100 scaling group" in output
+    state = RunStore(data_dir).list()[0]
+    assert state.source == "google_trends_unofficial"
+    assert state.provider_options["country_geos"] == {"italy": "IT"}
+    assert state.provider_options["request_interval_seconds"] == 30.0
+    assert len(state.resumable_windows()) == 1

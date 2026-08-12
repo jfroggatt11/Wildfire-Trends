@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from ..models import CollectionRequest, ProviderResult
+from ..models import CollectionRequest, ProviderResult, TrendProviderResult
 
 
 class ProviderError(RuntimeError):
@@ -18,7 +18,9 @@ class ProviderUnavailableError(ProviderError):
 class ProviderCollectionError(ProviderError):
     """A failed run that may contain successfully collected partial data."""
 
-    def __init__(self, message: str, result: ProviderResult):
+    def __init__(
+        self, message: str, result: ProviderResult | TrendProviderResult
+    ):
         super().__init__(message)
         self.result = result
 
@@ -40,4 +42,3 @@ class AttentionProvider(ABC):
 
     def __exit__(self, *_: object) -> None:
         self.close()
-

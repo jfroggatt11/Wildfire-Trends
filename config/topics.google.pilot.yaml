@@ -1,0 +1,32 @@
+schema_version: 1
+
+# One literal English search term per theme for the initial cross-country pilot.
+# These are separate Google Trends series and must not be summed into a topic total.
+topics:
+  climate_change:
+    label: Climate change
+    description: Google search interest for the literal phrase climate change.
+    queries:
+      - id: climate_change_phrase
+        expression: '"climate change"'
+
+  clean_energy:
+    label: Clean energy
+    description: Google search interest for the literal phrase clean energy.
+    queries:
+      - id: clean_energy_phrase
+        expression: '"clean energy"'
+
+  clean_transport:
+    label: Clean transport
+    description: Google search interest for the literal phrase clean transport.
+    queries:
+      - id: clean_transport_phrase
+        expression: '"clean transport"'
+
+  electric_vehicles:
+    label: Electric vehicles
+    description: Google search interest for the literal phrase electric vehicles.
+    queries:
+      - id: electric_vehicle_plural
+        expression: '"electric vehicles"'

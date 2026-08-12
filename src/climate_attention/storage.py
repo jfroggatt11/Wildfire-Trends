@@ -63,6 +63,7 @@ TREND_SCHEMA = pa.schema(
         ("country_monitored_count", pa.int64()),
         ("global_attention_share", pa.float64()),
         ("country_attention_share", pa.float64()),
+        ("attention_index", pa.float64()),
         ("collected_at", pa.timestamp("us", tz="UTC")),
         ("metadata_json", pa.string()),
     ]
@@ -530,6 +531,7 @@ def _merge_trends(existing: DailyTrend, incoming: DailyTrend) -> DailyTrend:
         "country_monitored_count",
         "global_attention_share",
         "country_attention_share",
+        "attention_index",
     ):
         incoming_value = getattr(incoming, field)
         updates[field] = (

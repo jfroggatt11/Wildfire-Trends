@@ -80,6 +80,25 @@ def test_trend_storage_round_trip_and_upsert(tmp_path):
     assert restored == [trend]
 
 
+def test_google_trend_index_round_trip(tmp_path):
+    storage = LocalParquetStorage(tmp_path / "data")
+    trend = DailyTrend(
+        record_id="google-trend-1",
+        date=datetime(2024, 1, 2).date(),
+        source="google_trends_unofficial",
+        topic_id="climate",
+        query_id="climate_phrase",
+        query_expression="climate change",
+        geography="italy",
+        attention_index=73,
+        collected_at=datetime(2024, 2, 1, tzinfo=timezone.utc),
+        metadata={"scaling_group_id": "scale-1", "time_resolution": "daily"},
+    )
+
+    assert storage.write_trends([trend]) == 1
+    assert storage.read_trends(source="google_trends_unofficial") == [trend]
+
+
 def test_country_coverage_enriches_existing_and_new_trends(tmp_path):
     storage = LocalParquetStorage(tmp_path / "data")
     trend = DailyTrend(

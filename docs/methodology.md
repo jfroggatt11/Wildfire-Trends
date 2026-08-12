@@ -1,6 +1,6 @@
 # Methodology
 
-## Unit of observation
+## GDELT unit of observation
 
 The canonical observation is one UTC day, conceptual topic, publishing outlet source
 country, and optional original source language. `geography` means the country assigned
@@ -93,12 +93,44 @@ the run state or manifest is `complete` and that all planned windows succeeded.
 Article-list collection is optional and intended for auditing spikes or later content
 classification. It is not needed to produce the canonical daily attention series.
 
+## Unofficial Google Trends fallback
+
+The Google mode measures search interest rather than media output. Each configured
+query is sent as a literal search term for one search-origin country and one requested
+date range. Query alternatives are intentionally not OR-combined: Google Trends does
+not provide GDELT-style Boolean deduplication, so every query remains a distinct
+series.
+
+Google samples eligible searches, divides each point by the highest point in the
+request's time and geography scope, and scales the result to `0..100`. The collector
+therefore stores `attention_index` and never converts it to an apparent share or
+count. Each response receives a deterministic `scaling_group_id`. Levels from
+separate countries, queries, or requested ranges are independently scaled and are not
+directly comparable.
+
+The provider decides the returned time resolution. The collector preserves the
+observed dates and labels the inferred resolution as daily, weekly, monthly, or
+irregular; it does not interpolate coarse series into daily data. Getting five years
+of genuinely daily data would require a separately implemented and validated
+overlapping-window stitching method. Repeated collection is also needed to quantify
+sampling variability before the series is used in an event study.
+
+The fallback uses only pytrends-modern's ordinary HTTP path. Browser automation,
+saved login sessions, proxy rotation, and user-agent rotation are disabled or absent.
+Because this is an undocumented web interface, endpoint changes and rate limits can
+break collection. Frozen configs, run state, package version, scaling metadata, and
+response envelopes must be retained, and an official API should replace this source
+when access is available.
+
 ## Source documentation
 
 - [GDELT DOC 2.0 API documentation](https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/)
 - [GDELT raw result counts announcement](https://blog.gdeltproject.org/gdelt-2-0-api-now-supports-raw-result-counts/)
 - [GDELT rate limiting and Web NGrams guidance](https://blog.gdeltproject.org/ukraine-api-rate-limiting-web-ngrams-3-0/)
 - [GDELT's June 2026 non-consumptive NGrams guidance](https://blog.gdeltproject.org/using-the-new-web-ngrams-dataset-to-find-relevant-coverage/)
+- [Google Trends data normalization](https://support.google.com/trends/answer/4365533?hl=en-GB)
+- [Google Trends search terms and topics](https://support.google.com/trends/answer/17309543)
+- [Google Trends API alpha](https://developers.google.com/search/apis/trends)
 
 Record the package version, frozen topic and country configs, manifest, and retrieval
 date when citing a derived dataset. Cite GDELT separately as the underlying source.

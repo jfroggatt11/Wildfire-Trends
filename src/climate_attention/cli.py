@@ -12,10 +12,10 @@ from uuid import uuid4
 
 from .aggregation import aggregate_daily
 from .config import ConfigError, config_hash, load_config, load_country_config
-from .manifest import build_manifest, build_run_manifest
-from .models import CollectionRequest, DailyCountryCoverage, DailyTrend, ProviderResult
+from .manifest import build_run_manifest
+from .models import CollectionRequest, DailyCountryCoverage, DailyTrend
 from .run_state import CollectionRunState, RunStore
-from .sources import GoogleTrendsProvider, ProviderUnavailableError
+from .sources import GoogleTrendsUnofficialProvider
 from .sources.base import ProviderCollectionError
 from .sources.gdelt import GDELTProvider, plan_gdelt_windows
 from .sources.gdelt_timeline import (
@@ -25,6 +25,7 @@ from .sources.gdelt_timeline import (
     plan_source_country_windows,
     plan_timeline_windows,
 )
+from .sources.google_trends import plan_google_trends_windows
 from .storage import LocalParquetStorage
 
 
@@ -144,6 +145,36 @@ def build_parser() -> argparse.ArgumentParser:
     trends.add_argument("--data-dir", type=Path, default=Path("data"))
     _add_runtime_options(trends)
 
+    google_trends = subparsers.add_parser(
+        "collect-google-trends",
+        help="collect unofficial Google Trends indices by query and search country",
+    )
+    google_trends.add_argument("--config", type=Path, required=True)
+    google_trends.add_argument("--countries-config", type=Path, required=True)
+    google_trends.add_argument("--start", type=_iso_date, required=True)
+    google_trends.add_argument("--end", type=_iso_date, required=True)
+    google_trends.add_argument(
+        "--topics", nargs="+", help="only collect these topic ids"
+    )
+    google_trends.add_argument(
+        "--countries", nargs="+", help="only collect these configured country ids"
+    )
+    google_trends.add_argument("--category", type=_nonnegative_int, default=0)
+    google_trends.add_argument(
+        "--property",
+        choices=("web", "news", "images", "youtube", "shopping"),
+        default="web",
+    )
+    google_trends.add_argument("--hl", default="en-US", help="Google request locale")
+    google_trends.add_argument(
+        "--tz", type=int, default=0, help="timezone offset in minutes from UTC"
+    )
+    google_trends.add_argument(
+        "--plan-only", action="store_true", help="create checkpoints without HTTP requests"
+    )
+    google_trends.add_argument("--data-dir", type=Path, default=Path("data"))
+    _add_runtime_options(google_trends)
+
     aggregate = subparsers.add_parser(
         "aggregate", aliases=["rebuild-aggregates"], help="rebuild daily Parquet"
     )
@@ -180,6 +211,8 @@ def main(argv: list[str] | None = None) -> int:
             return _collect(args)
         if args.command == "collect-trends":
             return _collect_trends(args)
+        if args.command == "collect-google-trends":
+            return _collect_google_trends(args)
         if args.command in {"aggregate", "rebuild-aggregates"}:
             return _aggregate(args.data_dir)
         if args.command == "runs":
@@ -269,8 +302,9 @@ def _collect(args: argparse.Namespace) -> int:
     request = CollectionRequest(start=args.start, end=args.end, topics=topics)
 
     if source != "gdelt":
-        return _collect_unavailable_provider(
-            source, config_path, request, LocalParquetStorage(args.data_dir)
+        raise ValueError(
+            "unofficial Google Trends uses a country-aware durable workflow; "
+            "run collect-google-trends instead"
         )
 
     started_at = datetime.now(timezone.utc)
@@ -297,13 +331,22 @@ def _resume_run(
 ) -> int:
     store = RunStore(data_dir)
     state = store.load(run_id)
-    if state.source not in {"gdelt", "gdelt_timeline", "gdelt_source_country"}:
+    if state.source not in {
+        "gdelt",
+        "gdelt_timeline",
+        "gdelt_source_country",
+        "google_trends_unofficial",
+    }:
         raise ValueError(f"run {run_id} uses unsupported resumable source {state.source!r}")
     if option_overrides:
         # Only explicitly supplied retry options should override the frozen values.
         state.provider_options.update(option_overrides)
         store.save(state)
-    if state.source in {"gdelt_timeline", "gdelt_source_country"}:
+    if state.source in {
+        "gdelt_timeline",
+        "gdelt_source_country",
+        "google_trends_unofficial",
+    }:
         return _execute_timeline_run(state, data_dir, store)
     return _execute_gdelt_run(state, data_dir, store)
 
@@ -376,6 +419,72 @@ def _collect_trends(args: argparse.Namespace) -> int:
             "data is also collected."
         )
     estimated_minutes = len(windows) * options["request_interval_seconds"] / 60
+    print(
+        f"Minimum pacing time: approximately {estimated_minutes:.1f} minutes, "
+        "excluding response latency and retries."
+    )
+    if args.plan_only:
+        print(f"Plan saved. Start it with: climate-attention runs retry {run_id}")
+        return 0
+    return _execute_timeline_run(state, args.data_dir, store)
+
+
+def _collect_google_trends(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    country_config = load_country_config(args.countries_config)
+    topics = config.enabled_topics(set(args.topics) if args.topics else None)
+    countries = country_config.enabled_countries(
+        set(args.countries) if args.countries else None
+    )
+    request = CollectionRequest(start=args.start, end=args.end, topics=topics)
+    windows, country_geos = plan_google_trends_windows(request, countries)
+    started_at = datetime.now(timezone.utc)
+    run_id = f"{started_at.strftime('%Y%m%dT%H%M%SZ')}-{uuid4().hex[:8]}"
+    options = _runtime_options(args)
+    if args.max_retries is None:
+        options["max_retries"] = 2
+    if args.request_interval is None:
+        options["request_interval_seconds"] = 30.0
+    if args.backoff_seconds is None:
+        options["backoff_seconds"] = 60.0
+    properties = {"web": "", "shopping": "froogle"}
+    options.update(
+        {
+            "country_geos": country_geos,
+            "country_labels": {
+                country.id: country.label for country in countries
+            },
+            "category": args.category,
+            "gprop": properties.get(args.property, args.property),
+            "hl": args.hl,
+            "tz": args.tz,
+        }
+    )
+    store = RunStore(args.data_dir)
+    state = store.create(
+        run_id=run_id,
+        source="google_trends_unofficial",
+        start=request.start,
+        end=request.end,
+        config_path=args.config,
+        config_sha256=config_hash(args.config),
+        country_config_path=args.countries_config,
+        country_config_sha256=config_hash(args.countries_config),
+        topics=topics,
+        provider_options=options,
+        windows=windows,
+    )
+    print(
+        f"Created unofficial Google Trends run {run_id}: {len(topics)} topic(s), "
+        f"{len(countries)} country/countries, {len(windows)} planned request(s)."
+    )
+    print(
+        "Each configured query and country is a separate 0-100 scaling group; "
+        "raw levels must not be compared across those groups."
+    )
+    estimated_minutes = max(0, len(windows) - 1) * options[
+        "request_interval_seconds"
+    ] / 60
     print(
         f"Minimum pacing time: approximately {estimated_minutes:.1f} minutes, "
         "excluding response latency and retries."
@@ -486,11 +595,12 @@ def _execute_timeline_run(
         state.apply_window_event(event, window, log, children)
         store.save(state)
 
-    provider_class = (
-        GDELTSourceCountryProvider
-        if state.source == "gdelt_source_country"
-        else GDELTTimelineProvider
-    )
+    if state.source == "google_trends_unofficial":
+        provider_class = GoogleTrendsUnofficialProvider
+    elif state.source == "gdelt_source_country":
+        provider_class = GDELTSourceCountryProvider
+    else:
+        provider_class = GDELTTimelineProvider
     provider = provider_class(
         **state.provider_options,
         response_sink=lambda envelope: storage.append_api_response(
@@ -538,39 +648,6 @@ def _execute_timeline_run(
         f"Trend dataset: {storage.root / 'trends'}."
     )
     return exit_code
-
-
-def _collect_unavailable_provider(
-    source: str,
-    config_path: Path,
-    request: CollectionRequest,
-    storage: LocalParquetStorage,
-) -> int:
-    started_at = datetime.now(timezone.utc)
-    run_id = f"{started_at.strftime('%Y%m%dT%H%M%SZ')}-{uuid4().hex[:8]}"
-    provider = GoogleTrendsProvider()
-    result = ProviderResult()
-    try:
-        provider.collect(request)
-    except ProviderUnavailableError as exc:
-        manifest = build_manifest(
-            run_id=run_id,
-            source=source,
-            status="failed",
-            started_at=started_at,
-            start=request.start,
-            end=request.end,
-            config_path=config_path,
-            topics=request.topics,
-            result=result,
-            records_newly_stored=0,
-            error=str(exc),
-        )
-        path = storage.write_manifest(run_id, manifest)
-        LOGGER.error("Collection failed: %s", exc)
-        LOGGER.error("Failure manifest: %s", path)
-        return 1
-    return 0
 
 
 def _runs(args: argparse.Namespace) -> int:

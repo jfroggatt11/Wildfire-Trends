@@ -70,6 +70,7 @@ class Country(StrictModel):
     id: str = Field(pattern=ID_PATTERN)
     label: str = Field(min_length=1)
     enabled: bool = True
+    google_geo: str | None = Field(default=None, pattern=r"^[A-Z]{2}$")
 
 
 class CountryConfig(StrictModel):

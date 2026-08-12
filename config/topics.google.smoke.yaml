@@ -1,0 +1,12 @@
+schema_version: 1
+
+# One literal term for a low-volume Google Trends connectivity test.
+topics:
+  climate_crisis_search:
+    label: Climate crisis search interest
+    description: Google search interest for the literal phrase climate crisis.
+    queries:
+      - id: climate_crisis_phrase
+        expression: '"climate crisis"'
+    languages: []
+    geographies: []

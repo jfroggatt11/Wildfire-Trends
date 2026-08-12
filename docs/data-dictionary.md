@@ -3,13 +3,13 @@
 ## Canonical topic trends
 
 Path:
-`data/trends/source=gdelt/topic_id=<topic>/geography=<country>/language=<language>/daily.parquet`
+`data/trends/source=<provider>/topic_id=<topic>/geography=<country>/language=<language>/daily.parquet`
 
 | Field | Type | Meaning |
 | --- | --- | --- |
 | `record_id` | string | Deterministic identity for provider, topic, query, dimension, and date. |
-| `date` | date | Inclusive UTC calendar day. |
-| `source` | string | Provider identifier; currently `gdelt`. |
+| `date` | date | Provider observation date. GDELT is daily; Google resolution is recorded in metadata. |
+| `source` | string | Provider identifier: `gdelt` or `google_trends_unofficial`. |
 | `topic_id` | string | Stable configured conceptual topic id. |
 | `query_id` | string | `topic_combined` for canonical topic trends. |
 | `query_expression` | string | Exact combined expression sent with provider filters. |
@@ -20,8 +20,15 @@ Path:
 | `country_monitored_count` | integer/null | All articles monitored for the requested source country/language that day. |
 | `global_attention_share` | float/null | `matched_count / global_monitored_count`. |
 | `country_attention_share` | float/null | Native GDELT country percentage divided by 100, or the equivalent raw-count ratio. |
+| `attention_index` | float/null | Google Trends request-normalized interest index in `0..100`; null for GDELT. |
 | `collected_at` | UTC timestamp | Retrieval time for this provider response. |
 | `metadata_json` | JSON string | Query details, series label, geography label, query scope, response series count, and normalization scopes. |
+
+For `google_trends_unofficial`, `matched_count`, denominator, and share fields are
+null. Metadata includes the provider geo, requested range, actual time resolution,
+partial-point flag, and `scaling_group_id`. Record identity includes that group, so
+overlapping ranges with different normalization contexts are not silently merged.
+Indexes from different scaling groups are not raw-level comparable.
 
 ## Country coverage baselines
 

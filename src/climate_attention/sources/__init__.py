@@ -3,7 +3,7 @@
 from .base import AttentionProvider, ProviderCollectionError, ProviderUnavailableError
 from .gdelt import GDELTProvider
 from .gdelt_timeline import GDELTSourceCountryProvider, GDELTTimelineProvider
-from .google_trends import GoogleTrendsProvider
+from .google_trends import GoogleTrendsProvider, GoogleTrendsUnofficialProvider
 
 __all__ = [
     "AttentionProvider",
@@ -11,6 +11,7 @@ __all__ = [
     "GDELTSourceCountryProvider",
     "GDELTTimelineProvider",
     "GoogleTrendsProvider",
+    "GoogleTrendsUnofficialProvider",
     "ProviderCollectionError",
     "ProviderUnavailableError",
 ]

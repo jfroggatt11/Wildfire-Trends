@@ -2,9 +2,10 @@
 
 `climate-attention` is the initial data-collection layer for research on how major
 events affect media and search attention around climate change and clean transport.
-This version collects canonical daily GDELT media-attention trends and optional
-article-level samples. It does not include event data, event-study analysis, a
-frontend, or a database service.
+This version collects canonical daily GDELT media-attention trends, optional
+article-level samples, and an explicitly unofficial Google Trends search-interest
+index. It does not include event data, event-study analysis, a frontend, or a
+database service.
 
 GDELT `TimelineSourceCountry` aggregates are the canonical comparable trend input;
 optional `TimelineVolRaw` requests add exact counts for selected validation panels.
@@ -46,6 +47,12 @@ original language and country. Trend collection instead takes source countries f
 `config/countries.world.yaml`, keeping the topic taxonomy separate from the geography
 catalog.
 
+The Google mode treats every configured query as one literal search term. It strips
+matching outer quotes but does not translate GDELT Boolean syntax, include/exclude
+terms, language filters, or topic-level geography fields. Use a separate query entry
+for each Google term. Country labels are resolved to ISO country codes; an explicit
+`google_geo: IT` value can override resolution in the country YAML.
+
 ## Collecting five-year daily trends
 
 The trend command combines all enabled query alternatives within a topic into one
@@ -80,7 +87,7 @@ Each output row contains:
 date, source, topic_id, query_id, query_expression,
 geography, language, matched_count, global_monitored_count,
 country_monitored_count, global_attention_share,
-country_attention_share, collected_at, metadata_json
+country_attention_share, attention_index, collected_at, metadata_json
 ```
 
 In the default mode, `country_attention_share` is GDELT's native percentage of the
@@ -105,6 +112,42 @@ climate-attention collect-trends \
 Raw mode populates `matched_count`, obtains a separate country coverage denominator,
 and computes both shares. Stable record identities allow raw results and native
 country shares to merge without creating duplicate daily rows.
+
+## Collecting unofficial Google Trends indices
+
+The optional fallback uses `pytrends-modern`'s standard HTTP client. It does not
+launch a browser, log into Google, rotate user agents, or configure proxies:
+
+```bash
+climate-attention collect-google-trends \
+  --config config/topics.example.yaml \
+  --countries-config config/countries.world.yaml \
+  --topics climate_change clean_energy \
+  --countries italy france germany unitedkingdom unitedstates \
+  --start 2026-07-01 \
+  --end 2026-07-31
+```
+
+Each `(query, country, requested date range)` is a separate request and scaling
+group. Google normalizes the returned series within that group to `0..100`, stored
+in `attention_index`; it is not a count, percentage, or share. Consequently, a raw
+index of 80 for Italy is not evidence of twice the search volume represented by 40
+in France, and separately requested query alternatives cannot be summed into a topic
+total. Analyze within-group changes, or add an explicitly validated anchor/stitching
+method before cross-request comparisons.
+
+Google chooses the temporal resolution. A month commonly returns daily observations,
+whereas a five-year request commonly returns weekly observations. The actual
+`time_resolution`, `is_partial`, and `scaling_group_id` are retained in
+`metadata_json`; this mode never labels weekly values as daily. Preview a workload
+with `--plan-only`. The conservative defaults are 30 seconds between requests, two
+retries, and a 60-second exponential backoff. All work units are checkpointed and
+resumable with `runs retry`.
+
+This source is an operational stand-in, not a stable official API. Google can change
+or block its web endpoints, results are sampled and normalized, and reproducibility
+requires archiving manifests and raw response envelopes. Prefer the official Google
+Trends API when project access becomes available.
 
 A whole-world run is intentionally slow. Live testing showed that GDELT's available
 capacity is variable: requests may be rejected even more than a minute apart, while
@@ -145,7 +188,7 @@ climate-attention collect \
   --end 2024-01-31
 ```
 
-Both collection modes create a durable run before making their first HTTP request. The run
+All collection modes create a durable run before making their first HTTP request. The run
 id is printed immediately. Successful article windows are written to Parquet and
 checkpointed as they finish, rather than being held until the entire command ends.
 
@@ -235,11 +278,12 @@ The default `data/` layout is:
 
 ```text
 data/
-├── trends/source=gdelt/topic_id=.../geography=.../language=.../daily.parquet
+├── trends/source=.../topic_id=.../geography=.../language=.../daily.parquet
 ├── country_coverage/source=gdelt/geography=.../language=.../daily.parquet
 ├── raw/source=gdelt/date=YYYY-MM-DD/topic_id=.../query_id=.../records.parquet
 ├── processed/daily_attention.parquet
 ├── api_responses/gdelt/<run-id>.jsonl
+├── api_responses/google_trends_unofficial/<run-id>.jsonl
 ├── runs/<run-id>/
 │   ├── state.json
 │   ├── config.yaml
@@ -285,11 +329,3 @@ Tests use mocked HTTP transports and never call live APIs:
 ```bash
 pytest
 ```
-
-## Google Trends
-
-`GoogleTrendsProvider` implements the provider interface but intentionally raises an
-informative error until official Google Trends API access and credentials are added.
-The project does not use `pytrends` or unofficial scraping. A future official adapter
-can emit the same provider-neutral records without changing configuration, storage,
-aggregation, or CLI orchestration.

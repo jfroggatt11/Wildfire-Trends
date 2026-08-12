@@ -25,6 +25,23 @@ with an explicit three-country filter for comparison.
 Use `--trend-mode raw-counts` when the pilot specifically needs article counts and
 denominators; that equivalent plan has three baseline and three topic requests.
 
+For the unofficial Google fallback, begin with one literal query, one country, and
+one month. `config/topics.google.smoke.yaml` is suitable:
+
+```bash
+climate-attention collect-google-trends \
+  --config config/topics.google.smoke.yaml \
+  --countries-config config/countries.world.yaml \
+  --countries italy \
+  --start 2026-07-01 \
+  --end 2026-07-31
+```
+
+Confirm that the run completes, `attention_index` is populated, and
+`metadata_json.time_resolution` is `daily` before widening the pilot. Do not run
+multiple Google collectors in parallel. A 429 is a recoverable provider failure, not
+permission to add account automation or rotating proxies.
+
 ## Rate-limit recovery
 
 HTTP 429 and server errors receive exponential retries. If the run still fails:
@@ -82,6 +99,11 @@ In the default mode, check that `country_attention_share` is populated;
 `matched_count` and `country_monitored_count` are expected to be null. In raw mode,
 null country denominators mean the corresponding baseline has not been collected or
 its denominator was zero.
+
+For Google data, load the matching `source=google_trends_unofficial` partition and
+select `date`, `attention_index`, and `metadata_json`. Compare changes only within a
+single `scaling_group_id` unless the analysis implements and validates an anchoring
+method.
 
 ## Preserve provenance
 

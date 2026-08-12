@@ -233,7 +233,7 @@ class DailyAttention(StrictModel):
 
 
 class DailyTrend(StrictModel):
-    """An authoritative provider aggregate for one day and configured dimension."""
+    """A dated provider trend observation for one configured dimension."""
 
     record_id: str
     date: date
@@ -248,6 +248,7 @@ class DailyTrend(StrictModel):
     country_monitored_count: int | None = Field(default=None, ge=0)
     global_attention_share: float | None = Field(default=None, ge=0)
     country_attention_share: float | None = Field(default=None, ge=0)
+    attention_index: float | None = Field(default=None, ge=0, le=100)
     collected_at: datetime = Field(default_factory=utc_now)
     metadata: dict[str, Any] = Field(default_factory=dict)
 

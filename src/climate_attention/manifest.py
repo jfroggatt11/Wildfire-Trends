@@ -74,7 +74,11 @@ def build_run_manifest(state: CollectionRunState) -> dict[str, Any]:
     """Build a reproducibility manifest from durable run state."""
     counts = state.status_counts()
     logs = state.request_logs()
-    if state.source in {"gdelt_timeline", "gdelt_source_country"}:
+    if state.source in {
+        "gdelt_timeline",
+        "gdelt_source_country",
+        "google_trends_unofficial",
+    }:
         query_values = {
             (
                 window.query.topic_id,
