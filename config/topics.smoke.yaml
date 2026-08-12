@@ -1,0 +1,12 @@
+schema_version: 1
+
+# Small global configuration for live connectivity checks.
+topics:
+  climate_crisis_global:
+    label: Climate crisis — global media
+    description: A lower-volume global query suitable for an end-to-end GDELT smoke test.
+    queries:
+      - id: climate_crisis_phrase
+        expression: '"climate crisis"'
+    languages: []
+    geographies: []

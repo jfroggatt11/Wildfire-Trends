@@ -122,11 +122,13 @@ class GDELTProvider(AttentionProvider):
         client: httpx.Client | None = None,
         timeout: float = 30.0,
         max_retries: int = 3,
-        backoff_seconds: float = 1.0,
+        backoff_seconds: float = 6.0,
+        request_interval_seconds: float = 6.0,
         max_records: int = 250,
         minimum_window: timedelta = timedelta(minutes=15),
         response_sink: Callable[[dict[str, Any]], None] | None = None,
         sleep: Callable[[float], None] = time.sleep,
+        monotonic: Callable[[], float] = time.monotonic,
     ) -> None:
         if timeout <= 0:
             raise ValueError("timeout must be greater than zero")
@@ -134,6 +136,8 @@ class GDELTProvider(AttentionProvider):
             raise ValueError("max_retries must be zero or greater")
         if backoff_seconds < 0:
             raise ValueError("backoff_seconds must be zero or greater")
+        if request_interval_seconds < 0:
+            raise ValueError("request_interval_seconds must be zero or greater")
         if not 1 <= max_records <= 250:
             raise ValueError("max_records must be between 1 and GDELT's limit of 250")
         if minimum_window <= timedelta(0):
@@ -146,10 +150,13 @@ class GDELTProvider(AttentionProvider):
         )
         self.max_retries = max_retries
         self.backoff_seconds = backoff_seconds
+        self.request_interval_seconds = request_interval_seconds
         self.max_records = max_records
         self.minimum_window = minimum_window
         self.response_sink = response_sink
         self.sleep = sleep
+        self.monotonic = monotonic
+        self._last_request_finished: float | None = None
 
     def close(self) -> None:
         if self._owns_client:
@@ -279,7 +286,11 @@ class GDELTProvider(AttentionProvider):
         last_error: Exception | None = None
         for attempt in range(1, self.max_retries + 2):
             try:
-                response = self.client.get(self.endpoint, params=params)
+                self._wait_for_request_slot()
+                try:
+                    response = self.client.get(self.endpoint, params=params)
+                finally:
+                    self._last_request_finished = self.monotonic()
                 if response.status_code == 429 or response.status_code >= 500:
                     if attempt <= self.max_retries:
                         delay = _retry_delay(
@@ -323,6 +334,15 @@ class GDELTProvider(AttentionProvider):
         raise _RequestFailed(
             f"GDELT request failed: {last_error}", self.max_retries + 1
         )
+
+    def _wait_for_request_slot(self) -> None:
+        if self._last_request_finished is None:
+            return
+        elapsed = self.monotonic() - self._last_request_finished
+        remaining = self.request_interval_seconds - elapsed
+        if remaining > 0:
+            LOGGER.debug("Pacing GDELT requests: waiting %.1fs", remaining)
+            self.sleep(remaining)
 
 
 def _date_range(start: date, end: date):

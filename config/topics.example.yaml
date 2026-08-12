@@ -13,8 +13,8 @@ topics:
       - id: climate_crisis_phrase
         expression: '"climate crisis"'
     exclude_terms: []
-    languages:
-      - English
+    # Empty dimensions mean worldwide coverage in every language indexed by GDELT.
+    languages: []
     geographies: []
 
   electric_vehicles:
@@ -35,4 +35,3 @@ topics:
     queries:
       - '"public transport"'
       - '"public transit"'
-

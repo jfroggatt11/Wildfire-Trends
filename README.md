@@ -35,7 +35,10 @@ query id is a stable hash of its expression.
 
 `languages` and `geographies` become GDELT `sourcelang:` and `sourcecountry:` query
 operators. Values must use terms understood by GDELT. Multiple values generate
-separate observations so the requested dimensions remain explicit.
+separate observations so the requested dimensions remain explicit. Omit these fields
+or use empty lists for global, all-language collection. GDELT searches English query
+terms across its machine-translated coverage, while each record retains the source's
+original language and country.
 
 ## Collecting GDELT data
 
@@ -60,12 +63,26 @@ climate-attention collect \
   --end 2024-01-31
 ```
 
+For a lower-volume live connectivity check, `config/topics.smoke.yaml` contains one
+global `"climate crisis"` query with no country or language restriction. Replace the
+dates with a recent UTC day:
+
+```bash
+climate-attention collect \
+  --source gdelt \
+  --config config/topics.smoke.yaml \
+  --start 2026-08-10 \
+  --end 2026-08-10
+```
+
 GDELT DOC requests are initially split into one-day UTC windows. A window that
 reaches the API's 250-record ceiling is recursively divided. If a 15-minute window
 still reaches the ceiling, collection fails explicitly because completeness cannot
 be guaranteed. HTTP 429 and server errors are retried with exponential backoff;
-`Retry-After` is honored. GDELT's own searchable-history limits still apply—an API
-rejection is recorded as a failed run rather than hidden.
+`Retry-After` is honored. Requests are serialized with a conservative six-second
+pause after each completed request to reduce pressure on GDELT's shared service.
+GDELT's own searchable-history limits still apply—an API rejection is recorded as a
+failed run rather than hidden.
 
 ## Generated data
 

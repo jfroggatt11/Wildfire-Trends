@@ -68,6 +68,7 @@ def test_gdelt_response_parsing_preserves_metadata():
 
 def test_retry_after_rate_limit_then_succeeds():
     calls = []
+    sleeps = []
 
     def handler(incoming: httpx.Request):
         calls.append(incoming)
@@ -76,11 +77,13 @@ def test_retry_after_rate_limit_then_succeeds():
         return httpx.Response(200, json={"articles": [article()]})
 
     client = httpx.Client(transport=httpx.MockTransport(handler))
-    provider = GDELTProvider(client=client, sleep=lambda _: None)
+    provider = GDELTProvider(client=client, sleep=sleeps.append)
     result = provider.collect(request())
 
     assert len(result.records) == 1
     assert result.requests[0].attempts == 2
+    assert sleeps[0] == 0.0
+    assert sleeps[1] == pytest.approx(6.0, abs=0.01)
     assert "startdatetime=20240102000000" in str(calls[-1].url)
     assert "enddatetime=20240102235959" in str(calls[-1].url)
 
@@ -132,3 +135,5 @@ def test_provider_options_are_validated():
         GDELTProvider(max_retries=-1)
     with pytest.raises(ValueError, match="limit of 250"):
         GDELTProvider(max_records=251)
+    with pytest.raises(ValueError, match="request_interval_seconds"):
+        GDELTProvider(request_interval_seconds=-1)
