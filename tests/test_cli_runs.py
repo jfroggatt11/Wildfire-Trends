@@ -121,7 +121,7 @@ def test_timeline_execution_writes_daily_points_and_completes(tmp_path, monkeypa
                 query_expression=current.query.expression,
                 geography="italy",
                 matched_count=4,
-                monitored_count=100,
+                global_monitored_count=100,
             )
             log = RequestLog(
                 window_id=current.window_id,
@@ -176,8 +176,43 @@ def test_collect_trends_plan_only_creates_frozen_resumable_work(tmp_path, capsys
     assert code == 0
     output = capsys.readouterr().out
     assert "2 planned window(s)" in output
+    assert "mode=country-share" in output
+    assert "matched_count remains null" in output
     states = RunStore(data_dir).list()
     assert len(states) == 1
     assert states[0].status == "planned"
     assert states[0].country_config_snapshot_path is not None
+    assert states[0].source == "gdelt_source_country"
     assert len(states[0].resumable_windows()) == 2
+
+
+def test_collect_trends_raw_mode_retains_count_and_baseline_plan(tmp_path, capsys):
+    topics = tmp_path / "topics.yaml"
+    topics.write_text(
+        "topics:\n  climate:\n    label: Climate\n    queries: [climate]\n",
+        encoding="utf-8",
+    )
+    countries = tmp_path / "countries.yaml"
+    countries.write_text("countries:\n  italy: Italy\n", encoding="utf-8")
+    data_dir = tmp_path / "data"
+    assert main(
+        [
+            "collect-trends",
+            "--config",
+            str(topics),
+            "--countries-config",
+            str(countries),
+            "--start",
+            "2021-01-01",
+            "--end",
+            "2022-01-02",
+            "--trend-mode",
+            "raw-counts",
+            "--plan-only",
+            "--data-dir",
+            str(data_dir),
+        ]
+    ) == 0
+    output = capsys.readouterr().out
+    assert "4 planned window(s)" in output
+    assert "2 country-coverage baseline window(s)" in output

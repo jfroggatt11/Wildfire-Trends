@@ -6,9 +6,10 @@ This version collects canonical daily GDELT media-attention trends and optional
 article-level samples. It does not include event data, event-study analysis, a
 frontend, or a database service.
 
-GDELT `TimelineVolRaw` aggregates are the canonical trend input. Article-list records
-remain useful for auditing spikes and future classification, but their 250-result API
-limit makes them unsuitable as the authoritative count.
+GDELT `TimelineSourceCountry` aggregates are the canonical comparable trend input;
+optional `TimelineVolRaw` requests add exact counts for selected validation panels.
+Article-list records remain useful for auditing spikes and future classification, but
+their 250-result API limit makes them unsuitable as the authoritative count.
 
 ## Installation
 
@@ -66,30 +67,55 @@ climate-attention collect-trends \
 ```
 
 Omit `--countries` to plan every enabled country in the world catalog. Omit
-`--topics` to use every enabled topic. The default work unit is at most 366 days, so
-a five-year topic-country series is split into five independently resumable requests.
-Change this with `--window-days` if live GDELT testing establishes a different
-reliable range.
+`--topics` to use every enabled topic. The default `country-share` mode places up to
+seven explicitly selected countries in each GDELT `TimelineSourceCountry` request.
+Each work unit covers at most 366 days and is independently resumable. Change the
+limits with `--country-batch-size` and `--window-days` only after live validation.
 
 Each output row contains:
 
 ```text
 date, source, topic_id, query_id, query_expression,
-geography, language, matched_count, monitored_count,
-attention_share, collected_at, metadata_json
+geography, language, matched_count, global_monitored_count,
+country_monitored_count, global_attention_share,
+country_attention_share, collected_at, metadata_json
 ```
 
-`matched_count` is the raw number of distinct matching articles reported by GDELT.
-`monitored_count` is GDELT's `norm` value for that interval and
-`attention_share = matched_count / monitored_count`. The raw count is the requested
-country-by-theme measure; retain the normalized series for longitudinal sensitivity
-analysis because GDELT's total monitoring volume varies over time.
+In the default mode, `country_attention_share` is GDELT's native percentage of the
+selected country's monitored coverage matching the topic, converted from percent to
+a fraction. `matched_count` and the denominator fields are null because this API mode
+does not expose them. This normalized share is the preferred measure for comparisons
+through time or between countries.
 
-A whole-world run is intentionally slow. With four themes, roughly 196 countries,
-five annual windows, and the default ten-second interval, it plans about 3,900 API
-requests and can take eleven hours or more before retries. It is safe to interrupt
-and resume. Start with a few countries to validate the taxonomy before launching the
-full catalog.
+Raw counts remain available as an optional companion collection:
+
+```bash
+climate-attention collect-trends \
+  --config config/topics.example.yaml \
+  --countries-config config/countries.world.yaml \
+  --topics clean_energy \
+  --countries unitedstates unitedkingdom italy \
+  --start 2021-08-12 \
+  --end 2026-08-11 \
+  --trend-mode raw-counts
+```
+
+Raw mode populates `matched_count`, obtains a separate country coverage denominator,
+and computes both shares. Stable record identities allow raw results and native
+country shares to merge without creating duplicate daily rows.
+
+A whole-world run is intentionally slow. Live testing showed that GDELT's available
+capacity is variable: requests may be rejected even more than a minute apart, while
+later retries can succeed. The conservative default is 65 seconds plus exponential
+backoff. With four themes, 197 countries, five annual windows, and batches of seven,
+the default plan has 580 requests and takes at least 10.5 hours before response
+latency and retries. The equivalent all-country raw-count plan has 4,925 requests and
+takes at least 89 hours. It is safe to
+interrupt and resume, but the public DOC API is best used for selected study
+countries; a complete world backfill will ultimately benefit from GDELT's bulk
+datasets. GDELT's [June 2026 guidance](https://blog.gdeltproject.org/using-the-new-web-ngrams-dataset-to-find-relevant-coverage/)
+specifically asks high-volume researchers to use its downloadable NGrams while the
+legacy search backend is migrated.
 
 Preview and persist the full workload without making an HTTP request:
 
@@ -154,7 +180,7 @@ GDELT's own searchable-history limits still apply—an API rejection is recorded
 failed run rather than hidden.
 
 The defaults are three retries, a 30-second initial retry delay, and six seconds
-between article-list requests or ten seconds between timeline requests. They can be
+between article-list requests or 65 seconds between timeline requests. They can be
 changed for a run with `--max-retries`,
 `--backoff-seconds`, `--request-interval`, and `--timeout`. Avoid aggressive values
 on GDELT's shared public service.
@@ -208,6 +234,7 @@ The default `data/` layout is:
 ```text
 data/
 ├── trends/source=gdelt/topic_id=.../geography=.../language=.../daily.parquet
+├── country_coverage/source=gdelt/geography=.../language=.../daily.parquet
 ├── raw/source=gdelt/date=YYYY-MM-DD/topic_id=.../query_id=.../records.parquet
 ├── processed/daily_attention.parquet
 ├── api_responses/gdelt/<run-id>.jsonl
@@ -227,6 +254,14 @@ and software versions. `runs/<run-id>/state.json` is the atomically updated
 operational request ledger, while `config.yaml` and `countries.yaml` freeze the exact
 taxonomy and source-country catalog used by a trend run. The manifest is a
 research-facing summary regenerated after each invocation.
+
+Successful windows are written into the shared Parquet datasets immediately. A
+dataset can therefore contain valid rows from an incomplete run. Check the relevant
+manifest or `runs inspect` output before treating a requested range as complete.
+
+See [methodology](docs/methodology.md), the
+[data dictionary](docs/data-dictionary.md), and the
+[operations guide](docs/operations.md) before analysis or a long backfill.
 
 ## Rebuilding aggregates
 

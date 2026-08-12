@@ -57,6 +57,7 @@ class GDELTWindow:
                 self.query.expression,
                 self.query.language or "",
                 self.query.geography or "",
+                ",".join(self.query.geographies),
                 self.start.astimezone(timezone.utc).isoformat(),
                 self.end.astimezone(timezone.utc).isoformat(),
             ]
@@ -86,6 +87,15 @@ def build_gdelt_query(query: Query) -> str:
         parts.append(f"sourcelang:{query.language}")
     if query.geography:
         parts.append(f"sourcecountry:{query.geography}")
+    if query.geographies:
+        country_filters = [
+            f"sourcecountry:{geography}" for geography in query.geographies
+        ]
+        parts.append(
+            country_filters[0]
+            if len(country_filters) == 1
+            else f"({' OR '.join(country_filters)})"
+        )
     return " ".join(parts)
 
 

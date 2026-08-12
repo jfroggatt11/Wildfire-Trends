@@ -13,12 +13,18 @@ from uuid import uuid4
 from .aggregation import aggregate_daily
 from .config import ConfigError, config_hash, load_config, load_country_config
 from .manifest import build_manifest, build_run_manifest
-from .models import CollectionRequest, ProviderResult
+from .models import CollectionRequest, DailyCountryCoverage, DailyTrend, ProviderResult
 from .run_state import CollectionRunState, RunStore
 from .sources import GoogleTrendsProvider, ProviderUnavailableError
 from .sources.base import ProviderCollectionError
 from .sources.gdelt import GDELTProvider, plan_gdelt_windows
-from .sources.gdelt_timeline import GDELTTimelineProvider, plan_timeline_windows
+from .sources.gdelt_timeline import (
+    COUNTRY_COVERAGE_TOPIC_ID,
+    GDELTSourceCountryProvider,
+    GDELTTimelineProvider,
+    plan_source_country_windows,
+    plan_timeline_windows,
+)
 from .storage import LocalParquetStorage
 
 
@@ -52,6 +58,13 @@ def _nonnegative_int(value: str) -> int:
     parsed = int(value)
     if parsed < 0:
         raise argparse.ArgumentTypeError("value must be zero or greater")
+    return parsed
+
+
+def _country_batch_size(value: str) -> int:
+    parsed = int(value)
+    if not 1 <= parsed <= 7:
+        raise argparse.ArgumentTypeError("value must be between 1 and 7")
     return parsed
 
 
@@ -97,7 +110,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     trends = subparsers.add_parser(
         "collect-trends",
-        help="collect canonical daily GDELT counts by topic and source country",
+        help="collect daily GDELT attention trends by topic and source country",
     )
     trends.add_argument("--config", type=Path, required=True)
     trends.add_argument("--countries-config", type=Path, required=True)
@@ -106,6 +119,21 @@ def build_parser() -> argparse.ArgumentParser:
     trends.add_argument("--topics", nargs="+", help="only collect these topic ids")
     trends.add_argument(
         "--countries", nargs="+", help="only collect these configured country ids"
+    )
+    trends.add_argument(
+        "--trend-mode",
+        choices=("country-share", "raw-counts"),
+        default="country-share",
+        help=(
+            "country-share uses GDELT's native normalized country timeline "
+            "(default); raw-counts makes per-country count and baseline requests"
+        ),
+    )
+    trends.add_argument(
+        "--country-batch-size",
+        type=_country_batch_size,
+        default=7,
+        help="countries per native country-share request (1-7; default: 7)",
     )
     trends.add_argument("--window-days", type=int, default=366)
     trends.add_argument(
@@ -267,13 +295,13 @@ def _resume_run(
 ) -> int:
     store = RunStore(data_dir)
     state = store.load(run_id)
-    if state.source not in {"gdelt", "gdelt_timeline"}:
+    if state.source not in {"gdelt", "gdelt_timeline", "gdelt_source_country"}:
         raise ValueError(f"run {run_id} uses unsupported resumable source {state.source!r}")
     if option_overrides:
         # Only explicitly supplied retry options should override the frozen values.
         state.provider_options.update(option_overrides)
         store.save(state)
-    if state.source == "gdelt_timeline":
+    if state.source in {"gdelt_timeline", "gdelt_source_country"}:
         return _execute_timeline_run(state, data_dir, store)
     return _execute_gdelt_run(state, data_dir, store)
 
@@ -286,21 +314,31 @@ def _collect_trends(args: argparse.Namespace) -> int:
         set(args.countries) if args.countries else None
     )
     request = CollectionRequest(start=args.start, end=args.end, topics=topics)
-    windows = plan_timeline_windows(
-        request, countries, window_days=args.window_days
-    )
+    if args.trend_mode == "country-share":
+        windows = plan_source_country_windows(
+            request,
+            countries,
+            window_days=args.window_days,
+            batch_size=args.country_batch_size,
+        )
+        source = "gdelt_source_country"
+    else:
+        windows = plan_timeline_windows(
+            request, countries, window_days=args.window_days
+        )
+        source = "gdelt_timeline"
     started_at = datetime.now(timezone.utc)
     run_id = f"{started_at.strftime('%Y%m%dT%H%M%SZ')}-{uuid4().hex[:8]}"
     options = _runtime_options(args)
     if args.request_interval is None:
-        options["request_interval_seconds"] = 10.0
+        options["request_interval_seconds"] = 65.0
     options["country_labels"] = {
         country.id: country.label for country in countries
     }
     store = RunStore(args.data_dir)
     state = store.create(
         run_id=run_id,
-        source="gdelt_timeline",
+        source=source,
         start=request.start,
         end=request.end,
         config_path=args.config,
@@ -313,8 +351,22 @@ def _collect_trends(args: argparse.Namespace) -> int:
     )
     print(
         f"Created trend run {run_id}: {len(topics)} topic(s), "
-        f"{len(countries)} country/countries, {len(windows)} planned window(s)."
+        f"{len(countries)} country/countries, {len(windows)} planned window(s), "
+        f"mode={args.trend_mode}."
     )
+    if args.trend_mode == "raw-counts":
+        coverage_windows = sum(
+            window.query.topic_id == COUNTRY_COVERAGE_TOPIC_ID for window in windows
+        )
+        print(
+            f"The plan includes {coverage_windows} country-coverage baseline "
+            "window(s) for within-country normalization."
+        )
+    else:
+        print(
+            "Country attention shares are returned natively by GDELT; "
+            "matched_count remains null unless raw-count data is also collected."
+        )
     estimated_minutes = len(windows) * options["request_interval_seconds"] / 60
     print(
         f"Minimum pacing time: approximately {estimated_minutes:.1f} minutes, "
@@ -409,16 +461,32 @@ def _execute_timeline_run(
     state.mark_started()
     store.save(state)
 
-    def checkpoint(event, window, log, trends, children):
-        if event == "success" and trends:
+    def checkpoint(event, window, log, observations, children):
+        if event == "success" and observations:
+            coverages = [
+                item
+                for item in observations
+                if isinstance(item, DailyCountryCoverage)
+            ]
+            trends = [
+                item for item in observations if isinstance(item, DailyTrend)
+            ]
+            # Coverage is written first so topic rows receive their country
+            # denominator immediately; it also refreshes matching older rows.
+            state.records_newly_stored += storage.write_country_coverages(coverages)
             state.records_newly_stored += storage.write_trends(trends)
         state.apply_window_event(event, window, log, children)
         store.save(state)
 
-    provider = GDELTTimelineProvider(
+    provider_class = (
+        GDELTSourceCountryProvider
+        if state.source == "gdelt_source_country"
+        else GDELTTimelineProvider
+    )
+    provider = provider_class(
         **state.provider_options,
         response_sink=lambda envelope: storage.append_api_response(
-            "gdelt_timeline", state.run_id, envelope
+            state.source, state.run_id, envelope
         ),
         timeline_sink=checkpoint,
     )

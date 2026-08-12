@@ -138,6 +138,17 @@ class Query(StrictModel):
     exclude_terms: list[str] = Field(default_factory=list)
     language: str | None = None
     geography: str | None = None
+    geographies: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def geography_modes_are_exclusive(self) -> "Query":
+        if self.geography is not None and self.geographies:
+            raise ValueError("query cannot define both geography and geographies")
+        if len(set(self.geographies)) != len(self.geographies):
+            raise ValueError("query geographies must be unique")
+        if any(not geography.strip() for geography in self.geographies):
+            raise ValueError("query geographies must not be blank")
+        return self
 
     @classmethod
     def from_topic(cls, topic: Topic) -> list["Query"]:
@@ -232,15 +243,38 @@ class DailyTrend(StrictModel):
     query_expression: str
     geography: str | None = None
     language: str | None = None
-    matched_count: int = Field(ge=0)
-    monitored_count: int | None = Field(default=None, ge=0)
-    attention_share: float | None = Field(default=None, ge=0)
+    matched_count: int | None = Field(default=None, ge=0)
+    global_monitored_count: int | None = Field(default=None, ge=0)
+    country_monitored_count: int | None = Field(default=None, ge=0)
+    global_attention_share: float | None = Field(default=None, ge=0)
+    country_attention_share: float | None = Field(default=None, ge=0)
     collected_at: datetime = Field(default_factory=utc_now)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("collected_at")
     @classmethod
     def collection_timestamp_must_be_aware(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("collection timestamp must include a timezone")
+        return value.astimezone(timezone.utc)
+
+
+class DailyCountryCoverage(StrictModel):
+    """Total GDELT coverage for one source country and day."""
+
+    record_id: str
+    date: date
+    source: str
+    geography: str
+    language: str | None = None
+    country_monitored_count: int = Field(ge=0)
+    global_monitored_count: int | None = Field(default=None, ge=0)
+    collected_at: datetime = Field(default_factory=utc_now)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("collected_at")
+    @classmethod
+    def coverage_timestamp_must_be_aware(cls, value: datetime) -> datetime:
         if value.tzinfo is None or value.utcoffset() is None:
             raise ValueError("collection timestamp must include a timezone")
         return value.astimezone(timezone.utc)
@@ -267,4 +301,5 @@ class ProviderResult(StrictModel):
 
 class TrendProviderResult(StrictModel):
     trends: list[DailyTrend] = Field(default_factory=list)
+    country_coverages: list[DailyCountryCoverage] = Field(default_factory=list)
     requests: list[RequestLog] = Field(default_factory=list)

@@ -108,6 +108,7 @@ class CollectionRunState(StrictModel):
                 window.query.query_id,
                 window.query.language or "",
                 window.query.geography or "",
+                ",".join(window.query.geographies),
             ),
         )
 

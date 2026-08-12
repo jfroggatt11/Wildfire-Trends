@@ -74,12 +74,13 @@ def build_run_manifest(state: CollectionRunState) -> dict[str, Any]:
     """Build a reproducibility manifest from durable run state."""
     counts = state.status_counts()
     logs = state.request_logs()
-    if state.source == "gdelt_timeline":
+    if state.source in {"gdelt_timeline", "gdelt_source_country"}:
         query_values = {
             (
                 window.query.topic_id,
                 window.query.query_id,
                 window.query.geography,
+                tuple(window.query.geographies),
                 window.query.language,
             ): window.query
             for window in state.windows.values()
