@@ -515,6 +515,14 @@ def _merge_trends(existing: DailyTrend, incoming: DailyTrend) -> DailyTrend:
         for field in comparable
         if getattr(existing, field) != getattr(incoming, field)
     ]
+    if (
+        existing.source == "gdelt_ngrams"
+        and incoming.source == "gdelt_ngrams"
+        and mismatched == ["query_expression"]
+    ):
+        # A native-language taxonomy upgrade replaces the canonical topic-day
+        # measurement. Frozen manifests/raw envelopes retain both definitions.
+        mismatched = []
     if mismatched:
         raise ValueError(
             f"trend record id collision with mismatched fields: {', '.join(mismatched)}"
@@ -525,6 +533,8 @@ def _merge_trends(existing: DailyTrend, incoming: DailyTrend) -> DailyTrend:
         "collected_at": max(existing.collected_at, incoming.collected_at),
         "metadata": metadata,
     }
+    if existing.source == "gdelt_ngrams":
+        updates["query_expression"] = incoming.query_expression
     for field in (
         "matched_count",
         "global_monitored_count",

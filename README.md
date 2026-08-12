@@ -175,6 +175,26 @@ climate-attention estimate-ngrams \
   --billing-project YOUR_RESEARCH_PROJECT
 ```
 
+For original-language global matching, use
+`config/topics.multilingual.example.yaml`. Its `ngram_phrases` groups associate each
+literal with a GDELT language code and either `space` or `character` segmentation.
+The bundled English terms are validated against the canonical queries; the nine
+translated language groups are research seeds marked `draft` and need native-speaker
+review before inferential use. Omitting `--countries` requests all 197 configured
+countries in the same topic/window query—it does not create one query per country.
+
+Audit the historical country-domain map before interpreting zeros:
+
+```bash
+climate-attention audit-ngram-countries \
+  --countries-config config/countries.world.yaml \
+  --billing-project YOUR_RESEARCH_PROJECT \
+  --output data/audits/ngram-country-map.csv
+```
+
+The audit reports mapped-domain counts, sample domains, and possible label matches.
+An unsupported mapping is not evidence of zero coverage.
+
 Only after reviewing those estimates, execute with a hard per-job limit slightly
 above the reported largest job:
 
@@ -199,17 +219,21 @@ topic, country, and day. It joins URLs to GDELT's
 unmapped domains are excluded, and an overall matched-URL attribution rate is
 retained in metadata.
 
-The pilot uses exact unpunctuated lower- and title-case anchor tokens so BigQuery can
-prune the clustered `ngram` table. This intentionally misses some capitalization and
-punctuation forms; treat that as a sensitivity test before production. Adding
+Space-segmented phrases use exact unpunctuated lower- and title-case anchor tokens;
+character-segmented phrases use a centered character anchor. This lets BigQuery
+prune the clustered `ngram` table but intentionally misses some punctuation and case
+forms; treat that as a sensitivity test before production. All translated matches
+are deduplicated to one URL per topic/day before country attribution. Adding
 `--include-denominator` scans the much larger Article List (`gal`) table and derives
 `country_attention_share`, but is optional and can be dramatically more expensive.
 Always estimate that mode separately.
 
 This is not semantically identical to the DOC API. NGrams search original-language
 article text while the DOC API searches GDELT's English machine translations. The
-domain-country table is also a 2015 snapshot. Treat the NGrams output as a candidate
-measure until the matched-panel comparison is satisfactory:
+domain-country table is also a 2015 snapshot. Every row records whether the requested
+country has mapped domains, its mapped-domain count, and daily per-language matched
+counts. Treat the NGrams output as a candidate measure until the matched-panel
+comparison is satisfactory:
 
 ```bash
 climate-attention compare-sources \

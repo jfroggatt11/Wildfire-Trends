@@ -305,7 +305,11 @@ def test_collect_ngrams_plan_only_freezes_billing_cap_and_queries(tmp_path, caps
     assert state.source == "gdelt_ngrams"
     assert state.provider_options["billing_project"] == "research-project"
     assert state.provider_options["maximum_bytes_billed"] == 2_500_000_000
-    assert state.provider_options["topic_phrases"] == {
-        "climate": ["climate change"]
+    assert state.provider_options["topic_phrases"]["climate"][0] == {
+        "text": "climate change",
+        "language": None,
+        "segmentation": "space",
+        "translation_status": "validated",
+        "notes": "legacy query fallback",
     }
     assert state.provider_options["include_denominator"] is False

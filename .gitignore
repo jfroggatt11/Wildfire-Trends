@@ -11,3 +11,4 @@ data/manifests/
 data/api_responses/
 data/runs/
 data/test_runs/
+data/audits/

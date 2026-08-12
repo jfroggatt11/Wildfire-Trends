@@ -167,3 +167,34 @@ def test_complementary_trend_modes_merge_without_losing_counts(tmp_path):
     assert restored.country_attention_share == 0.04
     assert restored.metadata["collection_mode"] == "timelinesourcecountry"
     assert restored.metadata["raw_mode"] == "timelinevolraw"
+
+
+def test_ngram_taxonomy_upgrade_replaces_canonical_topic_day(tmp_path):
+    storage = LocalParquetStorage(tmp_path / "data")
+    original = DailyTrend(
+        record_id="ngram-topic-day",
+        date=datetime(2026, 7, 1).date(),
+        source="gdelt_ngrams",
+        topic_id="climate",
+        query_id="topic_distinct_urls",
+        query_expression='"climate change"',
+        geography="italy",
+        matched_count=4,
+        collected_at=datetime(2026, 8, 1, tzinfo=timezone.utc),
+        metadata={"configured_languages": ["en"]},
+    )
+    multilingual = original.model_copy(
+        update={
+            "query_expression": '"climate change" OR "cambiamento climatico"',
+            "matched_count": 7,
+            "collected_at": datetime(2026, 8, 2, tzinfo=timezone.utc),
+            "metadata": {"configured_languages": ["en", "it"]},
+        }
+    )
+
+    assert storage.write_trends([original]) == 1
+    assert storage.write_trends([multilingual]) == 0
+    restored = storage.read_trends()[0]
+    assert restored.matched_count == 7
+    assert restored.query_expression == multilingual.query_expression
+    assert restored.metadata["configured_languages"] == ["en", "it"]

@@ -125,9 +125,12 @@ when access is available.
 ## GDELT Web NGrams validation source
 
 Web NGrams 3.0 is a URL-level index over original-language article text from January
-2020 onward. The collector reconstructs each configured literal phrase from the
-`pre`, `ngram`, and `post` context fields and deduplicates all matching alternatives
-to one URL per topic and day. It does not count phrase occurrences as articles.
+2020 onward. The collector reconstructs each configured native-language literal from
+the `pre`, `ngram`, and `post` context fields and deduplicates matches across phrases
+and languages to one URL per topic and day. It does not count phrase occurrences as
+articles. Phrase records carry the GDELT ISO language code, segmentation mode, and a
+translation-validation status. Character-mode context is concatenated without spaces
+for languages such as Chinese and Japanese.
 
 Country attribution uses GDELT's multilingual April 2015 domain-country table.
 Ambiguous domains are discarded, the longest matching domain suffix wins for
@@ -135,6 +138,10 @@ subdomains, and URLs without a mapping are excluded. This catalogue is both old 
 incomplete; metadata therefore records the share of all matching URLs that received
 any unambiguous country assignment. Selected-country coverage cannot by itself
 recover the country distribution of unmapped URLs.
+Each country-day row also records whether the requested country label has any mapped
+domains. A zero for an unsupported mapping must be treated as missing, not as a
+measured zero. `audit-ngram-countries` produces the full mapping review and suggested
+historical labels.
 
 The default NGram measure is a country-day article count:
 
@@ -158,10 +165,17 @@ The resulting optional share resembles but does not reproduce
 `TimelineSourceCountry`. The API uses GDELT's
 current internal source-country assignments and searches English machine-translated
 coverage. NGrams search the original text and use a historical externalized country
-map. Literal English phrases will therefore undercount non-English coverage. Initial
-validation must compare paired daily shapes, missingness and zero rates—not demand
-identical levels. A production global NGram taxonomy will require validated
-original-language phrases or another multilingual classification strategy.
+map. English-only phrases undercount non-English coverage. The bundled multilingual
+taxonomy is a draft research seed; translated terms must be reviewed for local usage,
+inflection and conceptual equivalence before inferential analysis. Initial validation
+must compare paired daily shapes, missingness, per-language composition and zero
+rates—not demand identical levels.
+
+The canonical NGram topic-country-day row is replaced when the same date is
+recollected with a newer phrase taxonomy. Phrase records in row metadata identify the
+active definition, while frozen run manifests and raw response envelopes preserve
+the earlier definition. Do not combine partially upgraded date ranges without
+checking that their configured-language and phrase metadata agree.
 
 All BigQuery jobs use parameterized SQL, a non-billable dry run, an explicit billing
 project and a hard `maximum_bytes_billed` cap. Query byte estimates and completed job

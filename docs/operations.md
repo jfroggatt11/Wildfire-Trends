@@ -93,7 +93,7 @@ gcloud auth application-default login
 gcloud auth application-default set-quota-project YOUR_RESEARCH_PROJECT
 
 climate-attention estimate-ngrams \
-  --config config/topics.example.yaml \
+  --config config/topics.multilingual.example.yaml \
   --countries-config config/countries.world.yaml \
   --topics climate_change clean_energy clean_transport electric_vehicles \
   --countries italy unitedkingdom unitedstates india brazil \
@@ -101,6 +101,19 @@ climate-attention estimate-ngrams \
   --end 2026-08-11 \
   --billing-project YOUR_RESEARCH_PROJECT
 ```
+
+Omit `--countries` to return every configured country from each topic/window query.
+Before doing so, audit the historical domain map:
+
+```bash
+climate-attention audit-ngram-countries \
+  --countries-config config/countries.world.yaml \
+  --billing-project YOUR_RESEARCH_PROJECT
+```
+
+Rows with `country_mapping_supported=false` are structurally unavailable and must
+not be analyzed as zero-attention days. Review draft translations and inspect the
+stored per-language counts before expanding the date range.
 
 Set `--maximum-gb-billed` slightly above the largest reported job, not an arbitrary
 large allowance, and then run `collect-ngrams` with the same arguments. BigQuery jobs

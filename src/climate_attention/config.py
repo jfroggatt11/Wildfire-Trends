@@ -22,6 +22,60 @@ def _normalize_query(value: Any) -> Any:
     return value
 
 
+def _normalize_ngram_phrases(value: Any, *, topic_id: str) -> list[dict[str, Any]]:
+    """Expand compact language mappings into validated phrase records."""
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return value
+    if not isinstance(value, dict):
+        raise ConfigError(
+            f"topic {topic_id!r} 'ngram_phrases' must be a mapping or list"
+        )
+    normalized: list[dict[str, Any]] = []
+    for language, raw_group in value.items():
+        segmentation = "space"
+        translation_status = "draft"
+        notes = None
+        phrases = raw_group
+        if isinstance(raw_group, dict):
+            phrases = raw_group.get("phrases")
+            segmentation = raw_group.get("segmentation", "space")
+            translation_status = raw_group.get("translation_status", "draft")
+            notes = raw_group.get("notes")
+        if not isinstance(phrases, list):
+            raise ConfigError(
+                f"topic {topic_id!r} NGram language {language!r} must contain "
+                "a phrase list"
+            )
+        for phrase in phrases:
+            if isinstance(phrase, str):
+                normalized.append(
+                    {
+                        "text": phrase,
+                        "language": language,
+                        "segmentation": segmentation,
+                        "translation_status": translation_status,
+                        "notes": notes,
+                    }
+                )
+            elif isinstance(phrase, dict):
+                normalized.append(
+                    {
+                        "language": language,
+                        "segmentation": segmentation,
+                        "translation_status": translation_status,
+                        "notes": notes,
+                        **phrase,
+                    }
+                )
+            else:
+                raise ConfigError(
+                    f"topic {topic_id!r} NGram phrase must be text or a mapping"
+                )
+    return normalized
+
+
 def _normalize_document(document: Any) -> dict[str, Any]:
     if not isinstance(document, dict):
         raise ConfigError("configuration root must be a mapping")
@@ -37,6 +91,9 @@ def _normalize_document(document: Any) -> dict[str, Any]:
         raw_queries = topic.get("queries")
         if isinstance(raw_queries, list):
             topic["queries"] = [_normalize_query(value) for value in raw_queries]
+        topic["ngram_phrases"] = _normalize_ngram_phrases(
+            topic.get("ngram_phrases"), topic_id=topic_id
+        )
         topics.append(topic)
     return {
         "schema_version": document.get("schema_version", 1),
@@ -71,6 +128,11 @@ class Country(StrictModel):
     label: str = Field(min_length=1)
     enabled: bool = True
     google_geo: str | None = Field(default=None, pattern=r"^[A-Z]{2}$")
+    gdelt_ngram_label: str | None = Field(default=None, min_length=1)
+
+    @property
+    def ngram_label(self) -> str:
+        return self.gdelt_ngram_label or self.label
 
 
 class CountryConfig(StrictModel):

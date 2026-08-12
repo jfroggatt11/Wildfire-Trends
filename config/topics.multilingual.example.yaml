@@ -1,0 +1,112 @@
+schema_version: 1
+
+# Research seed taxonomy for Web NGrams. English entries mirror the canonical
+# topic queries. Other translations are drafts and require native-speaker review
+# before inferential use. Language codes follow GDELT Web NGrams (ISO 639-1/639-2).
+topics:
+  climate_change:
+    label: Climate change
+    enabled: true
+    description: General public and media language about anthropogenic climate change.
+    queries:
+      - '"climate change"'
+      - '"global warming"'
+      - '"climate crisis"'
+    ngram_phrases:
+      en:
+        translation_status: validated
+        phrases: [climate change, global warming, climate crisis]
+      es: [cambio climático, calentamiento global, crisis climática]
+      pt: [mudanças climáticas, alteração climática, aquecimento global, crise climática]
+      fr: [changement climatique, réchauffement climatique, crise climatique]
+      de: [Klimawandel, globale Erwärmung, Klimakrise]
+      it: [cambiamento climatico, riscaldamento globale, crisi climatica]
+      ru: [изменение климата, глобальное потепление, климатический кризис]
+      ar: [تغير المناخ, الاحتباس الحراري, أزمة المناخ]
+      zh:
+        segmentation: character
+        phrases: [气候变化, 全球变暖, 气候危机]
+      ja:
+        segmentation: character
+        phrases: [気候変動, 地球温暖化, 気候危機]
+
+  electric_vehicles:
+    label: Electric vehicles
+    enabled: true
+    queries:
+      - '"electric vehicle"'
+      - '"electric vehicles"'
+      - '"electric car"'
+      - '"electric cars"'
+    ngram_phrases:
+      en:
+        translation_status: validated
+        phrases: [electric vehicle, electric vehicles, electric car, electric cars]
+      es: [vehículo eléctrico, vehículos eléctricos, coche eléctrico, coches eléctricos]
+      pt: [veículo elétrico, veículos elétricos, carro elétrico, carros elétricos]
+      fr: [véhicule électrique, véhicules électriques, voiture électrique, voitures électriques]
+      de: [Elektrofahrzeug, Elektrofahrzeuge, Elektroauto, Elektroautos]
+      it: [veicolo elettrico, veicoli elettrici, auto elettrica, auto elettriche]
+      ru: [электромобиль, электромобили, электрический автомобиль]
+      ar: [سيارة كهربائية, سيارات كهربائية, مركبة كهربائية, مركبات كهربائية]
+      zh:
+        segmentation: character
+        phrases: [电动汽车, 电动车]
+      ja:
+        segmentation: character
+        phrases: [電気自動車]
+
+  clean_energy:
+    label: Clean energy
+    enabled: true
+    description: Renewable and low-carbon energy technologies and deployment.
+    queries:
+      - '"clean energy"'
+      - '"renewable energy"'
+      - '"solar power"'
+      - '"wind power"'
+    ngram_phrases:
+      en:
+        translation_status: validated
+        phrases: [clean energy, renewable energy, solar power, wind power]
+      es: [energía limpia, energía renovable, energía solar, energía eólica]
+      pt: [energia limpa, energia renovável, energia solar, energia eólica]
+      fr: [énergie propre, énergie renouvelable, énergie solaire, énergie éolienne]
+      de: [saubere Energie, erneuerbare Energie, Solarenergie, Windenergie]
+      it: [energia pulita, energia rinnovabile, energia solare, energia eolica]
+      ru: [чистая энергия, возобновляемая энергия, солнечная энергия, ветровая энергия]
+      ar: [الطاقة النظيفة, الطاقة المتجددة, الطاقة الشمسية, طاقة الرياح]
+      zh:
+        segmentation: character
+        phrases: [清洁能源, 可再生能源, 太阳能, 风能]
+      ja:
+        segmentation: character
+        phrases: [クリーンエネルギー, 再生可能エネルギー, 太陽光発電, 風力発電]
+
+  clean_transport:
+    label: Clean transport
+    enabled: true
+    description: Low-carbon mobility and transport decarbonisation.
+    queries:
+      - '"clean transport"'
+      - '"sustainable transport"'
+      - '"transport decarbonisation"'
+      - '"transport decarbonization"'
+      - '"transport emissions"'
+    ngram_phrases:
+      en:
+        translation_status: validated
+        phrases: [clean transport, sustainable transport, transport decarbonisation, transport decarbonization, transport emissions]
+      es: [transporte limpio, transporte sostenible, descarbonización del transporte, emisiones del transporte]
+      pt: [transporte limpo, transporte sustentável, descarbonização dos transportes, emissões dos transportes]
+      fr: [transport propre, transport durable, décarbonation des transports, émissions des transports]
+      de: [sauberer Verkehr, nachhaltiger Verkehr, Dekarbonisierung des Verkehrs, Verkehrsemissionen]
+      it: [trasporto pulito, trasporto sostenibile, decarbonizzazione dei trasporti, emissioni dei trasporti]
+      ru: [чистый транспорт, устойчивый транспорт, декарбонизация транспорта, выбросы транспорта]
+      ar: [النقل النظيف, النقل المستدام, إزالة الكربون من النقل, انبعاثات النقل]
+      zh:
+        segmentation: character
+        phrases: [清洁交通, 可持续交通, 交通脱碳, 交通排放]
+      ja:
+        segmentation: character
+        phrases: [クリーン交通, 持続可能な交通, 交通の脱炭素化, 交通排出量]

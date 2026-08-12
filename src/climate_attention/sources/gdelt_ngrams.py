@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 from collections.abc import Callable, Iterable
@@ -44,6 +45,84 @@ class BigQueryExecutor(Protocol):
     ) -> tuple[list[dict[str, Any]], dict[str, Any]]: ...
 
 
+def build_country_audit_sql(
+    *, domain_country_table: str = DEFAULT_DOMAIN_COUNTRY_TABLE
+) -> str:
+    """Return a small query that audits exact labels against the domain map."""
+    if not _TABLE_PATTERN.fullmatch(domain_country_table):
+        raise ValueError(f"invalid BigQuery table identifier: {domain_country_table!r}")
+    return f"""
+WITH requested_countries AS (
+  SELECT country_id, country_label
+  FROM UNNEST(@country_ids) AS country_id WITH OFFSET AS position
+  JOIN UNNEST(@country_labels) AS country_label WITH OFFSET AS label_position
+    ON position = label_position
+),
+unambiguous_domains AS (
+  SELECT LOWER(Domain) AS domain, ANY_VALUE(CountryHumanName) AS country_label
+  FROM `{domain_country_table}`
+  WHERE Domain IS NOT NULL AND CountryHumanName IS NOT NULL
+  GROUP BY domain
+  HAVING COUNT(DISTINCT CountryHumanName) = 1
+),
+available_country_labels AS (
+  SELECT DISTINCT country_label FROM unambiguous_domains
+),
+label_suggestions AS (
+  SELECT
+    countries.country_id,
+    ARRAY_AGG(
+      candidate.country_label
+      ORDER BY EDIT_DISTANCE(
+        LOWER(countries.country_label), LOWER(candidate.country_label)
+      ), candidate.country_label
+      LIMIT 3
+    ) AS suggested_labels
+  FROM requested_countries AS countries
+  CROSS JOIN available_country_labels AS candidate
+  GROUP BY countries.country_id
+)
+SELECT
+  countries.country_id,
+  countries.country_label,
+  COUNT(domains.domain) AS mapped_domain_count,
+  ARRAY_AGG(domains.domain IGNORE NULLS ORDER BY domains.domain LIMIT 5)
+    AS sample_domains,
+  ANY_VALUE(suggestions.suggested_labels) AS suggested_labels
+FROM requested_countries AS countries
+JOIN label_suggestions AS suggestions USING (country_id)
+LEFT JOIN unambiguous_domains AS domains USING (country_label)
+GROUP BY country_id, country_label
+ORDER BY country_id
+""".strip()
+
+
+def audit_country_mapping(
+    *,
+    executor: BigQueryExecutor,
+    country_labels: dict[str, str],
+    maximum_bytes_billed: int,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    sql = build_country_audit_sql()
+    parameters = {
+        "country_ids": list(country_labels),
+        "country_labels": list(country_labels.values()),
+    }
+    estimate = executor.estimate(sql, parameters)
+    if estimate > maximum_bytes_billed:
+        raise ValueError(
+            f"country audit dry run estimated {estimate} bytes, above the cap of "
+            f"{maximum_bytes_billed} bytes"
+        )
+    rows, job = executor.query(
+        sql, parameters, maximum_bytes_billed=maximum_bytes_billed
+    )
+    return [_json_safe_row(row) for row in rows], {
+        **job,
+        "estimated_bytes_processed": estimate,
+    }
+
+
 NGramWindowSink = Callable[
     [str, GDELTWindow, RequestLog | None, list[DailyTrend], list[GDELTWindow]],
     None,
@@ -59,16 +138,21 @@ def _literal_phrase(expression: str) -> str:
     return value
 
 
-def topic_phrases(request: CollectionRequest) -> dict[str, list[str]]:
-    """Extract literal phrases while rejecting provider-specific query dimensions."""
-    values: dict[str, list[str]] = {}
+def topic_phrases(request: CollectionRequest) -> dict[str, list[dict[str, Any]]]:
+    """Build native-language phrase records, with legacy queries as a fallback."""
+    values: dict[str, list[dict[str, Any]]] = {}
     for topic in request.topics:
-        if topic.include_terms or topic.exclude_terms or topic.languages or topic.geographies:
+        if topic.include_terms or topic.exclude_terms or topic.geographies:
             raise ValueError(
                 f"NGram topic {topic.id!r} must contain literal query expressions "
                 "without GDELT include/exclude or dimension filters"
             )
-        phrases: list[str] = []
+        if topic.ngram_phrases:
+            values[topic.id] = [
+                phrase.model_dump(mode="json") for phrase in topic.ngram_phrases
+            ]
+            continue
+        phrases: list[dict[str, Any]] = []
         for spec in topic.queries:
             if not spec.enabled:
                 continue
@@ -77,16 +161,30 @@ def topic_phrases(request: CollectionRequest) -> dict[str, list[str]]:
                 for item in (
                     spec.include_terms,
                     spec.exclude_terms,
-                    spec.languages,
                     spec.geographies,
                 )
             ):
                 raise ValueError(
                     f"NGram query {spec.id!r} must be one literal expression"
                 )
-            phrases.append(_literal_phrase(spec.expression))
+            languages = spec.languages if spec.languages is not None else topic.languages
+            for language in languages or [None]:
+                phrases.append(
+                    {
+                        "text": _literal_phrase(spec.expression),
+                        "language": language,
+                        "segmentation": "space",
+                        "translation_status": "validated" if language is None else "draft",
+                        "notes": "legacy query fallback",
+                    }
+                )
         if phrases:
-            values[topic.id] = list(dict.fromkeys(phrases))
+            values[topic.id] = list(
+                {
+                    (item["text"].casefold(), item["language"], item["segmentation"]): item
+                    for item in phrases
+                }.values()
+            )
     return values
 
 
@@ -101,7 +199,9 @@ def plan_ngram_windows(
         phrases = phrases_by_topic.get(topic.id)
         if not phrases:
             continue
-        expression = " OR ".join(f'"{phrase}"' for phrase in phrases)
+        expression = " OR ".join(
+            f'"{phrase["text"]}"' for phrase in phrases
+        )
         current = request.start
         while current <= request.end:
             chunk_end = min(request.end, current + timedelta(days=window_days - 1))
@@ -122,7 +222,7 @@ def plan_ngram_windows(
 
 def build_ngram_sql(
     *,
-    phrases: list[str],
+    phrases: list[str | dict[str, Any]],
     ngram_table: str = DEFAULT_NGRAM_TABLE,
     coverage_table: str = DEFAULT_COVERAGE_TABLE,
     domain_country_table: str = DEFAULT_DOMAIN_COUNTRY_TABLE,
@@ -135,25 +235,43 @@ def build_ngram_sql(
     if not phrases:
         raise ValueError("at least one NGram phrase is required")
 
+    phrase_specs = _normalize_phrase_specs(phrases)
     clauses: list[str] = []
     parameters: dict[str, Any] = {}
-    for index, phrase in enumerate(phrases):
-        words = phrase.split()
-        if not words:
+    for index, phrase in enumerate(phrase_specs):
+        text = phrase["text"]
+        segmentation = phrase["segmentation"]
+        units = text.split() if segmentation == "space" else list(text.replace(" ", ""))
+        if not units:
             raise ValueError("NGram phrase must contain a word")
-        anchor = words[(len(words) - 1) // 2].casefold()
-        escaped = r"\s+".join(re.escape(word.casefold()) for word in words)
+        anchor = units[(len(units) - 1) // 2].casefold()
+        separator = r"\s+" if segmentation == "space" else ""
+        escaped = separator.join(re.escape(unit.casefold()) for unit in units)
         parameters[f"anchor_variants_{index}"] = _anchor_variants(
-            anchor, single_word=len(words) == 1
+            anchor, single_word=len(units) == 1, character=segmentation == "character"
         )
         parameters[f"pattern_{index}"] = (
-            rf"(^|[^\p{{L}}\p{{N}}]){escaped}([^\p{{L}}\p{{N}}]|$)"
+            escaped
+            if segmentation == "character"
+            else rf"(^|[^\p{{L}}\p{{N}}]){escaped}([^\p{{L}}\p{{N}}]|$)"
+        )
+        parameters[f"segmentation_type_{index}"] = (
+            2 if segmentation == "character" else 1
+        )
+        language_filter = ""
+        if phrase["language"]:
+            parameters[f"language_{index}"] = phrase["language"]
+            language_filter = f"lang = @language_{index} AND "
+        context = (
+            "CONCAT(COALESCE(pre, ''), ngram, COALESCE(post, ''))"
+            if segmentation == "character"
+            else "CONCAT(COALESCE(pre, ''), ' ', ngram, ' ', COALESCE(post, ''))"
         )
         clauses.append(
             "("
+            f"{language_filter}type = @segmentation_type_{index} AND "
             f"ngram IN UNNEST(@anchor_variants_{index}) AND "
-            "REGEXP_CONTAINS(LOWER(CONCAT(COALESCE(pre, ''), ' ', ngram, "
-            f"' ', COALESCE(post, ''))), @pattern_{index})"
+            f"REGEXP_CONTAINS(LOWER({context}), @pattern_{index})"
             ")"
         )
     phrase_filter = "\n      OR ".join(clauses)
@@ -203,15 +321,20 @@ unambiguous_domains AS (
   HAVING COUNT(DISTINCT CountryHumanName) = 1
 ),
 matched_urls AS (
-  SELECT DISTINCT DATE(date) AS day, url, LOWER(NET.HOST(url)) AS host
+  SELECT
+    DATE(date) AS day,
+    url,
+    LOWER(NET.HOST(url)) AS host,
+    ARRAY_AGG(DISTINCT lang ORDER BY lang LIMIT 1)[SAFE_OFFSET(0)] AS lang
   FROM `{ngram_table}`
   WHERE DATE(date) BETWEEN @start_date AND @end_date
     AND (
       {phrase_filter}
     )
+  GROUP BY day, url, host
 ),
 matched_attributed AS (
-  SELECT day, url, domains.country_label
+  SELECT day, url, lang, domains.country_label
   FROM matched_urls
   JOIN unambiguous_domains AS domains
     ON host = domains.domain OR ENDS_WITH(host, CONCAT('.', domains.domain))
@@ -229,6 +352,25 @@ country_matches AS (
   FROM matched_attributed
   JOIN requested_countries AS countries USING (country_label)
   GROUP BY day, country_id
+),
+country_language_matches AS (
+  SELECT day, countries.country_id, lang, COUNT(DISTINCT url) AS matched_count
+  FROM matched_attributed
+  JOIN requested_countries AS countries USING (country_label)
+  GROUP BY day, country_id, lang
+),
+country_language_breakdown AS (
+  SELECT day, country_id,
+    TO_JSON_STRING(ARRAY_AGG(STRUCT(lang, matched_count) ORDER BY lang))
+      AS language_counts_json
+  FROM country_language_matches
+  GROUP BY day, country_id
+),
+country_mapping_support AS (
+  SELECT countries.country_id, COUNT(domains.domain) AS mapped_domain_count
+  FROM requested_countries AS countries
+  LEFT JOIN unambiguous_domains AS domains USING (country_label)
+  GROUP BY country_id
 ){coverage_ctes},
 calendar AS (
   SELECT day
@@ -240,25 +382,62 @@ SELECT
   COALESCE(matches.matched_count, 0) AS matched_count,
   {monitored_expression} AS monitored_count,
   mapping_stats.total_matched_urls,
-  mapping_stats.attributed_matched_urls
+  mapping_stats.attributed_matched_urls,
+  support.mapped_domain_count,
+  COALESCE(language_breakdown.language_counts_json, '[]') AS language_counts_json
 FROM calendar
 CROSS JOIN requested_countries AS countries
 CROSS JOIN mapping_stats
 LEFT JOIN country_matches AS matches USING (day, country_id)
+LEFT JOIN country_language_breakdown AS language_breakdown USING (day, country_id)
+JOIN country_mapping_support AS support USING (country_id)
 {coverage_join}
 ORDER BY day, country_id
 """.strip()
     return sql, parameters
 
 
-def _anchor_variants(anchor: str, *, single_word: bool) -> list[str]:
+def _normalize_phrase_specs(
+    phrases: list[str | dict[str, Any]],
+) -> list[dict[str, Any]]:
+    normalized: list[dict[str, Any]] = []
+    for phrase in phrases:
+        if isinstance(phrase, str):
+            item = {
+                "text": phrase,
+                "language": None,
+                "segmentation": "space",
+                "translation_status": "validated",
+                "notes": "legacy query fallback",
+            }
+        else:
+            item = {
+                "language": None,
+                "segmentation": "space",
+                "translation_status": "draft",
+                "notes": None,
+                **phrase,
+            }
+        text = str(item["text"]).strip()
+        if not text:
+            raise ValueError("NGram phrase must not be empty")
+        if item["segmentation"] not in {"space", "character"}:
+            raise ValueError("NGram segmentation must be space or character")
+        item["text"] = text
+        normalized.append(item)
+    return normalized
+
+
+def _anchor_variants(
+    anchor: str, *, single_word: bool, character: bool = False
+) -> list[str]:
     """Return a bounded cluster-friendly pilot anchor set."""
-    cases = list(dict.fromkeys((anchor, anchor.capitalize())))
+    cases = [anchor] if character else list(dict.fromkeys((anchor, anchor.capitalize())))
     # Multiword phrases anchor on a non-final word. Unpunctuated lower/title forms
     # capture ordinary prose while keeping the BigQuery pilot affordable. Broader
     # punctuation/case recall is measured later as a sensitivity analysis.
     prefixes = ("",)
-    suffixes = ("", ".", ",") if single_word else ("",)
+    suffixes = ("",) if character else (("", ".", ",") if single_word else ("",))
     return list(
         dict.fromkeys(
             f"{prefix}{value}{suffix}"
@@ -272,7 +451,7 @@ def _anchor_variants(anchor: str, *, single_word: bool) -> list[str]:
 def prepare_ngram_query(
     window: GDELTWindow,
     *,
-    phrases: list[str],
+    phrases: list[str | dict[str, Any]],
     country_labels: dict[str, str],
     ngram_table: str = DEFAULT_NGRAM_TABLE,
     coverage_table: str = DEFAULT_COVERAGE_TABLE,
@@ -300,7 +479,7 @@ def estimate_ngram_windows(
     *,
     executor: BigQueryExecutor,
     country_labels: dict[str, str],
-    phrases_by_topic: dict[str, list[str]],
+    phrases_by_topic: dict[str, list[str | dict[str, Any]]],
     include_denominator: bool = False,
 ) -> list[dict[str, Any]]:
     estimates: list[dict[str, Any]] = []
@@ -364,6 +543,10 @@ class GoogleBigQueryExecutor:
                 query_parameters.append(
                     bigquery.ScalarQueryParameter(name, "DATE", value)
                 )
+            elif isinstance(value, int):
+                query_parameters.append(
+                    bigquery.ScalarQueryParameter(name, "INT64", value)
+                )
             else:
                 query_parameters.append(
                     bigquery.ScalarQueryParameter(name, "STRING", value)
@@ -420,7 +603,7 @@ class GDELTNGramsProvider:
         *,
         billing_project: str,
         country_labels: dict[str, str],
-        topic_phrases: dict[str, list[str]],
+        topic_phrases: dict[str, list[str | dict[str, Any]]],
         maximum_bytes_billed: int,
         location: str = "US",
         ngram_table: str = DEFAULT_NGRAM_TABLE,
@@ -576,7 +759,7 @@ def parse_ngram_rows(
     *,
     rows: Iterable[dict[str, Any]],
     window: GDELTWindow,
-    phrases: list[str],
+    phrases: list[str | dict[str, Any]],
     estimated_bytes: int,
     job: dict[str, Any],
     collected_at: datetime,
@@ -600,6 +783,8 @@ def parse_ngram_rows(
         monitored = int(raw_monitored) if raw_monitored is not None else None
         total_matched = int(row.get("total_matched_urls", 0))
         attributed_matched = int(row.get("attributed_matched_urls", 0))
+        mapped_domain_count = int(row.get("mapped_domain_count", 0))
+        language_counts = json.loads(row.get("language_counts_json") or "[]")
         if matched < 0 or (monitored is not None and monitored < 0):
             raise ValueError("NGram counts must be non-negative")
         share = matched / monitored if monitored else None
@@ -627,7 +812,18 @@ def parse_ngram_rows(
                 collected_at=collected_at,
                 metadata={
                     "collection_mode": "webngrams_distinct_urls",
-                    "phrases": phrases,
+                    "phrases": _normalize_phrase_specs(phrases),
+                    "language_counts": {
+                        item["lang"]: int(item["matched_count"])
+                        for item in language_counts
+                    },
+                    "configured_languages": sorted(
+                        {
+                            item["language"]
+                            for item in _normalize_phrase_specs(phrases)
+                            if item["language"]
+                        }
+                    ),
                     "deduplication_scope": "distinct_url_per_day_topic",
                     "anchor_variant_policy": (
                         "unpunctuated_lower_and_title_case_pilot"
@@ -638,6 +834,8 @@ def parse_ngram_rows(
                     "country_map_limitations": (
                         "2015 snapshot; ambiguous and unmapped domains excluded"
                     ),
+                    "country_mapping_supported": mapped_domain_count > 0,
+                    "mapped_domain_count": mapped_domain_count,
                     "all_country_total_matched_urls": total_matched,
                     "all_country_attributed_matched_urls": attributed_matched,
                     "all_country_url_attribution_rate": (

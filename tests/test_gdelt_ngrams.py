@@ -11,6 +11,8 @@ from climate_attention.sources.base import ProviderCollectionError
 from climate_attention.sources.gdelt_ngrams import (
     GDELTNGramsProvider,
     GoogleBigQueryExecutor,
+    audit_country_mapping,
+    build_country_audit_sql,
     build_ngram_sql,
     plan_ngram_windows,
 )
@@ -57,9 +59,10 @@ def test_ngram_planning_is_topic_window_not_country_window():
     windows, phrases = plan_ngram_windows(request, window_days=2)
 
     assert len(windows) == 2
-    assert phrases == {
-        "climate_change": ["climate change", "global warming"]
-    }
+    assert [item["text"] for item in phrases["climate_change"]] == [
+        "climate change",
+        "global warming",
+    ]
     assert all(window.query.geography is None for window in windows)
     assert windows[0].start.date() == date(2026, 1, 1)
     assert windows[1].start.date() == date(2026, 1, 3)
@@ -90,6 +93,8 @@ class FakeExecutor:
                         "monitored_count": monitored,
                         "total_matched_urls": 20,
                         "attributed_matched_urls": 16,
+                        "mapped_domain_count": 12,
+                        "language_counts_json": '[{"lang":"en","matched_count":4}]',
                     }
                 )
         return rows, {
@@ -129,6 +134,8 @@ def test_ngram_provider_dry_runs_then_writes_country_day_counts():
     assert italy.country_monitored_count == 100
     assert italy.country_attention_share == 0.04
     assert italy.metadata["all_country_url_attribution_rate"] == 0.8
+    assert italy.metadata["country_mapping_supported"] is True
+    assert italy.metadata["language_counts"] == {"en": 4}
     assert italy.metadata["bigquery_job"]["job_id"] == "job-1"
     assert [event[0] for event in events] == ["started", "success"]
     assert envelopes[0]["estimated_bytes_processed"] == 1234
@@ -155,6 +162,34 @@ def test_ngram_topic_rejects_gdelt_filters():
     request.topics[0].include_terms = ["policy"]
     with pytest.raises(ValueError, match="literal query expressions"):
         plan_ngram_windows(request)
+
+
+def test_multilingual_phrases_filter_language_and_character_segmentation():
+    sql, parameters = build_ngram_sql(
+        phrases=[
+            {
+                "text": "cambio climático",
+                "language": "es",
+                "segmentation": "space",
+            },
+            {
+                "text": "气候变化",
+                "language": "zh",
+                "segmentation": "character",
+            },
+        ]
+    )
+
+    assert "lang = @language_0" in sql
+    assert "type = @segmentation_type_1" in sql
+    assert parameters["language_0"] == "es"
+    assert parameters["language_1"] == "zh"
+    assert parameters["segmentation_type_0"] == 1
+    assert parameters["segmentation_type_1"] == 2
+    assert parameters["anchor_variants_1"] == ["候"]
+    assert parameters["pattern_1"] == "气候变化"
+    assert "language_counts_json" in sql
+    assert "mapped_domain_count" in sql
 
 
 def test_bigquery_dry_run_omits_none_maximum_bytes_billed():
@@ -184,3 +219,38 @@ def test_bigquery_dry_run_omits_none_maximum_bytes_billed():
 
     assert "maximum_bytes_billed" not in dry_run.kwargs
     assert capped.kwargs["maximum_bytes_billed"] == 123
+
+
+def test_country_audit_is_capped_and_parameterized():
+    class AuditExecutor:
+        def estimate(self, sql, parameters):
+            assert "EDIT_DISTANCE" in sql
+            assert parameters["country_ids"] == ["italy"]
+            return 50
+
+        def query(self, sql, parameters, *, maximum_bytes_billed):
+            assert maximum_bytes_billed == 100
+            return [
+                {
+                    "country_id": "italy",
+                    "country_label": "Italy",
+                    "mapped_domain_count": 10,
+                    "sample_domains": ["example.it"],
+                    "suggested_labels": ["Italy"],
+                }
+            ], {
+                "job_id": "audit-1",
+                "total_bytes_processed": 50,
+                "total_bytes_billed": 10_000_000,
+                "cache_hit": False,
+            }
+
+    rows, job = audit_country_mapping(
+        executor=AuditExecutor(),
+        country_labels={"italy": "Italy"},
+        maximum_bytes_billed=100,
+    )
+
+    assert rows[0]["mapped_domain_count"] == 10
+    assert job["estimated_bytes_processed"] == 50
+    assert "domainsbycountry_alllangs_april2015" in build_country_audit_sql()

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import logging
 import sys
@@ -29,6 +30,7 @@ from .sources.gdelt_timeline import (
 from .sources.gdelt_ngrams import (
     GDELTNGramsProvider,
     GoogleBigQueryExecutor,
+    audit_country_mapping,
     estimate_ngram_windows,
     plan_ngram_windows,
 )
@@ -235,6 +237,23 @@ def build_parser() -> argparse.ArgumentParser:
         help="include the optional GAL denominator scan in estimates",
     )
 
+    audit_ngrams = subparsers.add_parser(
+        "audit-ngram-countries",
+        help="audit configured country labels against GDELT's domain map",
+    )
+    audit_ngrams.add_argument("--countries-config", type=Path, required=True)
+    audit_ngrams.add_argument("--countries", nargs="+")
+    audit_ngrams.add_argument("--billing-project", required=True)
+    audit_ngrams.add_argument("--location", default="US")
+    audit_ngrams.add_argument(
+        "--maximum-gb-billed", type=_positive_float, default=0.1
+    )
+    audit_ngrams.add_argument(
+        "--output",
+        type=Path,
+        default=Path("data/audits/ngram-country-map.csv"),
+    )
+
     compare = subparsers.add_parser(
         "compare-sources", help="compare paired daily metrics from two sources"
     )
@@ -298,6 +317,8 @@ def main(argv: list[str] | None = None) -> int:
             return _collect_ngrams(args)
         if args.command == "estimate-ngrams":
             return _estimate_ngrams(args)
+        if args.command == "audit-ngram-countries":
+            return _audit_ngram_countries(args)
         if args.command == "compare-sources":
             return _compare_sources(args)
         if args.command in {"aggregate", "rebuild-aggregates"}:
@@ -315,9 +336,11 @@ def _validate_config(path: Path) -> int:
     config = load_config(path)
     enabled = config.enabled_topics()
     query_count = sum(len(topic.queries) for topic in enabled)
+    ngram_phrase_count = sum(len(topic.ngram_phrases) for topic in enabled)
     print(
         f"Valid configuration: {len(config.topics)} topic(s), "
-        f"{len(enabled)} enabled, {query_count} configured query/queries."
+        f"{len(enabled)} enabled, {query_count} configured query/queries, "
+        f"{ngram_phrase_count} native-language NGram phrase(s)."
     )
     return 0
 
@@ -599,7 +622,7 @@ def _collect_ngrams(args: argparse.Namespace) -> int:
         "location": args.location,
         "maximum_bytes_billed": maximum_bytes,
         "country_labels": {
-            country.id: country.label for country in countries
+            country.id: country.ngram_label for country in countries
         },
         "topic_phrases": phrases,
         "include_denominator": args.include_denominator,
@@ -648,7 +671,7 @@ def _estimate_ngrams(args: argparse.Namespace) -> int:
     )
     request = CollectionRequest(start=args.start, end=args.end, topics=topics)
     windows, phrases = plan_ngram_windows(request, window_days=args.window_days)
-    labels = {country.id: country.label for country in countries}
+    labels = {country.id: country.ngram_label for country in countries}
     executor = GoogleBigQueryExecutor(
         project=args.billing_project, location=args.location
     )
@@ -675,6 +698,58 @@ def _estimate_ngrams(args: argparse.Namespace) -> int:
         f"{maximum / 1_000_000_000:.3f} GB."
     )
     print("Dry runs do not process data or incur query charges.")
+    return 0
+
+
+def _audit_ngram_countries(args: argparse.Namespace) -> int:
+    country_config = load_country_config(args.countries_config)
+    countries = country_config.enabled_countries(
+        set(args.countries) if args.countries else None
+    )
+    executor = GoogleBigQueryExecutor(
+        project=args.billing_project, location=args.location
+    )
+    rows, job = audit_country_mapping(
+        executor=executor,
+        country_labels={country.id: country.ngram_label for country in countries},
+        maximum_bytes_billed=int(args.maximum_gb_billed * 1_000_000_000),
+    )
+    output = args.output
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with output.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=(
+                "country_id",
+                "country_label",
+                "mapped_domain_count",
+                "mapping_supported",
+                "sample_domains",
+                "suggested_labels",
+            ),
+        )
+        writer.writeheader()
+        for row in rows:
+            mapped = int(row["mapped_domain_count"])
+            writer.writerow(
+                {
+                    **row,
+                    "mapping_supported": mapped > 0,
+                    "sample_domains": "|".join(row.get("sample_domains") or []),
+                    "suggested_labels": "|".join(
+                        row.get("suggested_labels") or []
+                    ),
+                }
+            )
+    unsupported = sum(int(row["mapped_domain_count"]) == 0 for row in rows)
+    print(
+        f"Audited {len(rows)} country/countries: {len(rows) - unsupported} mapped, "
+        f"{unsupported} unsupported. Wrote {output}."
+    )
+    print(
+        f"BigQuery estimate: {job['estimated_bytes_processed'] / 1_000_000_000:.3f} "
+        f"GB; billed: {job['total_bytes_billed'] / 1_000_000_000:.3f} GB."
+    )
     return 0
 
 

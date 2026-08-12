@@ -69,6 +69,24 @@ class QuerySpec(StrictModel):
         return self
 
 
+class NGramPhrase(StrictModel):
+    """A native-language literal used only by the Web NGrams adapter."""
+
+    text: str = Field(min_length=1)
+    language: str = Field(pattern=r"^[a-z]{2,3}$")
+    segmentation: Literal["space", "character"] = "space"
+    translation_status: Literal["draft", "validated"] = "draft"
+    notes: str | None = None
+
+    @field_validator("text", "language")
+    @classmethod
+    def phrase_values_are_trimmed(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("NGram phrase values must not be blank")
+        return cleaned
+
+
 class Topic(StrictModel):
     """A conceptual subject that may contain several search expressions."""
 
@@ -80,6 +98,7 @@ class Topic(StrictModel):
     exclude_terms: list[str] = Field(default_factory=list)
     languages: list[str] = Field(default_factory=list)
     geographies: list[str] = Field(default_factory=list)
+    ngram_phrases: list[NGramPhrase] = Field(default_factory=list)
     description: str | None = None
     notes: str | None = None
 
@@ -100,6 +119,12 @@ class Topic(StrictModel):
         ids = [query.id for query in self.queries]
         if len(set(ids)) != len(ids):
             raise ValueError(f"query ids must be unique within topic {self.id!r}")
+        phrase_keys = [
+            (item.text.casefold(), item.language, item.segmentation)
+            for item in self.ngram_phrases
+        ]
+        if len(phrase_keys) != len(set(phrase_keys)):
+            raise ValueError(f"NGram phrases must be unique within topic {self.id!r}")
         return self
 
 

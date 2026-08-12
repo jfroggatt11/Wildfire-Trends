@@ -24,14 +24,18 @@ countries:
   benin: Benin
   bhutan: Bhutan
   bolivia: Bolivia
-  bosniaandherzegovina: Bosnia and Herzegovina
+  bosniaandherzegovina:
+    label: Bosnia and Herzegovina
+    gdelt_ngram_label: Bosnia-Herzegovina
   botswana: Botswana
   brazil: Brazil
   brunei: Brunei
   bulgaria: Bulgaria
   burkinafaso: Burkina Faso
   burundi: Burundi
-  caboverde: Cabo Verde
+  caboverde:
+    label: Cabo Verde
+    gdelt_ngram_label: Cape Verde
   cambodia: Cambodia
   cameroon: Cameroon
   canada: Canada
@@ -131,7 +135,9 @@ countries:
   niger: Niger
   nigeria: Nigeria
   northkorea: North Korea
-  northmacedonia: North Macedonia
+  northmacedonia:
+    label: North Macedonia
+    gdelt_ngram_label: Macedonia
   norway: Norway
   oman: Oman
   pakistan: Pakistan

@@ -37,7 +37,8 @@ optional denominator mode, `country_monitored_count` is the number of distinct U
 in GDELT's GAL table attributed to the country that day, and
 `country_attention_share` is their ratio. Metadata records phrases, anchor-variant
 policy, BigQuery job and byte details, URL deduplication, attribution rate, and
-country-map limitations.
+country-map limitations. Multilingual runs also record `configured_languages`, daily
+`language_counts`, `country_mapping_supported`, and `mapped_domain_count`.
 
 ## Country coverage baselines
 

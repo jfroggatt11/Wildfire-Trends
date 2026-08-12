@@ -103,10 +103,41 @@ def test_unknown_schema_version_is_rejected(tmp_path):
 def test_country_config_parsing_and_selection(tmp_path):
     path = tmp_path / "countries.yaml"
     path.write_text(
-        "countries:\n  italy: Italy\n  france:\n    label: France\n    enabled: false\n",
+        "countries:\n  italy:\n    label: Italy\n"
+        "    gdelt_ngram_label: Italian Republic\n"
+        "  france:\n    label: France\n    enabled: false\n",
         encoding="utf-8",
     )
     config = load_country_config(path)
     assert [country.id for country in config.enabled_countries()] == ["italy"]
+    assert config.enabled_countries()[0].ngram_label == "Italian Republic"
     with pytest.raises(ValueError, match="unknown country"):
         config.enabled_countries({"missing"})
+
+
+def test_compact_multilingual_ngram_phrases_are_normalized(tmp_path):
+    path = tmp_path / "topics.yaml"
+    path.write_text(
+        """
+topics:
+  climate:
+    label: Climate
+    queries: ['"climate change"']
+    ngram_phrases:
+      en:
+        translation_status: validated
+        phrases: [climate change]
+      zh:
+        segmentation: character
+        phrases: [气候变化]
+""",
+        encoding="utf-8",
+    )
+
+    phrases = load_config(path).topics[0].ngram_phrases
+    assert [(item.text, item.language, item.segmentation) for item in phrases] == [
+        ("climate change", "en", "space"),
+        ("气候变化", "zh", "character"),
+    ]
+    assert phrases[0].translation_status == "validated"
+    assert phrases[1].translation_status == "draft"
