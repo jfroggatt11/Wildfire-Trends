@@ -181,7 +181,9 @@ literal with a GDELT language code and either `space` or `character` segmentatio
 The bundled English terms are validated against the canonical queries; the nine
 translated language groups are research seeds marked `draft` and need native-speaker
 review before inferential use. Omitting `--countries` requests all 197 configured
-countries in the same topic/window query—it does not create one query per country.
+countries. All selected themes, phrases, languages, and countries share one BigQuery
+scan per date window; the result is still separated into canonical topic-country-day
+rows.
 
 Audit the historical country-domain map before interpreting zeros:
 
@@ -200,7 +202,7 @@ above the reported largest job:
 
 ```bash
 climate-attention collect-ngrams \
-  --config config/topics.example.yaml \
+  --config config/topics.multilingual.example.yaml \
   --countries-config config/countries.world.yaml \
   --topics climate_change clean_energy clean_transport electric_vehicles \
   --countries italy unitedkingdom unitedstates india brazil \
@@ -211,10 +213,12 @@ climate-attention collect-ngrams \
   --data-dir data
 ```
 
-Every job is dry-run again immediately before execution and is rejected if its
-estimate exceeds the frozen cap. The default query is counts-only: it reconstructs
-configured literal phrases from NGram context and counts each matching URL once per
-topic, country, and day. It joins URLs to GDELT's
+Every date-window job is dry-run again immediately before execution and is rejected
+if its estimate exceeds the frozen cap. The default query is counts-only: it scans
+the NGram table once for all selected topics, reconstructs configured literal phrases
+from context, assigns every match to its topic or topics, and counts each URL at most
+once per topic, country, and day. An article matching two different topics is validly
+counted once in each. It joins URLs to GDELT's
 `domainsbycountry_alllangs_april2015` table by longest domain suffix. Ambiguous and
 unmapped domains are excluded, and an overall matched-URL attribution rate is
 retained in metadata.
@@ -223,7 +227,9 @@ Space-segmented phrases use exact unpunctuated lower- and title-case anchor toke
 character-segmented phrases use a centered character anchor. This lets BigQuery
 prune the clustered `ngram` table but intentionally misses some punctuation and case
 forms; treat that as a sensitivity test before production. All translated matches
-are deduplicated to one URL per topic/day before country attribution. Adding
+are deduplicated to one URL per topic/day before country attribution. Batch
+checkpointing is per date window, while stored topic IDs and record IDs remain
+compatible with the older per-topic jobs. Adding
 `--include-denominator` scans the much larger Article List (`gal`) table and derives
 `country_attention_share`, but is optional and can be dramatically more expensive.
 Always estimate that mode separately.

@@ -625,6 +625,7 @@ def _collect_ngrams(args: argparse.Namespace) -> int:
             country.id: country.ngram_label for country in countries
         },
         "topic_phrases": phrases,
+        "batch_topics": True,
         "include_denominator": args.include_denominator,
     }
     started_at = datetime.now(timezone.utc)
@@ -647,6 +648,7 @@ def _collect_ngrams(args: argparse.Namespace) -> int:
         f"Created GDELT NGrams run {run_id}: {len(topics)} topic(s), "
         f"{len(countries)} country/countries, {len(windows)} BigQuery job(s)."
     )
+    print("All selected topics share one BigQuery scan per date window.")
     print(
         "Each job is dry-run first and cannot exceed the configured per-job "
         f"cap of {maximum_bytes / 1_000_000_000:.3f} GB."
@@ -684,8 +686,9 @@ def _estimate_ngrams(args: argparse.Namespace) -> int:
     )
     for estimate in estimates:
         gb = estimate["estimated_bytes_processed"] / 1_000_000_000
+        topic_label = ",".join(estimate["topic_ids"])
         print(
-            f"{estimate['topic_id']}: {estimate['start']}..{estimate['end']} "
+            f"batch[{topic_label}]: {estimate['start']}..{estimate['end']} "
             f"{gb:.3f} GB"
         )
     total = sum(item["estimated_bytes_processed"] for item in estimates)

@@ -86,7 +86,7 @@ caffeinate -i climate-attention collect-trends \
 ```
 
 In another terminal, authenticate against a dedicated research project and estimate
-the four NGram jobs before execution:
+the batched NGram job before execution:
 
 ```bash
 gcloud auth application-default login
@@ -102,7 +102,9 @@ climate-attention estimate-ngrams \
   --billing-project YOUR_RESEARCH_PROJECT
 ```
 
-Omit `--countries` to return every configured country from each topic/window query.
+Omit `--countries` to return every configured country. All selected topics share one
+scan per date window; `--window-days` therefore controls both the retry boundary and
+the per-job billing-cap boundary.
 Before doing so, audit the historical domain map:
 
 ```bash
@@ -115,7 +117,7 @@ Rows with `country_mapping_supported=false` are structurally unavailable and mus
 not be analyzed as zero-attention days. Review draft translations and inspect the
 stored per-language counts before expanding the date range.
 
-Set `--maximum-gb-billed` slightly above the largest reported job, not an arbitrary
+Set `--maximum-gb-billed` slightly above the largest reported batch, not an arbitrary
 large allowance, and then run `collect-ngrams` with the same arguments. BigQuery jobs
 do not need pacing; the byte cap controls exposure. Finally run `compare-sources` as
 shown in the README. Its default metrics are API `country_attention_share` and NGram
@@ -125,6 +127,12 @@ estimate and collection rather than assuming the counts-only estimate applies. D
 not interpret correlation alone as validity: inspect country mapping coverage,
 zero-day rates, spikes, anchor-token sensitivity, and differences caused by
 original-language versus translated search.
+
+As a concrete benchmark, the four multilingual themes over July 2026 and all 197
+configured countries dry-ran at 587.958 GB in one batch, versus 1,080.384 GB across
+four separate topic jobs—a 45.6% reduction. A one-day batch returned exactly the same
+788 topic-country counts as the four earlier jobs. Re-estimate every new date range;
+clustering and phrase anchors mean this benchmark is not a guaranteed billing ratio.
 
 ## Verify completeness
 

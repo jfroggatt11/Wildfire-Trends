@@ -25,6 +25,9 @@ from .gdelt import GDELTWindow
 
 LOGGER = logging.getLogger(__name__)
 SOURCE = "gdelt_ngrams"
+BATCH_TOPIC_ID = "ngram_topic_batch"
+BATCH_QUERY_ID = "topics_distinct_urls"
+TOPIC_QUERY_ID = "topic_distinct_urls"
 DEFAULT_NGRAM_TABLE = "gdelt-bq.gdeltv2.webngrams"
 DEFAULT_COVERAGE_TABLE = "gdelt-bq.gdeltv2.gal"
 DEFAULT_DOMAIN_COUNTRY_TABLE = (
@@ -190,33 +193,29 @@ def topic_phrases(request: CollectionRequest) -> dict[str, list[dict[str, Any]]]
 
 def plan_ngram_windows(
     request: CollectionRequest, *, window_days: int = 366
-) -> tuple[list[GDELTWindow], dict[str, list[str]]]:
+) -> tuple[list[GDELTWindow], dict[str, list[dict[str, Any]]]]:
     if window_days < 1:
         raise ValueError("NGram window must be at least one day")
     phrases_by_topic = topic_phrases(request)
+    if not phrases_by_topic:
+        return [], phrases_by_topic
     windows: list[GDELTWindow] = []
-    for topic in request.topics:
-        phrases = phrases_by_topic.get(topic.id)
-        if not phrases:
-            continue
-        expression = " OR ".join(
-            f'"{phrase["text"]}"' for phrase in phrases
-        )
-        current = request.start
-        while current <= request.end:
-            chunk_end = min(request.end, current + timedelta(days=window_days - 1))
-            windows.append(
-                GDELTWindow(
-                    query=Query(
-                        topic_id=topic.id,
-                        query_id="topic_distinct_urls",
-                        expression=expression,
-                    ),
-                    start=datetime.combine(current, dt_time.min, tzinfo=timezone.utc),
-                    end=datetime.combine(chunk_end, dt_time.max, tzinfo=timezone.utc),
-                )
+    expression = ",".join(sorted(phrases_by_topic))
+    current = request.start
+    while current <= request.end:
+        chunk_end = min(request.end, current + timedelta(days=window_days - 1))
+        windows.append(
+            GDELTWindow(
+                query=Query(
+                    topic_id=BATCH_TOPIC_ID,
+                    query_id=BATCH_QUERY_ID,
+                    expression=expression,
+                ),
+                start=datetime.combine(current, dt_time.min, tzinfo=timezone.utc),
+                end=datetime.combine(chunk_end, dt_time.max, tzinfo=timezone.utc),
             )
-            current = chunk_end + timedelta(days=1)
+        )
+        current = chunk_end + timedelta(days=1)
     return windows, phrases_by_topic
 
 
@@ -228,53 +227,55 @@ def build_ngram_sql(
     domain_country_table: str = DEFAULT_DOMAIN_COUNTRY_TABLE,
     include_denominator: bool = False,
 ) -> tuple[str, dict[str, Any]]:
-    """Build parameterized SQL for deduplicated matched URL counts."""
+    """Build the legacy single-topic shape through the batched SQL builder."""
+    return build_ngram_batch_sql(
+        phrases_by_topic={"single_topic": phrases},
+        ngram_table=ngram_table,
+        coverage_table=coverage_table,
+        domain_country_table=domain_country_table,
+        include_denominator=include_denominator,
+    )
+
+
+def build_ngram_batch_sql(
+    *,
+    phrases_by_topic: dict[str, list[str | dict[str, Any]]],
+    ngram_table: str = DEFAULT_NGRAM_TABLE,
+    coverage_table: str = DEFAULT_COVERAGE_TABLE,
+    domain_country_table: str = DEFAULT_DOMAIN_COUNTRY_TABLE,
+    include_denominator: bool = False,
+) -> tuple[str, dict[str, Any]]:
+    """Build one scan that independently deduplicates URLs for every topic."""
     for table in (ngram_table, coverage_table, domain_country_table):
         if not _TABLE_PATTERN.fullmatch(table):
             raise ValueError(f"invalid BigQuery table identifier: {table!r}")
-    if not phrases:
-        raise ValueError("at least one NGram phrase is required")
+    if not phrases_by_topic or any(not values for values in phrases_by_topic.values()):
+        raise ValueError("each NGram topic must contain at least one phrase")
 
-    phrase_specs = _normalize_phrase_specs(phrases)
-    clauses: list[str] = []
     parameters: dict[str, Any] = {}
-    for index, phrase in enumerate(phrase_specs):
-        text = phrase["text"]
-        segmentation = phrase["segmentation"]
-        units = text.split() if segmentation == "space" else list(text.replace(" ", ""))
-        if not units:
-            raise ValueError("NGram phrase must contain a word")
-        anchor = units[(len(units) - 1) // 2].casefold()
-        separator = r"\s+" if segmentation == "space" else ""
-        escaped = separator.join(re.escape(unit.casefold()) for unit in units)
-        parameters[f"anchor_variants_{index}"] = _anchor_variants(
-            anchor, single_word=len(units) == 1, character=segmentation == "character"
-        )
-        parameters[f"pattern_{index}"] = (
-            escaped
-            if segmentation == "character"
-            else rf"(^|[^\p{{L}}\p{{N}}]){escaped}([^\p{{L}}\p{{N}}]|$)"
-        )
-        parameters[f"segmentation_type_{index}"] = (
-            2 if segmentation == "character" else 1
-        )
-        language_filter = ""
-        if phrase["language"]:
-            parameters[f"language_{index}"] = phrase["language"]
-            language_filter = f"lang = @language_{index} AND "
-        context = (
-            "CONCAT(COALESCE(pre, ''), ngram, COALESCE(post, ''))"
-            if segmentation == "character"
-            else "CONCAT(COALESCE(pre, ''), ' ', ngram, ' ', COALESCE(post, ''))"
-        )
-        clauses.append(
-            "("
-            f"{language_filter}type = @segmentation_type_{index} AND "
-            f"ngram IN UNNEST(@anchor_variants_{index}) AND "
-            f"REGEXP_CONTAINS(LOWER({context}), @pattern_{index})"
-            ")"
-        )
-    phrase_filter = "\n      OR ".join(clauses)
+    topic_clauses: list[tuple[int, str]] = []
+    phrase_index = 0
+    topic_ids = sorted(phrases_by_topic)
+    for topic_index, topic_id in enumerate(topic_ids):
+        parameters[f"topic_id_{topic_index}"] = topic_id
+        clauses: list[str] = []
+        for phrase in _normalize_phrase_specs(phrases_by_topic[topic_id]):
+            clause, values = _phrase_sql_clause(phrase, phrase_index)
+            parameters.update(values)
+            clauses.append(clause)
+            phrase_index += 1
+        topic_clauses.append((topic_index, " OR ".join(clauses)))
+    phrase_filter = "\n      OR ".join(
+        f"({clause})" for _, clause in topic_clauses
+    )
+    topic_array = "ARRAY_CONCAT(\n        " + ",\n        ".join(
+        "IF(("
+        + clause
+        + f"), ARRAY<STRING>[@topic_id_{topic_index}], ARRAY<STRING>[])"
+        for topic_index, clause in topic_clauses
+    ) + "\n      )"
+
+    parameters["topic_ids"] = topic_ids
 
     coverage_ctes = ""
     monitored_expression = "CAST(NULL AS INT64)"
@@ -313,6 +314,9 @@ WITH requested_countries AS (
   JOIN UNNEST(@country_labels) AS country_label WITH OFFSET AS label_position
     ON position = label_position
 ),
+requested_topics AS (
+  SELECT topic_id FROM UNNEST(@topic_ids) AS topic_id
+),
 unambiguous_domains AS (
   SELECT LOWER(Domain) AS domain, ANY_VALUE(CountryHumanName) AS country_label
   FROM `{domain_country_table}`
@@ -322,49 +326,59 @@ unambiguous_domains AS (
 ),
 matched_urls AS (
   SELECT
+    topic_id,
     DATE(date) AS day,
     url,
     LOWER(NET.HOST(url)) AS host,
     ARRAY_AGG(DISTINCT lang ORDER BY lang LIMIT 1)[SAFE_OFFSET(0)] AS lang
   FROM `{ngram_table}`
+  CROSS JOIN UNNEST(
+    {topic_array}
+  ) AS topic_id
   WHERE DATE(date) BETWEEN @start_date AND @end_date
     AND (
       {phrase_filter}
     )
-  GROUP BY day, url, host
+  GROUP BY topic_id, day, url, host
 ),
 matched_attributed AS (
-  SELECT day, url, lang, domains.country_label
+  SELECT topic_id, day, url, lang, domains.country_label
   FROM matched_urls
   JOIN unambiguous_domains AS domains
     ON host = domains.domain OR ENDS_WITH(host, CONCAT('.', domains.domain))
   QUALIFY ROW_NUMBER() OVER (
-    PARTITION BY day, url ORDER BY LENGTH(domains.domain) DESC
+    PARTITION BY topic_id, day, url ORDER BY LENGTH(domains.domain) DESC
   ) = 1
 ),
 mapping_stats AS (
   SELECT
-    (SELECT COUNT(*) FROM matched_urls) AS total_matched_urls,
-    (SELECT COUNT(*) FROM matched_attributed) AS attributed_matched_urls
+    topics.topic_id,
+    COUNT(DISTINCT matched.url) AS total_matched_urls,
+    COUNT(DISTINCT attributed.url) AS attributed_matched_urls
+  FROM requested_topics AS topics
+  LEFT JOIN matched_urls AS matched USING (topic_id)
+  LEFT JOIN matched_attributed AS attributed USING (topic_id, day, url)
+  GROUP BY topic_id
 ),
 country_matches AS (
-  SELECT day, countries.country_id, COUNT(DISTINCT url) AS matched_count
+  SELECT topic_id, day, countries.country_id, COUNT(DISTINCT url) AS matched_count
   FROM matched_attributed
   JOIN requested_countries AS countries USING (country_label)
-  GROUP BY day, country_id
+  GROUP BY topic_id, day, country_id
 ),
 country_language_matches AS (
-  SELECT day, countries.country_id, lang, COUNT(DISTINCT url) AS matched_count
+  SELECT topic_id, day, countries.country_id, lang,
+    COUNT(DISTINCT url) AS matched_count
   FROM matched_attributed
   JOIN requested_countries AS countries USING (country_label)
-  GROUP BY day, country_id, lang
+  GROUP BY topic_id, day, country_id, lang
 ),
 country_language_breakdown AS (
-  SELECT day, country_id,
+  SELECT topic_id, day, country_id,
     TO_JSON_STRING(ARRAY_AGG(STRUCT(lang, matched_count) ORDER BY lang))
       AS language_counts_json
   FROM country_language_matches
-  GROUP BY day, country_id
+  GROUP BY topic_id, day, country_id
 ),
 country_mapping_support AS (
   SELECT countries.country_id, COUNT(domains.domain) AS mapped_domain_count
@@ -377,6 +391,7 @@ calendar AS (
   FROM UNNEST(GENERATE_DATE_ARRAY(@start_date, @end_date)) AS day
 )
 SELECT
+  topics.topic_id,
   calendar.day,
   countries.country_id,
   COALESCE(matches.matched_count, 0) AS matched_count,
@@ -386,15 +401,60 @@ SELECT
   support.mapped_domain_count,
   COALESCE(language_breakdown.language_counts_json, '[]') AS language_counts_json
 FROM calendar
+CROSS JOIN requested_topics AS topics
 CROSS JOIN requested_countries AS countries
-CROSS JOIN mapping_stats
-LEFT JOIN country_matches AS matches USING (day, country_id)
-LEFT JOIN country_language_breakdown AS language_breakdown USING (day, country_id)
+JOIN mapping_stats USING (topic_id)
+LEFT JOIN country_matches AS matches USING (topic_id, day, country_id)
+LEFT JOIN country_language_breakdown AS language_breakdown
+  USING (topic_id, day, country_id)
 JOIN country_mapping_support AS support USING (country_id)
 {coverage_join}
-ORDER BY day, country_id
+ORDER BY topic_id, day, country_id
 """.strip()
     return sql, parameters
+
+
+def _phrase_sql_clause(
+    phrase: dict[str, Any], index: int
+) -> tuple[str, dict[str, Any]]:
+    text = phrase["text"]
+    segmentation = phrase["segmentation"]
+    units = text.split() if segmentation == "space" else list(text.replace(" ", ""))
+    if not units:
+        raise ValueError("NGram phrase must contain a word")
+    anchor = units[(len(units) - 1) // 2].casefold()
+    separator = r"\s+" if segmentation == "space" else ""
+    escaped = separator.join(re.escape(unit.casefold()) for unit in units)
+    values: dict[str, Any] = {
+        f"anchor_variants_{index}": _anchor_variants(
+            anchor,
+            single_word=len(units) == 1,
+            character=segmentation == "character",
+        ),
+        f"pattern_{index}": (
+            escaped
+            if segmentation == "character"
+            else rf"(^|[^\p{{L}}\p{{N}}]){escaped}([^\p{{L}}\p{{N}}]|$)"
+        ),
+        f"segmentation_type_{index}": 2 if segmentation == "character" else 1,
+    }
+    language_filter = ""
+    if phrase["language"]:
+        values[f"language_{index}"] = phrase["language"]
+        language_filter = f"lang = @language_{index} AND "
+    context = (
+        "CONCAT(COALESCE(pre, ''), ngram, COALESCE(post, ''))"
+        if segmentation == "character"
+        else "CONCAT(COALESCE(pre, ''), ' ', ngram, ' ', COALESCE(post, ''))"
+    )
+    return (
+        "("
+        f"{language_filter}type = @segmentation_type_{index} AND "
+        f"ngram IN UNNEST(@anchor_variants_{index}) AND "
+        f"REGEXP_CONTAINS(LOWER({context}), @pattern_{index})"
+        ")",
+        values,
+    )
 
 
 def _normalize_phrase_specs(
@@ -428,6 +488,12 @@ def _normalize_phrase_specs(
     return normalized
 
 
+def _topic_expression(phrases: list[str | dict[str, Any]]) -> str:
+    return " OR ".join(
+        f'"{phrase["text"]}"' for phrase in _normalize_phrase_specs(phrases)
+    )
+
+
 def _anchor_variants(
     anchor: str, *, single_word: bool, character: bool = False
 ) -> list[str]:
@@ -458,8 +524,29 @@ def prepare_ngram_query(
     domain_country_table: str = DEFAULT_DOMAIN_COUNTRY_TABLE,
     include_denominator: bool = False,
 ) -> tuple[str, dict[str, Any]]:
-    sql, phrase_parameters = build_ngram_sql(
-        phrases=phrases,
+    return prepare_ngram_batch_query(
+        window,
+        phrases_by_topic={window.query.topic_id: phrases},
+        country_labels=country_labels,
+        ngram_table=ngram_table,
+        coverage_table=coverage_table,
+        domain_country_table=domain_country_table,
+        include_denominator=include_denominator,
+    )
+
+
+def prepare_ngram_batch_query(
+    window: GDELTWindow,
+    *,
+    phrases_by_topic: dict[str, list[str | dict[str, Any]]],
+    country_labels: dict[str, str],
+    ngram_table: str = DEFAULT_NGRAM_TABLE,
+    coverage_table: str = DEFAULT_COVERAGE_TABLE,
+    domain_country_table: str = DEFAULT_DOMAIN_COUNTRY_TABLE,
+    include_denominator: bool = False,
+) -> tuple[str, dict[str, Any]]:
+    sql, phrase_parameters = build_ngram_batch_sql(
+        phrases_by_topic=phrases_by_topic,
         ngram_table=ngram_table,
         coverage_table=coverage_table,
         domain_country_table=domain_country_table,
@@ -484,10 +571,14 @@ def estimate_ngram_windows(
 ) -> list[dict[str, Any]]:
     estimates: list[dict[str, Any]] = []
     for window in windows:
-        phrases = phrases_by_topic[window.query.topic_id]
-        sql, parameters = prepare_ngram_query(
+        selected_phrases = (
+            phrases_by_topic
+            if window.query.topic_id == BATCH_TOPIC_ID
+            else {window.query.topic_id: phrases_by_topic[window.query.topic_id]}
+        )
+        sql, parameters = prepare_ngram_batch_query(
             window,
-            phrases=phrases,
+            phrases_by_topic=selected_phrases,
             country_labels=country_labels,
             include_denominator=include_denominator,
         )
@@ -495,6 +586,7 @@ def estimate_ngram_windows(
             {
                 "window_id": window.window_id,
                 "topic_id": window.query.topic_id,
+                "topic_ids": sorted(selected_phrases),
                 "start": window.start.date(),
                 "end": window.end.date(),
                 "estimated_bytes_processed": executor.estimate(sql, parameters),
@@ -657,12 +749,18 @@ class GDELTNGramsProvider:
         return result
 
     def _collect_window(self, window: GDELTWindow) -> list[DailyTrend]:
-        phrases = self.topic_phrases.get(window.query.topic_id)
-        if not phrases:
+        selected_phrases = (
+            self.topic_phrases
+            if window.query.topic_id == BATCH_TOPIC_ID
+            else {
+                window.query.topic_id: self.topic_phrases.get(window.query.topic_id, [])
+            }
+        )
+        if not selected_phrases or any(not values for values in selected_phrases.values()):
             raise ValueError(f"missing NGram phrases for topic {window.query.topic_id!r}")
-        sql, parameters = prepare_ngram_query(
+        sql, parameters = prepare_ngram_batch_query(
             window,
-            phrases=phrases,
+            phrases_by_topic=selected_phrases,
             country_labels=self.country_labels,
             ngram_table=self.ngram_table,
             coverage_table=self.coverage_table,
@@ -688,7 +786,7 @@ class GDELTNGramsProvider:
                     "window_id": window.window_id,
                     "source": SOURCE,
                     "query": window.query.model_dump(mode="json"),
-                    "phrases": phrases,
+                    "topic_phrases": selected_phrases,
                     "start": window.start.isoformat(),
                     "end": window.end.isoformat(),
                     "estimated_bytes_processed": estimated_bytes,
@@ -696,10 +794,10 @@ class GDELTNGramsProvider:
                     "response": [_json_safe_row(row) for row in rows],
                 }
             )
-        trends = parse_ngram_rows(
+        trends = parse_ngram_batch_rows(
             rows=rows,
             window=window,
-            phrases=phrases,
+            phrases_by_topic=selected_phrases,
             estimated_bytes=estimated_bytes,
             job=job,
             collected_at=collected_at,
@@ -707,7 +805,7 @@ class GDELTNGramsProvider:
         )
         expected = (
             (window.end.date() - window.start.date()).days + 1
-        ) * len(self.country_labels)
+        ) * len(self.country_labels) * len(selected_phrases)
         if len(trends) != expected:
             raise ValueError(
                 f"BigQuery returned {len(trends)} country-day rows; expected {expected}"
@@ -715,7 +813,11 @@ class GDELTNGramsProvider:
         returned_countries = {trend.geography for trend in trends}
         if returned_countries != set(self.country_labels):
             raise ValueError("BigQuery returned unexpected country dimensions")
+        returned_topics = {trend.topic_id for trend in trends}
+        if returned_topics != set(selected_phrases):
+            raise ValueError("BigQuery returned unexpected topic dimensions")
         return trends
+
     @staticmethod
     def _log(
         window: GDELTWindow,
@@ -765,18 +867,47 @@ def parse_ngram_rows(
     collected_at: datetime,
     include_denominator: bool = False,
 ) -> list[DailyTrend]:
+    return parse_ngram_batch_rows(
+        rows=rows,
+        window=window,
+        phrases_by_topic={window.query.topic_id: phrases},
+        estimated_bytes=estimated_bytes,
+        job=job,
+        collected_at=collected_at,
+        include_denominator=include_denominator,
+    )
+
+
+def parse_ngram_batch_rows(
+    *,
+    rows: Iterable[dict[str, Any]],
+    window: GDELTWindow,
+    phrases_by_topic: dict[str, list[str | dict[str, Any]]],
+    estimated_bytes: int,
+    job: dict[str, Any],
+    collected_at: datetime,
+    include_denominator: bool = False,
+) -> list[DailyTrend]:
     trends: list[DailyTrend] = []
-    seen: set[tuple[date, str]] = set()
+    seen: set[tuple[str, date, str]] = set()
+    sole_topic = next(iter(phrases_by_topic)) if len(phrases_by_topic) == 1 else None
+    batch_topic_ids = sorted(phrases_by_topic)
     for row in rows:
         day = row.get("day")
         if isinstance(day, datetime):
             day = day.date()
         if not isinstance(day, date):
             day = date.fromisoformat(str(day))
+        topic_id = str(row.get("topic_id") or sole_topic or "")
+        if topic_id not in phrases_by_topic:
+            raise ValueError(f"unexpected NGram topic id: {topic_id!r}")
+        phrases = phrases_by_topic[topic_id]
         country_id = str(row["country_id"])
-        key = (day, country_id)
+        key = (topic_id, day, country_id)
         if key in seen:
-            raise ValueError(f"duplicate NGram aggregate row for {country_id} {day}")
+            raise ValueError(
+                f"duplicate NGram aggregate row for {topic_id}/{country_id}/{day}"
+            )
         seen.add(key)
         matched = int(row["matched_count"])
         raw_monitored = row.get("monitored_count")
@@ -791,8 +922,8 @@ def parse_ngram_rows(
         identity = "|".join(
             [
                 "gdelt-ngrams-v1",
-                window.query.topic_id,
-                window.query.query_id,
+                topic_id,
+                TOPIC_QUERY_ID,
                 country_id,
                 day.isoformat(),
             ]
@@ -802,9 +933,9 @@ def parse_ngram_rows(
                 record_id=sha256(identity.encode("utf-8")).hexdigest(),
                 date=day,
                 source=SOURCE,
-                topic_id=window.query.topic_id,
-                query_id=window.query.query_id,
-                query_expression=window.query.expression,
+                topic_id=topic_id,
+                query_id=TOPIC_QUERY_ID,
+                query_expression=_topic_expression(phrases),
                 geography=country_id,
                 matched_count=matched,
                 country_monitored_count=monitored,
@@ -812,6 +943,12 @@ def parse_ngram_rows(
                 collected_at=collected_at,
                 metadata={
                     "collection_mode": "webngrams_distinct_urls",
+                    "bigquery_collection_mode": (
+                        "multi_topic_batch"
+                        if len(batch_topic_ids) > 1
+                        else "single_topic_batch"
+                    ),
+                    "bigquery_batch_topic_ids": batch_topic_ids,
                     "phrases": _normalize_phrase_specs(phrases),
                     "language_counts": {
                         item["lang"]: int(item["matched_count"])

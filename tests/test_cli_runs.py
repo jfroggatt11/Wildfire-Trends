@@ -313,3 +313,4 @@ def test_collect_ngrams_plan_only_freezes_billing_cap_and_queries(tmp_path, caps
         "notes": "legacy query fallback",
     }
     assert state.provider_options["include_denominator"] is False
+    assert state.provider_options["batch_topics"] is True

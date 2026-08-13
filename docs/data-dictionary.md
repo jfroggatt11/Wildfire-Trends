@@ -38,7 +38,10 @@ in GDELT's GAL table attributed to the country that day, and
 `country_attention_share` is their ratio. Metadata records phrases, anchor-variant
 policy, BigQuery job and byte details, URL deduplication, attribution rate, and
 country-map limitations. Multilingual runs also record `configured_languages`, daily
-`language_counts`, `country_mapping_supported`, and `mapped_domain_count`.
+`language_counts`, `country_mapping_supported`, and `mapped_domain_count`. Batched
+runs record `bigquery_collection_mode=multi_topic_batch` and
+`bigquery_batch_topic_ids`; these are operational metadata and do not alter canonical
+topic-level identity.
 
 ## Country coverage baselines
 

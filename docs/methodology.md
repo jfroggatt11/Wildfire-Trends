@@ -132,6 +132,14 @@ articles. Phrase records carry the GDELT ISO language code, segmentation mode, a
 translation-validation status. Character-mode context is concatenated without spaces
 for languages such as Chinese and Japanese.
 
+All selected topics are evaluated in one table scan per date window. A matched URL
+is expanded to every applicable topic and then deduplicated on
+`(topic_id, day, url)`. Thus synonyms and translations within a topic cannot inflate
+its count, while an article legitimately matching two conceptual topics contributes
+once to each. The batch window is the operational retry unit; canonical record
+identity remains topic-specific and is backward-compatible with earlier per-topic
+runs.
+
 Country attribution uses GDELT's multilingual April 2015 domain-country table.
 Ambiguous domains are discarded, the longest matching domain suffix wins for
 subdomains, and URLs without a mapping are excluded. This catalogue is both old and
@@ -178,9 +186,10 @@ the earlier definition. Do not combine partially upgraded date ranges without
 checking that their configured-language and phrase metadata agree.
 
 All BigQuery jobs use parameterized SQL, a non-billable dry run, an explicit billing
-project and a hard `maximum_bytes_billed` cap. Query byte estimates and completed job
-statistics are retained in response envelopes and row metadata. Denominator mode is
-not the default because scanning GAL can dominate cost; estimate it independently.
+project and a hard per-window `maximum_bytes_billed` cap. Query byte estimates,
+batched topic IDs, and completed job statistics are retained in response envelopes
+and row metadata. Denominator mode is not the default because scanning GAL can
+dominate cost; estimate it independently.
 
 ## Source documentation
 

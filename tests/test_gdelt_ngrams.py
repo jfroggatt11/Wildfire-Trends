@@ -1,19 +1,22 @@
 from __future__ import annotations
 
 import json
-from datetime import date
+from dataclasses import replace
+from datetime import date, datetime, timezone
 
 import pytest
 
 from climate_attention.config import Country
-from climate_attention.models import CollectionRequest, QuerySpec, Topic
+from climate_attention.models import CollectionRequest, Query, QuerySpec, Topic
 from climate_attention.sources.base import ProviderCollectionError
 from climate_attention.sources.gdelt_ngrams import (
     GDELTNGramsProvider,
     GoogleBigQueryExecutor,
     audit_country_mapping,
     build_country_audit_sql,
+    build_ngram_batch_sql,
     build_ngram_sql,
+    parse_ngram_batch_rows,
     plan_ngram_windows,
 )
 
@@ -66,6 +69,89 @@ def test_ngram_planning_is_topic_window_not_country_window():
     assert all(window.query.geography is None for window in windows)
     assert windows[0].start.date() == date(2026, 1, 1)
     assert windows[1].start.date() == date(2026, 1, 3)
+
+
+def test_ngram_planning_batches_all_topics_per_date_window():
+    request = _request().model_copy(deep=True)
+    request.topics.append(
+        Topic(
+            id="clean_energy",
+            label="Clean energy",
+            queries=[QuerySpec(expression='"clean energy"')],
+        )
+    )
+    request = request.model_copy(update={"end": date(2026, 1, 3)})
+
+    windows, phrases = plan_ngram_windows(request, window_days=2)
+
+    assert len(windows) == 2
+    assert set(phrases) == {"climate_change", "clean_energy"}
+    assert all(window.query.topic_id == "ngram_topic_batch" for window in windows)
+    assert all(window.query.query_id == "topics_distinct_urls" for window in windows)
+
+
+def test_batch_sql_scans_ngram_table_once_and_keeps_topic_membership():
+    sql, parameters = build_ngram_batch_sql(
+        phrases_by_topic={
+            "climate_change": ["climate change", "global warming"],
+            "clean_energy": ["clean energy"],
+        }
+    )
+
+    assert sql.count("`gdelt-bq.gdeltv2.webngrams`") == 1
+    assert "CROSS JOIN UNNEST" in sql
+    assert "ARRAY_CONCAT" in sql
+    assert "GROUP BY topic_id, day, url, host" in sql
+    assert "PARTITION BY topic_id, day, url" in sql
+    assert parameters["topic_ids"] == ["clean_energy", "climate_change"]
+    assert {parameters["topic_id_0"], parameters["topic_id_1"]} == {
+        "clean_energy",
+        "climate_change",
+    }
+
+
+def test_batch_parser_creates_stable_topic_rows_and_deduplicates_per_topic():
+    window, _ = plan_ngram_windows(_request())
+    phrases = {
+        "climate_change": ["climate change"],
+        "clean_energy": ["clean energy"],
+    }
+    rows = [
+        {
+            "topic_id": topic_id,
+            "day": date(2026, 1, 1),
+            "country_id": "italy",
+            "matched_count": count,
+            "monitored_count": None,
+            "total_matched_urls": count,
+            "attributed_matched_urls": count,
+            "mapped_domain_count": 2,
+            "language_counts_json": (
+                f'[{json.dumps({"lang": "en", "matched_count": count})}]'
+            ),
+        }
+        for topic_id, count in (("climate_change", 3), ("clean_energy", 5))
+    ]
+
+    trends = parse_ngram_batch_rows(
+        rows=rows,
+        window=window[0],
+        phrases_by_topic=phrases,
+        estimated_bytes=100,
+        job={"job_id": "batch-1"},
+        collected_at=datetime(2026, 2, 1, tzinfo=timezone.utc),
+    )
+
+    assert {(row.topic_id, row.matched_count) for row in trends} == {
+        ("climate_change", 3),
+        ("clean_energy", 5),
+    }
+    assert all(row.query_id == "topic_distinct_urls" for row in trends)
+    assert all(
+        row.metadata["bigquery_collection_mode"] == "multi_topic_batch"
+        for row in trends
+    )
+    assert len({row.record_id for row in trends}) == 2
 
 
 class FakeExecutor:
@@ -155,6 +241,31 @@ def test_ngram_provider_refuses_query_over_cost_cap():
 
     with pytest.raises(ProviderCollectionError, match="above the per-window cap"):
         provider.collect_windows(windows)
+
+
+def test_provider_retries_legacy_per_topic_window():
+    windows, phrases = plan_ngram_windows(_request())
+    legacy_window = replace(
+        windows[0],
+        query=Query(
+            topic_id="climate_change",
+            query_id="topic_distinct_urls",
+            expression='"climate change" OR "global warming"',
+        ),
+    )
+    provider = GDELTNGramsProvider(
+        billing_project="research-project",
+        country_labels={"italy": "Italy", "unitedkingdom": "United Kingdom"},
+        topic_phrases=phrases,
+        maximum_bytes_billed=10_000,
+        executor=FakeExecutor(),
+    )
+
+    result = provider.collect_windows([legacy_window])
+
+    assert len(result.trends) == 4
+    assert {trend.topic_id for trend in result.trends} == {"climate_change"}
+    assert all(trend.query_id == "topic_distinct_urls" for trend in result.trends)
 
 
 def test_ngram_topic_rejects_gdelt_filters():
