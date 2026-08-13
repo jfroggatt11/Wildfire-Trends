@@ -68,6 +68,47 @@ Native country-share and raw-count observations use the same deterministic recor
 identity. Storage merges their non-null measurements, so collecting raw counts later
 augments rather than duplicates the canonical daily row.
 
+## Physical hazard country-days
+
+Path: `data/hazards/source=firms/hazard_type=wildfire/daily.parquet`
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `record_id` | string | Stable provider/product/hazard/date/country identity. |
+| `date` | date | UTC FIRMS acquisition date. |
+| `source` | string | `firms`. |
+| `hazard_type` | string | `wildfire`. |
+| `geography` | string | Stable id from the configured country catalogue. |
+| `country_iso3` | string | Three-letter country code used for spatial/event joins. |
+| `observation_count` | integer/null | Retained active-fire detections; null if boundary support is unavailable. |
+| `total_intensity` | float/null | Sum of retained fire radiative power in MW. |
+| `mean_intensity` | float/null | Mean retained fire radiative power in MW. |
+| `max_intensity` | float/null | Maximum retained fire radiative power in MW. |
+| `high_confidence_count` | integer/null | Retained detections marked high confidence. |
+| `request_complete` | boolean | All source windows needed for this emitted row completed. |
+| `boundary_supported` | boolean | Country has a matching polygon; false rows contain nulls rather than false zeroes. |
+| `collected_at` | UTC timestamp | Aggregation time. |
+| `metadata_json` | JSON string | Product, unit, world scope, and filtering policy. |
+
+A measured zero means the complete API responses contained no retained detection in
+the country polygon that day. It does not prove absence of fire where satellite
+observations were obscured or unavailable.
+
+## Major hazard events
+
+Path: `data/events/source=gdacs/events.parquet`
+
+Each row is one GDACS event, not one country-day. Important fields are
+`source_event_id`, `hazard_type`, `name`, `start_at`, `end_at`, `geography_ids`,
+`country_iso3s`, `alert_level`, `alert_score`, `severity`, `severity_unit`,
+`source_url`, `source_updated_at`, and `geometry_json`. `metadata_json` preserves the
+episode id, GDACS hazard/source codes, episode alert, severity text, detail/geometry
+URLs, and any affected ISO3 code not found in the configured country catalogue.
+
+Event records are mutable upstream. A later collection with the same stable event id
+and a newer provider modification timestamp replaces the canonical record instead of
+creating a duplicate.
+
 ## Article samples and derived counts
 
 `data/raw/` contains article metadata returned by optional GDELT article-list

@@ -13,7 +13,14 @@ from typing import Any
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from .models import AttentionRecord, DailyAttention, DailyCountryCoverage, DailyTrend
+from .models import (
+    AttentionRecord,
+    DailyAttention,
+    DailyCountryCoverage,
+    DailyHazard,
+    DailyTrend,
+    HazardEvent,
+)
 
 
 RECORD_SCHEMA = pa.schema(
@@ -79,6 +86,49 @@ COUNTRY_COVERAGE_SCHEMA = pa.schema(
         ("country_monitored_count", pa.int64()),
         ("global_monitored_count", pa.int64()),
         ("collected_at", pa.timestamp("us", tz="UTC")),
+        ("metadata_json", pa.string()),
+    ]
+)
+
+HAZARD_SCHEMA = pa.schema(
+    [
+        ("record_id", pa.string()),
+        ("date", pa.date32()),
+        ("source", pa.string()),
+        ("hazard_type", pa.string()),
+        ("geography", pa.string()),
+        ("country_iso3", pa.string()),
+        ("observation_count", pa.int64()),
+        ("total_intensity", pa.float64()),
+        ("mean_intensity", pa.float64()),
+        ("max_intensity", pa.float64()),
+        ("high_confidence_count", pa.int64()),
+        ("request_complete", pa.bool_()),
+        ("boundary_supported", pa.bool_()),
+        ("collected_at", pa.timestamp("us", tz="UTC")),
+        ("metadata_json", pa.string()),
+    ]
+)
+
+EVENT_SCHEMA = pa.schema(
+    [
+        ("record_id", pa.string()),
+        ("source", pa.string()),
+        ("source_event_id", pa.string()),
+        ("hazard_type", pa.string()),
+        ("name", pa.string()),
+        ("start_at", pa.timestamp("us", tz="UTC")),
+        ("end_at", pa.timestamp("us", tz="UTC")),
+        ("geography_ids", pa.list_(pa.string())),
+        ("country_iso3s", pa.list_(pa.string())),
+        ("alert_level", pa.string()),
+        ("alert_score", pa.float64()),
+        ("severity", pa.float64()),
+        ("severity_unit", pa.string()),
+        ("source_url", pa.string()),
+        ("source_updated_at", pa.timestamp("us", tz="UTC")),
+        ("collected_at", pa.timestamp("us", tz="UTC")),
+        ("geometry_json", pa.string()),
         ("metadata_json", pa.string()),
     ]
 )
@@ -318,6 +368,112 @@ class LocalParquetStorage(AttentionStorage):
             ),
         )
 
+    def write_hazards(self, observations: list[DailyHazard]) -> int:
+        """Upsert country-day physical hazard measurements by stable id."""
+        groups: dict[tuple[str, str], list[DailyHazard]] = defaultdict(list)
+        for observation in observations:
+            groups[(observation.source, observation.hazard_type)].append(observation)
+        added = 0
+        for (source, hazard_type), incoming in groups.items():
+            path = self._hazard_path(source, hazard_type)
+            existing = self._read_hazard_file(path) if path.exists() else []
+            by_id = {item.record_id: item for item in existing}
+            before = len(by_id)
+            by_id.update({item.record_id: item for item in incoming})
+            added += len(by_id) - before
+            rows = [_hazard_to_row(item) for item in sorted(
+                by_id.values(), key=lambda item: (item.date, item.geography)
+            )]
+            _atomic_parquet_write(path, pa.Table.from_pylist(rows, schema=HAZARD_SCHEMA))
+        return added
+
+    def read_hazards(
+        self,
+        *,
+        source: str | None = None,
+        hazard_types: set[str] | None = None,
+        start: date | None = None,
+        end: date | None = None,
+        geographies: set[str] | None = None,
+    ) -> list[DailyHazard]:
+        base = self.root / "hazards"
+        paths = (
+            (base / f"source={source}").rglob("daily.parquet")
+            if source
+            else base.rglob("daily.parquet")
+        )
+        observations: list[DailyHazard] = []
+        for path in sorted(paths):
+            observations.extend(self._read_hazard_file(path))
+        return sorted(
+            (
+                item
+                for item in observations
+                if (hazard_types is None or item.hazard_type in hazard_types)
+                and (start is None or item.date >= start)
+                and (end is None or item.date <= end)
+                and (geographies is None or item.geography in geographies)
+            ),
+            key=lambda item: (item.date, item.hazard_type, item.geography),
+        )
+
+    def write_events(self, events: list[HazardEvent]) -> int:
+        """Upsert named hazard events, preferring the latest provider version."""
+        groups: dict[str, list[HazardEvent]] = defaultdict(list)
+        for event in events:
+            groups[event.source].append(event)
+        added = 0
+        for source, incoming in groups.items():
+            path = self._event_path(source)
+            existing = self._read_event_file(path) if path.exists() else []
+            by_id = {item.record_id: item for item in existing}
+            before = len(by_id)
+            for event in incoming:
+                previous = by_id.get(event.record_id)
+                if previous is None or (
+                    event.source_updated_at or event.collected_at
+                ) >= (previous.source_updated_at or previous.collected_at):
+                    by_id[event.record_id] = event
+            added += len(by_id) - before
+            rows = [_event_to_row(item) for item in sorted(
+                by_id.values(), key=lambda item: (item.start_at, item.record_id)
+            )]
+            _atomic_parquet_write(path, pa.Table.from_pylist(rows, schema=EVENT_SCHEMA))
+        return added
+
+    def read_events(
+        self,
+        *,
+        source: str | None = None,
+        hazard_types: set[str] | None = None,
+        start: date | None = None,
+        end: date | None = None,
+        geographies: set[str] | None = None,
+    ) -> list[HazardEvent]:
+        base = self.root / "events"
+        paths = (
+            (base / f"source={source}").rglob("events.parquet")
+            if source
+            else base.rglob("events.parquet")
+        )
+        events: list[HazardEvent] = []
+        for path in sorted(paths):
+            events.extend(self._read_event_file(path))
+        return sorted(
+            (
+                item
+                for item in events
+                if (hazard_types is None or item.hazard_type in hazard_types)
+                and (start is None or item.start_at.date() >= start)
+                and (end is None or item.start_at.date() <= end)
+                and (
+                    geographies is None
+                    or bool(set(item.geography_ids) & geographies)
+                )
+            ),
+            key=lambda item: (item.start_at, item.record_id),
+        )
+
     def _record_path(
         self, source: str, day: date, topic_id: str, query_id: str
     ) -> Path:
@@ -330,6 +486,18 @@ class LocalParquetStorage(AttentionStorage):
             / f"query_id={query_id}"
             / "records.parquet"
         )
+
+    def _hazard_path(self, source: str, hazard_type: str) -> Path:
+        return (
+            self.root
+            / "hazards"
+            / f"source={source}"
+            / f"hazard_type={hazard_type}"
+            / "daily.parquet"
+        )
+
+    def _event_path(self, source: str) -> Path:
+        return self.root / "events" / f"source={source}" / "events.parquet"
 
     def _trend_path(
         self,
@@ -428,6 +596,26 @@ class LocalParquetStorage(AttentionStorage):
             coverages.append(DailyCountryCoverage.model_validate(row))
         return coverages
 
+    @staticmethod
+    def _read_hazard_file(path: Path) -> list[DailyHazard]:
+        rows = pq.read_table(path).to_pylist()
+        observations: list[DailyHazard] = []
+        for row in rows:
+            row["metadata"] = json.loads(row.pop("metadata_json"))
+            observations.append(DailyHazard.model_validate(row))
+        return observations
+
+    @staticmethod
+    def _read_event_file(path: Path) -> list[HazardEvent]:
+        rows = pq.read_table(path).to_pylist()
+        events: list[HazardEvent] = []
+        for row in rows:
+            row["metadata"] = json.loads(row.pop("metadata_json"))
+            geometry = row.pop("geometry_json")
+            row["geometry"] = json.loads(geometry) if geometry else None
+            events.append(HazardEvent.model_validate(row))
+        return events
+
 
 def _record_to_row(record: AttentionRecord) -> dict[str, Any]:
     row = record.model_dump(exclude={"metadata"})
@@ -449,6 +637,27 @@ def _country_coverage_to_row(coverage: DailyCountryCoverage) -> dict[str, Any]:
     row = coverage.model_dump(exclude={"metadata"})
     row["metadata_json"] = json.dumps(
         coverage.metadata, ensure_ascii=False, sort_keys=True, default=str
+    )
+    return row
+
+
+def _hazard_to_row(observation: DailyHazard) -> dict[str, Any]:
+    row = observation.model_dump(exclude={"metadata"})
+    row["metadata_json"] = json.dumps(
+        observation.metadata, ensure_ascii=False, sort_keys=True, default=str
+    )
+    return row
+
+
+def _event_to_row(event: HazardEvent) -> dict[str, Any]:
+    row = event.model_dump(exclude={"metadata", "geometry"})
+    row["geometry_json"] = (
+        json.dumps(event.geometry, ensure_ascii=False, sort_keys=True)
+        if event.geometry is not None
+        else None
+    )
+    row["metadata_json"] = json.dumps(
+        event.metadata, ensure_ascii=False, sort_keys=True, default=str
     )
     return row
 

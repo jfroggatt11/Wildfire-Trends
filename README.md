@@ -4,8 +4,9 @@
 events affect media and search attention around climate change and clean transport.
 This version collects canonical daily GDELT media-attention trends, optional
 article-level samples, and an explicitly unofficial Google Trends search-interest
-index. It does not include event data, event-study analysis, a frontend, or a
-database service.
+index. It now also collects an independent global event layer from NASA FIRMS and
+GDACS. It does not yet include event-study analysis, a frontend, or a database
+service.
 
 GDELT `TimelineSourceCountry` aggregates are the canonical comparable trend input;
 optional `TimelineVolRaw` requests add exact counts for selected validation panels.
@@ -284,6 +285,61 @@ climate-attention collect-trends \
 The command prints its run id, number of windows, and minimum pacing time. Start the
 saved plan later with `climate-attention runs retry <run-id>`.
 
+## Collecting global wildfire and major-event data
+
+The event layer deliberately does not infer physical extreme-weather events from the
+same news coverage used as the outcome. NASA FIRMS supplies daily physical wildfire
+activity; GDACS supplies named major wildfires, floods, and tropical cyclones.
+
+Request a free NASA FIRMS `MAP_KEY`, then preview the 2025 global workload:
+
+```bash
+export FIRMS_MAP_KEY=your-personal-key
+
+climate-attention collect-firms \
+  --countries-config config/countries.world.yaml \
+  --start 2025-01-01 \
+  --end 2025-12-31 \
+  --plan-only
+```
+
+Run it by removing `--plan-only`. The collector uses the FIRMS `world` area and
+non-overlapping windows of at most five days. Every raw response is cached by product
+and date window, so rerunning after interruption does not repeat completed downloads.
+The default product is science-quality `VIIRS_SNPP_SP`; it is appropriate for the
+historical panel but arrives months after near-real-time products. The collector
+retains presumed vegetation fires (`type=0`), excludes low-confidence detections,
+assigns points to all 197 configured countries using a checksummed, revision-pinned
+Natural Earth boundary file, and derives daily detection and fire-radiative-power
+metrics. The map key is never stored.
+
+FIRMS is free, but NASA charges large responses against a transaction allowance. A
+global response can contain tens of thousands of detections per day. Keep the cached
+windows, use the conservative 25-second pacing default, and do not launch overlapping
+runs. A 365-day plan contains 73 requests and therefore has roughly 30 minutes of
+deliberate pacing, in addition to download and processing time.
+
+Collect the corresponding GDACS catalogue independently:
+
+```bash
+climate-attention collect-gdacs \
+  --countries-config config/countries.world.yaml \
+  --start 2025-01-01 \
+  --end 2025-12-31
+```
+
+GDACS results are fetched in pages of 100 and cached as GeoJSON. Canonical records
+preserve provider event ids, start/end timestamps, affected ISO3 countries, alert
+level and score, severity, geometry, source URLs, modification time, and extra
+provider metadata. FIRMS hotspots are not treated as named disasters: use the GDACS
+wildfire catalogue to identify major events and FIRMS to measure their physical
+country-day intensity.
+
+GDELT searches about extreme weather can later measure an event's media salience or
+audit missing catalogue entries. They should not define the main event treatment,
+because deriving both the event and attention outcome from GDELT would introduce
+circular selection and additional BigQuery scanning cost.
+
 ## Collecting article samples
 
 Dates are inclusive and interpreted as UTC:
@@ -388,6 +444,11 @@ The default `data/` layout is:
 data/
 ├── trends/source=.../topic_id=.../geography=.../language=.../daily.parquet
 ├── country_coverage/source=gdelt/geography=.../language=.../daily.parquet
+├── hazards/source=firms/hazard_type=wildfire/daily.parquet
+├── events/source=gdacs/events.parquet
+├── raw_events/firms/<product>/<start>_<end>.csv
+├── raw_events/gdacs/<start>_<end>_pageNNNN.geojson
+├── reference/ne_50m_admin_0_countries.geojson
 ├── raw/source=gdelt/date=YYYY-MM-DD/topic_id=.../query_id=.../records.parquet
 ├── processed/daily_attention.parquet
 ├── api_responses/gdelt/<run-id>.jsonl

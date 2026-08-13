@@ -5,6 +5,8 @@ from .gdelt import GDELTProvider
 from .gdelt_timeline import GDELTSourceCountryProvider, GDELTTimelineProvider
 from .google_trends import GoogleTrendsProvider, GoogleTrendsUnofficialProvider
 from .gdelt_ngrams import GDELTNGramsProvider
+from .firms import FIRMSProvider
+from .gdacs import GDACSProvider
 
 __all__ = [
     "AttentionProvider",
@@ -14,6 +16,8 @@ __all__ = [
     "GDELTNGramsProvider",
     "GoogleTrendsProvider",
     "GoogleTrendsUnofficialProvider",
+    "FIRMSProvider",
+    "GDACSProvider",
     "ProviderCollectionError",
     "ProviderUnavailableError",
 ]

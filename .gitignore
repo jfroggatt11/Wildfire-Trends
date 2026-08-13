@@ -12,3 +12,7 @@ data/api_responses/
 data/runs/
 data/test_runs/
 data/audits/
+data/hazards/
+data/events/
+data/raw_events/
+data/reference/

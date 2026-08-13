@@ -128,6 +128,7 @@ class Country(StrictModel):
     label: str = Field(min_length=1)
     enabled: bool = True
     google_geo: str | None = Field(default=None, pattern=r"^[A-Z]{2}$")
+    iso3: str | None = Field(default=None, pattern=r"^[A-Z]{3}$")
     gdelt_ngram_label: str | None = Field(default=None, min_length=1)
 
     @property

@@ -14,7 +14,7 @@ from uuid import uuid4
 from .aggregation import aggregate_daily
 from .config import ConfigError, config_hash, load_config, load_country_config
 from .comparison import compare_trends, write_comparisons
-from .manifest import build_run_manifest
+from .manifest import build_run_manifest, package_version
 from .models import CollectionRequest, DailyCountryCoverage, DailyTrend
 from .run_state import CollectionRunState, RunStore
 from .sources import GoogleTrendsUnofficialProvider
@@ -35,6 +35,17 @@ from .sources.gdelt_ngrams import (
     plan_ngram_windows,
 )
 from .sources.google_trends import plan_google_trends_windows
+from .sources.firms import (
+    FIRMS_SOURCE,
+    ALLOWED_SOURCES as FIRMS_ALLOWED_SOURCES,
+    NATURAL_EARTH_FILENAME,
+    FIRMSProvider,
+    ensure_natural_earth_boundaries,
+    firms_map_key,
+    plan_firms_windows,
+)
+from .sources.gdacs import GDACSProvider
+from .geography import load_country_boundaries
 from .storage import LocalParquetStorage
 
 
@@ -254,6 +265,40 @@ def build_parser() -> argparse.ArgumentParser:
         default=Path("data/audits/ngram-country-map.csv"),
     )
 
+    firms = subparsers.add_parser(
+        "collect-firms",
+        help="collect global NASA FIRMS wildfire intensity by country and day",
+    )
+    firms.add_argument("--countries-config", type=Path, required=True)
+    firms.add_argument("--start", type=_iso_date, required=True)
+    firms.add_argument("--end", type=_iso_date, required=True)
+    firms.add_argument(
+        "--source", choices=sorted(FIRMS_ALLOWED_SOURCES), default=FIRMS_SOURCE
+    )
+    firms.add_argument(
+        "--boundaries",
+        type=Path,
+        help="custom Natural Earth-style country GeoJSON; default is pinned and cached",
+    )
+    firms.add_argument(
+        "--plan-only", action="store_true", help="show the global five-day request plan"
+    )
+    firms.add_argument("--data-dir", type=Path, default=Path("data"))
+    _add_runtime_options(firms)
+
+    gdacs = subparsers.add_parser(
+        "collect-gdacs",
+        help="collect global GDACS wildfire, flood, and tropical-cyclone events",
+    )
+    gdacs.add_argument("--countries-config", type=Path, required=True)
+    gdacs.add_argument("--start", type=_iso_date, required=True)
+    gdacs.add_argument("--end", type=_iso_date, required=True)
+    gdacs.add_argument(
+        "--plan-only", action="store_true", help="validate without making API requests"
+    )
+    gdacs.add_argument("--data-dir", type=Path, default=Path("data"))
+    _add_runtime_options(gdacs)
+
     compare = subparsers.add_parser(
         "compare-sources", help="compare paired daily metrics from two sources"
     )
@@ -319,6 +364,10 @@ def main(argv: list[str] | None = None) -> int:
             return _estimate_ngrams(args)
         if args.command == "audit-ngram-countries":
             return _audit_ngram_countries(args)
+        if args.command == "collect-firms":
+            return _collect_firms(args)
+        if args.command == "collect-gdacs":
+            return _collect_gdacs(args)
         if args.command == "compare-sources":
             return _compare_sources(args)
         if args.command in {"aggregate", "rebuild-aggregates"}:
@@ -754,6 +803,258 @@ def _audit_ngram_countries(args: argparse.Namespace) -> int:
         f"GB; billed: {job['total_bytes_billed'] / 1_000_000_000:.3f} GB."
     )
     return 0
+
+
+def _collect_firms(args: argparse.Namespace) -> int:
+    country_config = load_country_config(args.countries_config)
+    countries = country_config.enabled_countries()
+    windows = plan_firms_windows(args.start, args.end)
+    if args.plan_only:
+        interval = args.request_interval if args.request_interval is not None else 25.0
+        print(
+            f"Global FIRMS plan: {len(windows)} non-overlapping request(s), "
+            f"{len(countries)} configured countries, {args.start}..{args.end}."
+        )
+        print(
+            "Each request uses the FIRMS world area and at most five days; raw CSV "
+            "windows are cached for safe resumption."
+        )
+        print(
+            f"Minimum deliberate pacing: {max(0, len(windows) - 1) * interval / 60:.1f} "
+            "minutes, excluding download and country-assignment time."
+        )
+        return 0
+
+    started_at = datetime.now(timezone.utc)
+    run_id = f"{started_at.strftime('%Y%m%dT%H%M%SZ')}-{uuid4().hex[:8]}"
+    storage = LocalParquetStorage(args.data_dir)
+    key = firms_map_key()
+    # FIRMS embeds its secret map key in the request path. Suppress httpx's
+    # otherwise helpful request URL logging for this command.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    boundary_path = args.boundaries or (
+        args.data_dir / "reference" / NATURAL_EARTH_FILENAME
+    )
+    if args.boundaries is None:
+        ensure_natural_earth_boundaries(boundary_path)
+    boundary_index = load_country_boundaries(boundary_path, countries)
+    options = _runtime_options(args)
+    if args.request_interval is None:
+        options["request_interval_seconds"] = 25.0
+    requests: list[dict] = []
+    try:
+        with FIRMSProvider(
+            map_key=key,
+            source=args.source,
+            boundary_index=boundary_index,
+            countries=countries,
+            cache_dir=args.data_dir / "raw_events" / "firms",
+            max_retries=options["max_retries"],
+            backoff_seconds=options["backoff_seconds"],
+            request_interval_seconds=options["request_interval_seconds"],
+        ) as provider:
+            observations, requests, totals = provider.collect(args.start, args.end)
+        added = storage.write_hazards(observations)
+    except ProviderError as exc:
+        storage.write_manifest(
+            run_id,
+            _event_manifest(
+                run_id=run_id,
+                source="firms",
+                status="failed",
+                started_at=started_at,
+                start=args.start,
+                end=args.end,
+                country_config=args.countries_config,
+                provider_options={
+                    "product": args.source,
+                    "area": "world",
+                    "map_key_stored": False,
+                },
+                requests=requests,
+                summary={},
+                error=str(exc),
+            ),
+        )
+        raise
+    unsupported = sorted(
+        country.id
+        for country in countries
+        if country.id not in boundary_index.supported_country_ids
+    )
+    manifest_path = storage.write_manifest(
+        run_id,
+        _event_manifest(
+            run_id=run_id,
+            source="firms",
+            status="success",
+            started_at=started_at,
+            start=args.start,
+            end=args.end,
+            country_config=args.countries_config,
+            provider_options={
+                "product": args.source,
+                "area": "world",
+                "window_days": 5,
+                "map_key_stored": False,
+                "boundary_path": str(boundary_path),
+            },
+            requests=requests,
+            summary={
+                **totals,
+                "daily_rows": len(observations),
+                "daily_rows_newly_stored": added,
+                "boundary_supported_countries": len(countries) - len(unsupported),
+                "boundary_unsupported_countries": unsupported,
+            },
+        ),
+    )
+    print(
+        f"Global FIRMS collection complete: {totals['rows_retained']:,} retained "
+        f"detections, {len(observations):,} country-day rows ({added:,} new)."
+    )
+    print(
+        f"Dataset: {args.data_dir / 'hazards'}. Manifest: {manifest_path}. "
+        f"Unassigned detections: {totals['rows_unassigned']:,}."
+    )
+    if unsupported:
+        print(
+            "Boundary coverage is unavailable for: " + ", ".join(unsupported) + ". "
+            "Those rows contain null measurements, not false zeroes."
+        )
+    return 0
+
+
+def _collect_gdacs(args: argparse.Namespace) -> int:
+    country_config = load_country_config(args.countries_config)
+    countries = country_config.enabled_countries()
+    if args.end < args.start:
+        raise ValueError("GDACS end date must not precede start date")
+    if args.plan_only:
+        print(
+            f"GDACS plan: wildfire, flood, and tropical-cyclone events for "
+            f"{args.start}..{args.end}, mapped to {len(countries)} configured countries."
+        )
+        print("Responses will be paged in batches of 100 and cached as GeoJSON.")
+        return 0
+
+    started_at = datetime.now(timezone.utc)
+    run_id = f"{started_at.strftime('%Y%m%dT%H%M%SZ')}-{uuid4().hex[:8]}"
+    storage = LocalParquetStorage(args.data_dir)
+    options = _runtime_options(args)
+    if args.request_interval is None:
+        options["request_interval_seconds"] = 1.0
+    if args.backoff_seconds is None:
+        options["backoff_seconds"] = 5.0
+    requests: list[dict] = []
+    try:
+        with GDACSProvider(
+            countries=countries,
+            cache_dir=args.data_dir / "raw_events" / "gdacs",
+            max_retries=options["max_retries"],
+            backoff_seconds=options["backoff_seconds"],
+            request_interval_seconds=options["request_interval_seconds"],
+        ) as provider:
+            events, requests = provider.collect(args.start, args.end)
+        added = storage.write_events(events)
+    except ProviderError as exc:
+        storage.write_manifest(
+            run_id,
+            _event_manifest(
+                run_id=run_id,
+                source="gdacs",
+                status="failed",
+                started_at=started_at,
+                start=args.start,
+                end=args.end,
+                country_config=args.countries_config,
+                provider_options={"event_types": ["WF", "FL", "TC"]},
+                requests=requests,
+                summary={},
+                error=str(exc),
+            ),
+        )
+        raise
+    counts = {
+        hazard: sum(event.hazard_type == hazard for event in events)
+        for hazard in ("wildfire", "flood", "tropical_cyclone")
+    }
+    unmatched = sorted(
+        {
+            iso3
+            for event in events
+            for iso3 in event.metadata.get("unmatched_country_iso3s", [])
+        }
+    )
+    manifest_path = storage.write_manifest(
+        run_id,
+        _event_manifest(
+            run_id=run_id,
+            source="gdacs",
+            status="success",
+            started_at=started_at,
+            start=args.start,
+            end=args.end,
+            country_config=args.countries_config,
+            provider_options={
+                "event_types": ["WF", "FL", "TC"],
+                "alert_levels": ["green", "orange", "red"],
+                "page_size": 100,
+            },
+            requests=requests,
+            summary={
+                "events_collected": len(events),
+                "events_newly_stored": added,
+                "events_by_hazard": counts,
+                "unmatched_country_iso3s": unmatched,
+            },
+        ),
+    )
+    print(
+        f"GDACS collection complete: {len(events):,} event(s) ({added:,} new): "
+        f"{counts['wildfire']} wildfire, {counts['flood']} flood, "
+        f"{counts['tropical_cyclone']} tropical cyclone."
+    )
+    print(f"Dataset: {args.data_dir / 'events'}. Manifest: {manifest_path}.")
+    return 0
+
+
+def _event_manifest(
+    *,
+    run_id: str,
+    source: str,
+    status: str,
+    started_at: datetime,
+    start: date,
+    end: date,
+    country_config: Path,
+    provider_options: dict,
+    requests: list[dict],
+    summary: dict,
+    error: str | None = None,
+) -> dict:
+    return {
+        "manifest_version": 1,
+        "run_id": run_id,
+        "status": status,
+        "source": source,
+        "started_at": started_at.isoformat(),
+        "finished_at": datetime.now(timezone.utc).isoformat(),
+        "requested_date_range": {"start": start.isoformat(), "end": end.isoformat()},
+        "country_config": {
+            "path": str(country_config),
+            "sha256": config_hash(country_config),
+        },
+        "provider_options": provider_options,
+        "requests": requests,
+        "summary": summary,
+        "software": {
+            "package": "climate-attention",
+            "version": package_version(),
+            "python": sys.version.split()[0],
+        },
+        "error": error,
+    }
 
 
 def _compare_sources(args: argparse.Namespace) -> int:

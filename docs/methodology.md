@@ -93,6 +93,31 @@ the run state or manifest is `complete` and that all planned windows succeeded.
 Article-list collection is optional and intended for auditing spikes or later content
 classification. It is not needed to produce the canonical daily attention series.
 
+## Independent event measurement
+
+The primary event treatment is external to the attention outcome. NASA FIRMS
+science-quality VIIRS S-NPP detections provide the physical daily wildfire series,
+while GDACS provides a global catalogue of major wildfires, floods, and tropical
+cyclones. GDELT extreme-weather queries may later be used as a secondary event-news
+salience measure, but not as the sole treatment definition: selecting events from the
+same news stream being explained would mechanically favour well-covered events.
+
+FIRMS requests use the documented `world` area in non-overlapping windows of no more
+than five days. Points classified as presumed vegetation fire (`type=0`) are retained
+unless confidence is low. Each point is assigned to a configured sovereign country
+using revision-pinned Natural Earth 1:50m polygons, then count and fire radiative
+power are aggregated by UTC acquisition date. Complete country polygons receive zero
+when no retained point exists; a country without boundary support receives null.
+Neither a hotspot nor summed FRP is equivalent to burned area, fire impact, or a
+named wildfire event. Agricultural and prescribed burning may remain.
+
+GDACS records are used at event level. The canonical identity combines provider,
+hazard code, and event id; affected-country arrays support multi-country events.
+Start/end dates and severity can be revised, so `source_updated_at` controls upserts.
+GDACS alert scores are oriented toward potential humanitarian consequences rather
+than a uniform physical magnitude. Analyses should preserve both event type and
+source-specific severity semantics instead of pooling them naively.
+
 ## Unofficial Google Trends fallback
 
 The Google mode measures search interest rather than media output. Each configured

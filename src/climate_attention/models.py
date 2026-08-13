@@ -306,6 +306,77 @@ class DailyCountryCoverage(StrictModel):
         return value.astimezone(timezone.utc)
 
 
+class DailyHazard(StrictModel):
+    """A provider-neutral physical hazard measurement for one country-day."""
+
+    record_id: str
+    date: date
+    source: str
+    hazard_type: str
+    geography: str
+    country_iso3: str = Field(pattern=r"^[A-Z]{3}$")
+    observation_count: int | None = Field(default=None, ge=0)
+    total_intensity: float | None = Field(default=None, ge=0)
+    mean_intensity: float | None = Field(default=None, ge=0)
+    max_intensity: float | None = Field(default=None, ge=0)
+    high_confidence_count: int | None = Field(default=None, ge=0)
+    request_complete: bool
+    boundary_supported: bool
+    collected_at: datetime = Field(default_factory=utc_now)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("collected_at")
+    @classmethod
+    def hazard_timestamp_must_be_aware(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("collection timestamp must include a timezone")
+        return value.astimezone(timezone.utc)
+
+
+class HazardEvent(StrictModel):
+    """A named major event from an external disaster catalogue."""
+
+    record_id: str
+    source: str
+    source_event_id: str
+    hazard_type: str
+    name: str
+    start_at: datetime
+    end_at: datetime | None = None
+    geography_ids: list[str] = Field(default_factory=list)
+    country_iso3s: list[str] = Field(default_factory=list)
+    alert_level: str | None = None
+    alert_score: float | None = None
+    severity: float | None = None
+    severity_unit: str | None = None
+    source_url: str | None = None
+    source_updated_at: datetime | None = None
+    collected_at: datetime = Field(default_factory=utc_now)
+    geometry: dict[str, Any] | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("start_at", "end_at", "source_updated_at", "collected_at")
+    @classmethod
+    def event_timestamps_must_be_aware(
+        cls, value: datetime | None
+    ) -> datetime | None:
+        if value is None:
+            return None
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("event timestamps must include a timezone")
+        return value.astimezone(timezone.utc)
+
+    @model_validator(mode="after")
+    def event_date_range_is_valid(self) -> "HazardEvent":
+        if self.end_at is not None and self.end_at < self.start_at:
+            raise ValueError("event end must not precede event start")
+        if len(self.geography_ids) != len(set(self.geography_ids)):
+            raise ValueError("event geography ids must be unique")
+        if len(self.country_iso3s) != len(set(self.country_iso3s)):
+            raise ValueError("event country ISO3 codes must be unique")
+        return self
+
+
 class RequestLog(StrictModel):
     window_id: str | None = None
     parent_window_id: str | None = None
