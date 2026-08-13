@@ -78,11 +78,42 @@ def plan_firms_windows(start: date, end: date) -> list[FirmsWindow]:
 def firms_map_key(value: str | None = None) -> str:
     key = (value or os.environ.get("FIRMS_MAP_KEY", "")).strip()
     if not key:
+        candidates = [Path.cwd() / ".env"]
+        development_root = Path(__file__).resolve().parents[3] / ".env"
+        if development_root not in candidates:
+            candidates.append(development_root)
+        for path in candidates:
+            key = _env_value(path, "FIRMS_MAP_KEY")
+            if key:
+                break
+    if not key:
         raise ValueError(
-            "missing FIRMS_MAP_KEY; request a free NASA FIRMS map key and export it "
+            "missing FIRMS_MAP_KEY; add it to the project .env file or export it "
             "in the shell before collecting"
         )
     return key
+
+
+def _env_value(path: Path, name: str) -> str:
+    """Read one simple dotenv assignment without mutating process environment."""
+    if not path.is_file():
+        return ""
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError as exc:
+        raise ValueError(f"cannot read environment file {path}: {exc}") from exc
+    for raw_line in lines:
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        variable, raw_value = line.split("=", 1)
+        if variable.strip() != name:
+            continue
+        value = raw_value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+            value = value[1:-1]
+        return value.strip()
+    return ""
 
 
 def ensure_natural_earth_boundaries(

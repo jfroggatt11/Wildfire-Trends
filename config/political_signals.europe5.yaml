@@ -1,0 +1,117 @@
+schema_version: 1
+
+# Research seed taxonomy. English phrases are reviewed seeds; every translation
+# remains draft until native-speaker validation. Matching is language-specific.
+signals:
+  political_actor:
+    label: Political actor
+    description: References to elected institutions, office-holders, or parties.
+    phrases:
+      en:
+        translation_status: validated
+        phrases: [government, minister, parliament, prime minister, president, political party]
+      es: [gobierno, ministro, ministra, parlamento, primer ministro, primera ministra, presidente, presidenta, partido político]
+      pt: [governo, ministro, ministra, parlamento, primeiro-ministro, primeira-ministra, presidente, partido político]
+      fr: [gouvernement, ministre, parlement, premier ministre, présidente, président, parti politique]
+      de: [Regierung, Minister, Ministerin, Parlament, Bundeskanzler, Bundeskanzlerin, Präsident, Präsidentin, politische Partei]
+      it: [governo, ministro, ministra, parlamento, presidente, partito politico]
+      ru: [правительство, министр, парламент, премьер-министр, президент, политическая партия]
+      ar: [الحكومة, وزير, وزيرة, البرلمان, رئيس الوزراء, الرئيس, حزب سياسي]
+      zh:
+        segmentation: character
+        phrases: [政府, 部长, 议会, 总理, 总统, 政党]
+      ja:
+        segmentation: character
+        phrases: [政府, 大臣, 国会, 首相, 大統領, 政党]
+
+  government_action:
+    label: Government action
+    description: Policy, law, regulation, public spending, targets, bans, or official decisions.
+    phrases:
+      en:
+        translation_status: validated
+        phrases: [government policy, climate policy, new law, legislation, regulation, government subsidy, emissions target, government ban]
+      es: [política gubernamental, política climática, nueva ley, legislación, regulación, subvención pública, objetivo de emisiones, prohibición gubernamental]
+      pt: [política governamental, política climática, nova lei, legislação, regulamentação, subsídio público, meta de emissões, proibição governamental]
+      fr: [politique gouvernementale, politique climatique, nouvelle loi, législation, réglementation, subvention publique, objectif d'émissions, interdiction gouvernementale]
+      de: [Regierungspolitik, Klimapolitik, neues Gesetz, Gesetzgebung, Regulierung, staatliche Subvention, Emissionsziel, staatliches Verbot]
+      it: [politica governativa, politica climatica, nuova legge, legislazione, regolamentazione, sussidio pubblico, obiettivo di emissioni, divieto governativo]
+      ru: [государственная политика, климатическая политика, новый закон, законодательство, регулирование, государственная субсидия, цель по выбросам, правительственный запрет]
+      ar: [سياسة حكومية, سياسة المناخ, قانون جديد, تشريع, تنظيم حكومي, دعم حكومي, هدف الانبعاثات, حظر حكومي]
+      zh:
+        segmentation: character
+        phrases: [政府政策, 气候政策, 新法律, 立法, 监管, 政府补贴, 排放目标, 政府禁令]
+      ja:
+        segmentation: character
+        phrases: [政府方針, 気候政策, 新法, 法制化, 規制, 政府補助金, 排出目標, 政府による禁止]
+
+  party_politics:
+    label: Party politics
+    description: Electoral competition, governing/opposition parties, and named major parties in the five MVP countries.
+    phrases:
+      en:
+        translation_status: validated
+        phrases: [governing party, opposition party, election campaign, Labour Party, Conservative Party, Liberal Democrats, Green Party, Reform UK]
+      es: [partido gobernante, partido de oposición, campaña electoral, Partido Socialista, Partido Popular, partido Vox, movimiento Sumar]
+      pt: [partido do governo, partido da oposição, campanha eleitoral]
+      fr: [parti au pouvoir, parti d'opposition, campagne électorale, Renaissance parti, Les Républicains, Rassemblement National, La France Insoumise, Les Écologistes]
+      de: [Regierungspartei, Oppositionspartei, Wahlkampf, Sozialdemokratische Partei, Christlich Demokratische Union, Bündnis 90 Die Grünen, Alternative für Deutschland, Freie Demokratische Partei, Die Linke]
+      it: [partito di governo, partito di opposizione, campagna elettorale, Partito Democratico, Fratelli d'Italia, Movimento 5 Stelle, partito della Lega, Forza Italia]
+      ru: [правящая партия, оппозиционная партия, избирательная кампания]
+      ar: [الحزب الحاكم, حزب المعارضة, حملة انتخابية]
+      zh:
+        segmentation: character
+        phrases: [执政党, 反对党, 竞选活动]
+      ja:
+        segmentation: character
+        phrases: [与党, 野党, 選挙運動]
+
+# Bare domains are matched to the article hostname, including subdomains. This
+# registry is intentionally explicit and should be versioned/audited over time.
+official_domains:
+  unitedkingdom:
+    - gov.uk
+    - parliament.uk
+    - labour.org.uk
+    - conservatives.com
+    - libdems.org.uk
+    - greenparty.org.uk
+    - reformparty.uk
+  france:
+    - gouvernement.fr
+    - elysee.fr
+    - assemblee-nationale.fr
+    - senat.fr
+    - renaissancefrance.fr
+    - republicains.fr
+    - rassemblementnational.fr
+    - lafranceinsoumise.fr
+    - lesecologistes.fr
+  spain:
+    - lamoncloa.gob.es
+    - congreso.es
+    - senado.es
+    - psoe.es
+    - pp.es
+    - voxespana.es
+    - movimiento-sumar.es
+  germany:
+    - bundesregierung.de
+    - bundestag.de
+    - bundesrat.de
+    - spd.de
+    - cdu.de
+    - csu.de
+    - gruene.de
+    - afd.de
+    - fdp.de
+    - die-linke.de
+  italy:
+    - governo.it
+    - camera.it
+    - senato.it
+    - partitodemocratico.it
+    - fratelli-italia.it
+    - movimento5stelle.eu
+    - legaonline.it
+    - forza-italia.it

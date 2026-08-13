@@ -20,6 +20,7 @@ from .models import (
     DailyHazard,
     DailyTrend,
     HazardEvent,
+    PoliticalArticleSample,
 )
 
 
@@ -71,6 +72,12 @@ TREND_SCHEMA = pa.schema(
         ("global_attention_share", pa.float64()),
         ("country_attention_share", pa.float64()),
         ("attention_index", pa.float64()),
+        ("political_count", pa.int64()),
+        ("political_actor_count", pa.int64()),
+        ("government_action_count", pa.int64()),
+        ("party_politics_count", pa.int64()),
+        ("official_source_count", pa.int64()),
+        ("political_share_of_matched", pa.float64()),
         ("collected_at", pa.timestamp("us", tz="UTC")),
         ("metadata_json", pa.string()),
     ]
@@ -129,6 +136,28 @@ EVENT_SCHEMA = pa.schema(
         ("source_updated_at", pa.timestamp("us", tz="UTC")),
         ("collected_at", pa.timestamp("us", tz="UTC")),
         ("geometry_json", pa.string()),
+        ("metadata_json", pa.string()),
+    ]
+)
+
+POLITICAL_ARTICLE_SCHEMA = pa.schema(
+    [
+        ("record_id", pa.string()),
+        ("date", pa.date32()),
+        ("source", pa.string()),
+        ("topic_id", pa.string()),
+        ("geography", pa.string()),
+        ("url", pa.string()),
+        ("domain", pa.string()),
+        ("title", pa.string()),
+        ("description", pa.string()),
+        ("language", pa.string()),
+        ("author", pa.string()),
+        ("political_actor", pa.bool_()),
+        ("government_action", pa.bool_()),
+        ("party_politics", pa.bool_()),
+        ("official_source", pa.bool_()),
+        ("collected_at", pa.timestamp("us", tz="UTC")),
         ("metadata_json", pa.string()),
     ]
 )
@@ -474,6 +503,59 @@ class LocalParquetStorage(AttentionStorage):
             key=lambda item: (item.start_at, item.record_id),
         )
 
+    def write_political_article_samples(
+        self, samples: list[PoliticalArticleSample]
+    ) -> int:
+        groups: dict[tuple[str, str, str], list[PoliticalArticleSample]] = defaultdict(list)
+        for sample in samples:
+            groups[(sample.source, sample.topic_id, sample.geography)].append(sample)
+        added = 0
+        for (source, topic_id, geography), incoming in groups.items():
+            path = self._political_article_path(source, topic_id, geography)
+            existing = self._read_political_article_file(path) if path.exists() else []
+            by_id = {item.record_id: item for item in existing}
+            before = len(by_id)
+            by_id.update({item.record_id: item for item in incoming})
+            added += len(by_id) - before
+            rows = [
+                _political_article_to_row(item)
+                for item in sorted(by_id.values(), key=lambda item: (item.date, item.url))
+            ]
+            _atomic_parquet_write(
+                path, pa.Table.from_pylist(rows, schema=POLITICAL_ARTICLE_SCHEMA)
+            )
+        return added
+
+    def read_political_article_samples(
+        self,
+        *,
+        source: str | None = None,
+        topics: set[str] | None = None,
+        geographies: set[str] | None = None,
+        start: date | None = None,
+        end: date | None = None,
+    ) -> list[PoliticalArticleSample]:
+        base = self.root / "political_articles"
+        paths = (
+            (base / f"source={source}").rglob("articles.parquet")
+            if source
+            else base.rglob("articles.parquet")
+        )
+        samples: list[PoliticalArticleSample] = []
+        for path in sorted(paths):
+            samples.extend(self._read_political_article_file(path))
+        return sorted(
+            (
+                item
+                for item in samples
+                if (topics is None or item.topic_id in topics)
+                and (geographies is None or item.geography in geographies)
+                and (start is None or item.date >= start)
+                and (end is None or item.date <= end)
+            ),
+            key=lambda item: (item.date, item.topic_id, item.geography, item.url),
+        )
+
     def _record_path(
         self, source: str, day: date, topic_id: str, query_id: str
     ) -> Path:
@@ -498,6 +580,18 @@ class LocalParquetStorage(AttentionStorage):
 
     def _event_path(self, source: str) -> Path:
         return self.root / "events" / f"source={source}" / "events.parquet"
+
+    def _political_article_path(
+        self, source: str, topic_id: str, geography: str
+    ) -> Path:
+        return (
+            self.root
+            / "political_articles"
+            / f"source={source}"
+            / f"topic_id={topic_id}"
+            / f"geography={geography}"
+            / "articles.parquet"
+        )
 
     def _trend_path(
         self,
@@ -616,6 +710,15 @@ class LocalParquetStorage(AttentionStorage):
             events.append(HazardEvent.model_validate(row))
         return events
 
+    @staticmethod
+    def _read_political_article_file(path: Path) -> list[PoliticalArticleSample]:
+        rows = pq.read_table(path).to_pylist()
+        samples: list[PoliticalArticleSample] = []
+        for row in rows:
+            row["metadata"] = json.loads(row.pop("metadata_json"))
+            samples.append(PoliticalArticleSample.model_validate(row))
+        return samples
+
 
 def _record_to_row(record: AttentionRecord) -> dict[str, Any]:
     row = record.model_dump(exclude={"metadata"})
@@ -658,6 +761,14 @@ def _event_to_row(event: HazardEvent) -> dict[str, Any]:
     )
     row["metadata_json"] = json.dumps(
         event.metadata, ensure_ascii=False, sort_keys=True, default=str
+    )
+    return row
+
+
+def _political_article_to_row(sample: PoliticalArticleSample) -> dict[str, Any]:
+    row = sample.model_dump(exclude={"metadata"})
+    row["metadata_json"] = json.dumps(
+        sample.metadata, ensure_ascii=False, sort_keys=True, default=str
     )
     return row
 
@@ -751,6 +862,12 @@ def _merge_trends(existing: DailyTrend, incoming: DailyTrend) -> DailyTrend:
         "global_attention_share",
         "country_attention_share",
         "attention_index",
+        "political_count",
+        "political_actor_count",
+        "government_action_count",
+        "party_politics_count",
+        "official_source_count",
+        "political_share_of_matched",
     ):
         incoming_value = getattr(incoming, field)
         updates[field] = (

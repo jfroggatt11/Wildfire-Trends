@@ -4,7 +4,11 @@ from datetime import datetime, timezone
 
 from climate_attention.aggregation import aggregate_daily
 from climate_attention.storage import LocalParquetStorage
-from climate_attention.models import DailyCountryCoverage, DailyTrend
+from climate_attention.models import (
+    DailyCountryCoverage,
+    DailyTrend,
+    PoliticalArticleSample,
+)
 
 
 def test_aggregation_deduplicates_and_groups(record_factory):
@@ -97,6 +101,48 @@ def test_google_trend_index_round_trip(tmp_path):
 
     assert storage.write_trends([trend]) == 1
     assert storage.read_trends(source="google_trends_unofficial") == [trend]
+
+
+def test_political_counts_and_article_samples_round_trip(tmp_path):
+    storage = LocalParquetStorage(tmp_path / "data")
+    collected_at = datetime(2025, 2, 1, tzinfo=timezone.utc)
+    trend = DailyTrend(
+        record_id="political-trend",
+        date=datetime(2025, 1, 2).date(),
+        source="gdelt_ngrams",
+        topic_id="climate_change",
+        query_id="topic_distinct_urls",
+        query_expression="climate change",
+        geography="italy",
+        matched_count=10,
+        political_count=4,
+        political_actor_count=3,
+        government_action_count=2,
+        party_politics_count=1,
+        official_source_count=1,
+        political_share_of_matched=0.4,
+        collected_at=collected_at,
+    )
+    sample = PoliticalArticleSample(
+        record_id="sample-1",
+        date=trend.date,
+        topic_id=trend.topic_id,
+        geography="italy",
+        url="https://example.it/story",
+        domain="example.it",
+        title="Climate policy",
+        political_actor=True,
+        collected_at=collected_at,
+        metadata={"validation_sample_only": True},
+    )
+
+    assert storage.write_trends([trend]) == 1
+    assert storage.write_political_article_samples([sample]) == 1
+    assert storage.write_political_article_samples([sample]) == 0
+    assert storage.read_trends(source="gdelt_ngrams") == [trend]
+    assert storage.read_political_article_samples(
+        source="gdelt_ngrams", topics={"climate_change"}, geographies={"italy"}
+    ) == [sample]
 
 
 def test_country_coverage_enriches_existing_and_new_trends(tmp_path):

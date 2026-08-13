@@ -1,0 +1,26 @@
+schema_version: 1
+
+# The 2025 political-discourse MVP. Country IDs deliberately match the global
+# configuration so these rows can later be merged into a worldwide run.
+countries:
+  unitedkingdom:
+    label: United Kingdom
+    gdelt_ngram_label: United Kingdom
+    google_geo: GB
+    iso3: GBR
+  france:
+    label: France
+    google_geo: FR
+    iso3: FRA
+  spain:
+    label: Spain
+    google_geo: ES
+    iso3: ESP
+  germany:
+    label: Germany
+    google_geo: DE
+    iso3: DEU
+  italy:
+    label: Italy
+    google_geo: IT
+    iso3: ITA

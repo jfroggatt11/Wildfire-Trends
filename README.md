@@ -214,6 +214,52 @@ climate-attention collect-ngrams \
   --data-dir data
 ```
 
+### 2025 political-discourse MVP
+
+The bundled MVP uses the same four multilingual topic definitions, but limits the
+output and validation workload to the United Kingdom, France, Spain, Germany, and
+Italy. It adds three article-level signals—political actors, government action, and
+party politics—plus an explicit registry of government, parliament, and party
+domains. Exact counts and their union are stored on each daily trend row. A bounded,
+deterministic URL sample can also retain GAL title/description metadata for manual
+precision and recall review; the sample is never used to estimate the counts.
+
+Estimate the full calendar year first (dry runs do not incur query charges):
+
+```bash
+climate-attention estimate-ngrams \
+  --config config/topics.multilingual.example.yaml \
+  --countries-config config/countries.europe5.yaml \
+  --political-config config/political_signals.europe5.yaml \
+  --article-sample-size 10 \
+  --start 2025-01-01 \
+  --end 2025-12-31 \
+  --window-days 31 \
+  --billing-project YOUR_RESEARCH_PROJECT
+```
+
+Then run the identical workload with a cap just above the largest monthly estimate:
+
+```bash
+climate-attention collect-ngrams \
+  --config config/topics.multilingual.example.yaml \
+  --countries-config config/countries.europe5.yaml \
+  --political-config config/political_signals.europe5.yaml \
+  --article-sample-size 10 \
+  --start 2025-01-01 \
+  --end 2025-12-31 \
+  --window-days 31 \
+  --billing-project YOUR_RESEARCH_PROJECT \
+  --maximum-gb-billed MAX_GB_PER_JOB \
+  --data-dir data
+```
+
+Political article samples are written under `data/political_articles`. The political
+translations and official-domain registry are research seeds and must be audited
+before inferential analysis. Selecting five countries reduces output and validation
+work, but does not proportionally reduce bytes scanned because BigQuery must still
+identify matching URLs before country attribution.
+
 Every date-window job is dry-run again immediately before execution and is rejected
 if its estimate exceeds the frozen cap. The default query is counts-only: it scans
 the NGram table once for all selected topics, reconstructs configured literal phrases
@@ -291,10 +337,21 @@ The event layer deliberately does not infer physical extreme-weather events from
 same news coverage used as the outcome. NASA FIRMS supplies daily physical wildfire
 activity; GDACS supplies named major wildfires, floods, and tropical cyclones.
 
-Request a free NASA FIRMS `MAP_KEY`, then preview the 2025 global workload:
+Request a free NASA FIRMS `MAP_KEY`, copy the environment template, and place the
+key in the ignored project-root `.env` file:
 
 ```bash
-export FIRMS_MAP_KEY=your-personal-key
+cp .env.example .env
+```
+
+```dotenv
+FIRMS_MAP_KEY=your-personal-key
+```
+
+An exported shell variable with the same name takes precedence over `.env`. Preview
+the 2025 global workload with:
+
+```bash
 
 climate-attention collect-firms \
   --countries-config config/countries.world.yaml \

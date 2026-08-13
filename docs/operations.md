@@ -128,6 +128,15 @@ not interpret correlation alone as validity: inspect country mapping coverage,
 zero-day rates, spikes, anchor-token sensitivity, and differences caused by
 original-language versus translated search.
 
+For the bounded 2025 political MVP, use `config/countries.europe5.yaml` and add
+`--political-config config/political_signals.europe5.yaml --article-sample-size 10`
+to both the estimate and collection commands. Prefer 31-day windows so a failure or
+billing cap affects one month rather than the entire year. The stored political
+component counts overlap; use `political_count` for their distinct-URL union and the
+`political_articles` dataset only for manual validation. Review false positives,
+false negatives, language balance, named-party coverage, and official-domain drift
+before extending the design globally.
+
 As a concrete benchmark, the four multilingual themes over July 2026 and all 197
 configured countries dry-ran at 587.958 GB in one batch, versus 1,080.384 GB across
 four separate topic jobs—a 45.6% reduction. A one-day batch returned exactly the same

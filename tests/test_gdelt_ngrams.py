@@ -17,6 +17,7 @@ from climate_attention.sources.gdelt_ngrams import (
     build_ngram_batch_sql,
     build_ngram_sql,
     parse_ngram_batch_rows,
+    parse_political_article_samples,
     plan_ngram_windows,
 )
 
@@ -108,6 +109,94 @@ def test_batch_sql_scans_ngram_table_once_and_keeps_topic_membership():
         "clean_energy",
         "climate_change",
     }
+
+
+def test_political_sql_counts_url_level_signals_and_samples_articles():
+    sql, parameters = build_ngram_batch_sql(
+        phrases_by_topic={"climate_change": ["climate change"]},
+        political_signals={
+            "political_actor": ["government"],
+            "government_action": ["new law"],
+            "party_politics": ["opposition party"],
+        },
+        official_domains={"italy": ["governo.it"]},
+        article_sample_size=10,
+    )
+
+    assert sql.count("`gdelt-bq.gdeltv2.webngrams`") == 1
+    assert "LOGICAL_OR(political_actor)" in sql
+    assert "COUNTIF(" in sql
+    assert "article_samples_json" in sql
+    assert "FARM_FINGERPRINT(url)" in sql
+    assert "`gdelt-bq.gdeltv2.gal`" in sql
+    assert "attribution_domains" in sql
+    assert parameters["official_country_ids"] == ["italy"]
+    assert parameters["official_domains"] == ["governo.it"]
+
+
+def test_political_parser_keeps_exact_counts_separate_from_validation_sample():
+    window, _ = plan_ngram_windows(_request())
+    rows = [
+        {
+            "topic_id": "climate_change",
+            "day": date(2026, 1, 1),
+            "country_id": "italy",
+            "matched_count": 8,
+            "monitored_count": None,
+            "political_count": 3,
+            "political_actor_count": 2,
+            "government_action_count": 1,
+            "party_politics_count": 1,
+            "official_source_count": 1,
+            "total_matched_urls": 8,
+            "attributed_matched_urls": 8,
+            "mapped_domain_count": 2,
+            "language_counts_json": '[{"lang":"it","matched_count":8}]',
+            "article_samples_json": json.dumps(
+                [
+                    {
+                        "url": "https://example.it/story",
+                        "domain": "example.it",
+                        "title": "Story",
+                        "description": "Description",
+                        "lang": "it",
+                        "author": "Reporter",
+                        "political_actor": True,
+                        "government_action": False,
+                        "party_politics": False,
+                        "official_source": False,
+                    }
+                ]
+            ),
+        }
+    ]
+    signals = {
+        "political_actor": ["governo"],
+        "government_action": ["nuova legge"],
+        "party_politics": ["partito di opposizione"],
+    }
+
+    trends = parse_ngram_batch_rows(
+        rows=rows,
+        window=window[0],
+        phrases_by_topic={"climate_change": ["climate change"]},
+        estimated_bytes=100,
+        job={"job_id": "politics-1"},
+        collected_at=datetime(2026, 2, 1, tzinfo=timezone.utc),
+        political_signals=signals,
+    )
+    samples = parse_political_article_samples(
+        rows=rows,
+        collected_at=datetime(2026, 2, 1, tzinfo=timezone.utc),
+        sample_size=10,
+    )
+
+    assert trends[0].political_count == 3
+    assert trends[0].political_share_of_matched == 0.375
+    assert trends[0].metadata["political_classifier"]["counts_are_census"] is True
+    assert len(samples) == 1
+    assert samples[0].political is True
+    assert samples[0].metadata["validation_sample_only"] is True
 
 
 def test_batch_parser_creates_stable_topic_rows_and_deduplicates_per_topic():

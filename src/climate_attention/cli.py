@@ -12,10 +12,21 @@ from pathlib import Path
 from uuid import uuid4
 
 from .aggregation import aggregate_daily
-from .config import ConfigError, config_hash, load_config, load_country_config
+from .config import (
+    ConfigError,
+    config_hash,
+    load_config,
+    load_country_config,
+    load_political_config,
+)
 from .comparison import compare_trends, write_comparisons
 from .manifest import build_run_manifest, package_version
-from .models import CollectionRequest, DailyCountryCoverage, DailyTrend
+from .models import (
+    CollectionRequest,
+    DailyCountryCoverage,
+    DailyTrend,
+    PoliticalArticleSample,
+)
 from .run_state import CollectionRunState, RunStore
 from .sources import GoogleTrendsUnofficialProvider
 from .sources.base import ProviderCollectionError, ProviderError
@@ -86,6 +97,13 @@ def _country_batch_size(value: str) -> int:
     parsed = int(value)
     if not 1 <= parsed <= 7:
         raise argparse.ArgumentTypeError("value must be between 1 and 7")
+    return parsed
+
+
+def _article_sample_size(value: str) -> int:
+    parsed = int(value)
+    if not 0 <= parsed <= 100:
+        raise argparse.ArgumentTypeError("value must be between 0 and 100")
     return parsed
 
 
@@ -209,6 +227,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     ngrams.add_argument("--window-days", type=int, default=366)
     ngrams.add_argument(
+        "--political-config",
+        type=Path,
+        help="multilingual political signals and audited official domains",
+    )
+    ngrams.add_argument(
+        "--article-sample-size",
+        type=_article_sample_size,
+        default=0,
+        help="deterministic validation URLs per topic/country/day (0-100)",
+    )
+    ngrams.add_argument(
         "--billing-project",
         required=True,
         help="explicit Google Cloud project used for BigQuery billing",
@@ -240,6 +269,10 @@ def build_parser() -> argparse.ArgumentParser:
     estimate_ngrams.add_argument("--topics", nargs="+")
     estimate_ngrams.add_argument("--countries", nargs="+")
     estimate_ngrams.add_argument("--window-days", type=int, default=366)
+    estimate_ngrams.add_argument("--political-config", type=Path)
+    estimate_ngrams.add_argument(
+        "--article-sample-size", type=_article_sample_size, default=0
+    )
     estimate_ngrams.add_argument("--billing-project", required=True)
     estimate_ngrams.add_argument("--location", default="US")
     estimate_ngrams.add_argument(
@@ -663,6 +696,21 @@ def _collect_ngrams(args: argparse.Namespace) -> int:
     countries = country_config.enabled_countries(
         set(args.countries) if args.countries else None
     )
+    political = (
+        load_political_config(args.political_config)
+        if args.political_config
+        else None
+    )
+    if args.article_sample_size and political is None:
+        raise ValueError("--article-sample-size requires --political-config")
+    if political is not None:
+        selected_ids = {country.id for country in countries}
+        unknown_domains = set(political.official_domains) - selected_ids
+        if unknown_domains:
+            raise ValueError(
+                "political config has official domains outside the selected countries: "
+                + ", ".join(sorted(unknown_domains))
+            )
     request = CollectionRequest(start=args.start, end=args.end, topics=topics)
     windows, phrases = plan_ngram_windows(request, window_days=args.window_days)
     maximum_bytes = int(args.maximum_gb_billed * 1_000_000_000)
@@ -676,6 +724,17 @@ def _collect_ngrams(args: argparse.Namespace) -> int:
         "topic_phrases": phrases,
         "batch_topics": True,
         "include_denominator": args.include_denominator,
+        "political_signals": political.phrase_mapping() if political else None,
+        "official_domains": political.official_domains if political else {},
+        "article_sample_size": args.article_sample_size,
+        "political_config": (
+            {
+                "path": str(args.political_config),
+                "sha256": config_hash(args.political_config),
+            }
+            if political
+            else None
+        ),
     }
     started_at = datetime.now(timezone.utc)
     run_id = f"{started_at.strftime('%Y%m%dT%H%M%SZ')}-{uuid4().hex[:8]}"
@@ -698,14 +757,26 @@ def _collect_ngrams(args: argparse.Namespace) -> int:
         f"{len(countries)} country/countries, {len(windows)} BigQuery job(s)."
     )
     print("All selected topics share one BigQuery scan per date window.")
+    if political:
+        print(
+            "Political actor, government-action, party-politics, and official-source "
+            "counts are computed over distinct topic URLs. "
+            f"Validation sample: {args.article_sample_size} URL(s) per "
+            "topic/country/day."
+        )
     print(
         "Each job is dry-run first and cannot exceed the configured per-job "
         f"cap of {maximum_bytes / 1_000_000_000:.3f} GB."
     )
     denominator = "with GAL denominators" if args.include_denominator else "counts only"
+    attribution = (
+        "GDELT's April 2015 domain map plus the configured official-domain overrides"
+        if political
+        else "GDELT's April 2015 domain map"
+    )
     print(
-        "Counts are distinct URLs; country attribution uses GDELT's April 2015 "
-        f"domain map, with ambiguous and unmapped domains excluded ({denominator})."
+        f"Counts are distinct URLs; country attribution uses {attribution}, with "
+        f"ambiguous and unmapped domains excluded ({denominator})."
     )
     if args.plan_only:
         print(f"Plan saved. Start it with: climate-attention runs retry {run_id}")
@@ -720,6 +791,21 @@ def _estimate_ngrams(args: argparse.Namespace) -> int:
     countries = country_config.enabled_countries(
         set(args.countries) if args.countries else None
     )
+    political = (
+        load_political_config(args.political_config)
+        if args.political_config
+        else None
+    )
+    if args.article_sample_size and political is None:
+        raise ValueError("--article-sample-size requires --political-config")
+    if political is not None:
+        selected_ids = {country.id for country in countries}
+        unknown_domains = set(political.official_domains) - selected_ids
+        if unknown_domains:
+            raise ValueError(
+                "political config has official domains outside the selected countries: "
+                + ", ".join(sorted(unknown_domains))
+            )
     request = CollectionRequest(start=args.start, end=args.end, topics=topics)
     windows, phrases = plan_ngram_windows(request, window_days=args.window_days)
     labels = {country.id: country.ngram_label for country in countries}
@@ -732,6 +818,9 @@ def _estimate_ngrams(args: argparse.Namespace) -> int:
         country_labels=labels,
         phrases_by_topic=phrases,
         include_denominator=args.include_denominator,
+        political_signals=political.phrase_mapping() if political else None,
+        official_domains=political.official_domains if political else None,
+        article_sample_size=args.article_sample_size,
     )
     for estimate in estimates:
         gb = estimate["estimated_bytes_processed"] / 1_000_000_000
@@ -1177,10 +1266,18 @@ def _execute_timeline_run(
             trends = [
                 item for item in observations if isinstance(item, DailyTrend)
             ]
+            political_samples = [
+                item
+                for item in observations
+                if isinstance(item, PoliticalArticleSample)
+            ]
             # Coverage is written first so topic rows receive their country
             # denominator immediately; it also refreshes matching older rows.
             state.records_newly_stored += storage.write_country_coverages(coverages)
             state.records_newly_stored += storage.write_trends(trends)
+            state.records_newly_stored += storage.write_political_article_samples(
+                political_samples
+            )
         state.apply_window_event(event, window, log, children)
         store.save(state)
 
@@ -1238,6 +1335,10 @@ def _execute_timeline_run(
         f"Windows: {counts}. Manifest: {manifest_path}. "
         f"Trend dataset: {storage.root / 'trends'}."
     )
+    if state.source == "gdelt_ngrams" and state.provider_options.get(
+        "article_sample_size", 0
+    ):
+        print(f"Political validation articles: {storage.root / 'political_articles'}.")
     return exit_code
 
 

@@ -10,7 +10,7 @@ from climate_attention.cli import main
 from climate_attention.config import Country
 from climate_attention.geography import load_country_boundaries
 from climate_attention.models import DailyHazard, HazardEvent
-from climate_attention.sources.firms import FIRMSProvider, plan_firms_windows
+from climate_attention.sources.firms import FIRMSProvider, firms_map_key, plan_firms_windows
 from climate_attention.sources.base import ProviderError
 from climate_attention.sources.gdacs import GDACSProvider
 from climate_attention.storage import LocalParquetStorage
@@ -71,6 +71,19 @@ def test_country_boundary_index_and_firms_window_plan(tmp_path):
         (6, 10),
         (11, 12),
     ]
+
+
+def test_firms_map_key_loads_dotenv_and_environment_takes_precedence(
+    tmp_path, monkeypatch
+):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("FIRMS_MAP_KEY", raising=False)
+    (tmp_path / ".env").write_text(
+        "# local secret\nFIRMS_MAP_KEY='dotenv-key'\n", encoding="utf-8"
+    )
+    assert firms_map_key() == "dotenv-key"
+    monkeypatch.setenv("FIRMS_MAP_KEY", "shell-key")
+    assert firms_map_key() == "shell-key"
 
 
 def test_firms_filters_and_builds_complete_country_day_rows(tmp_path):

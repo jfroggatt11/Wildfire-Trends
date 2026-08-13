@@ -165,12 +165,34 @@ once to each. The batch window is the operational retry unit; canonical record
 identity remains topic-specific and is backward-compatible with earlier per-topic
 runs.
 
+When a political configuration is supplied, the same NGram scan also accumulates
+URL-level co-occurrence flags for `political_actor`, `government_action`, and
+`party_politics`. The daily political measure is the distinct-URL union of those
+flags and an `official_source` flag derived from the versioned country-domain
+registry:
+
+```text
+political_count = distinct topic URLs where actor OR action OR party OR official
+political_share_of_matched = political_count / matched_count
+```
+
+The component counts overlap by design and therefore must not be summed. Political
+phrases may occur anywhere in the indexed article text; this is a discourse-relevance
+screen, not a claim that a politician caused or endorsed the underlying event. A
+deterministic hash-ordered sample can be joined to GAL for URL, title, description,
+language, and author review. Exact daily counts are a census of matched indexed URLs;
+the bounded article sample exists only to label and audit classifier error.
+
 Country attribution uses GDELT's multilingual April 2015 domain-country table.
 Ambiguous domains are discarded, the longest matching domain suffix wins for
 subdomains, and URLs without a mapping are excluded. This catalogue is both old and
 incomplete; metadata therefore records the share of all matching URLs that received
 any unambiguous country assignment. Selected-country coverage cannot by itself
 recover the country distribution of unmapped URLs.
+In political mode, configured official domains are also eligible attribution domains
+and take precedence over an equally specific historical mapping. This retains known
+government, parliamentary, and party pages that are missing or stale in the 2015
+catalogue, while keeping the override transparent in the frozen configuration.
 Each country-day row also records whether the requested country label has any mapped
 domains. A zero for an unsupported mapping must be treated as missing, not as a
 measured zero. `audit-ngram-countries` produces the full mapping review and suggested

@@ -274,12 +274,56 @@ class DailyTrend(StrictModel):
     global_attention_share: float | None = Field(default=None, ge=0)
     country_attention_share: float | None = Field(default=None, ge=0)
     attention_index: float | None = Field(default=None, ge=0, le=100)
+    political_count: int | None = Field(default=None, ge=0)
+    political_actor_count: int | None = Field(default=None, ge=0)
+    government_action_count: int | None = Field(default=None, ge=0)
+    party_politics_count: int | None = Field(default=None, ge=0)
+    official_source_count: int | None = Field(default=None, ge=0)
+    political_share_of_matched: float | None = Field(default=None, ge=0, le=1)
     collected_at: datetime = Field(default_factory=utc_now)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("collected_at")
     @classmethod
     def collection_timestamp_must_be_aware(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("collection timestamp must include a timezone")
+        return value.astimezone(timezone.utc)
+
+
+class PoliticalArticleSample(StrictModel):
+    """Deterministically sampled topic article used to validate political labels."""
+
+    record_id: str
+    date: date
+    source: str = "gdelt_ngrams"
+    topic_id: str
+    geography: str
+    url: str
+    domain: str | None = None
+    title: str | None = None
+    description: str | None = None
+    language: str | None = None
+    author: str | None = None
+    political_actor: bool = False
+    government_action: bool = False
+    party_politics: bool = False
+    official_source: bool = False
+    collected_at: datetime = Field(default_factory=utc_now)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @property
+    def political(self) -> bool:
+        return (
+            self.political_actor
+            or self.government_action
+            or self.party_politics
+            or self.official_source
+        )
+
+    @field_validator("collected_at")
+    @classmethod
+    def article_sample_timestamp_must_be_aware(cls, value: datetime) -> datetime:
         if value.tzinfo is None or value.utcoffset() is None:
             raise ValueError("collection timestamp must include a timezone")
         return value.astimezone(timezone.utc)

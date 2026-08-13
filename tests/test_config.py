@@ -2,7 +2,12 @@ from __future__ import annotations
 
 import pytest
 
-from climate_attention.config import ConfigError, load_config, load_country_config
+from climate_attention.config import (
+    ConfigError,
+    load_config,
+    load_country_config,
+    load_political_config,
+)
 from climate_attention.models import Query
 
 
@@ -141,3 +146,40 @@ topics:
     ]
     assert phrases[0].translation_status == "validated"
     assert phrases[1].translation_status == "draft"
+
+
+def test_political_config_normalizes_signals_and_domains(tmp_path):
+    path = tmp_path / "political.yaml"
+    path.write_text(
+        """
+signals:
+  political_actor:
+    label: Actor
+    phrases:
+      en: [government]
+      zh:
+        segmentation: character
+        phrases: [政府]
+  government_action:
+    label: Action
+    phrases:
+      en: [new law]
+  party_politics:
+    label: Party
+    phrases:
+      en: [opposition party]
+official_domains:
+  italy: [GOVERNO.IT]
+""",
+        encoding="utf-8",
+    )
+
+    config = load_political_config(path)
+
+    assert set(config.phrase_mapping()) == {
+        "political_actor",
+        "government_action",
+        "party_politics",
+    }
+    assert config.signals[0].phrases[1].segmentation == "character"
+    assert config.official_domains == {"italy": ["governo.it"]}

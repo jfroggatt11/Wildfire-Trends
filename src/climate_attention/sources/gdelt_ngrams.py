@@ -14,6 +14,7 @@ from ..config import Country
 from ..models import (
     CollectionRequest,
     DailyTrend,
+    PoliticalArticleSample,
     Query,
     RequestLog,
     TrendProviderResult,
@@ -127,7 +128,13 @@ def audit_country_mapping(
 
 
 NGramWindowSink = Callable[
-    [str, GDELTWindow, RequestLog | None, list[DailyTrend], list[GDELTWindow]],
+    [
+        str,
+        GDELTWindow,
+        RequestLog | None,
+        list[DailyTrend | PoliticalArticleSample],
+        list[GDELTWindow],
+    ],
     None,
 ]
 
@@ -226,6 +233,9 @@ def build_ngram_sql(
     coverage_table: str = DEFAULT_COVERAGE_TABLE,
     domain_country_table: str = DEFAULT_DOMAIN_COUNTRY_TABLE,
     include_denominator: bool = False,
+    political_signals: dict[str, list[str | dict[str, Any]]] | None = None,
+    official_domains: dict[str, list[str]] | None = None,
+    article_sample_size: int = 0,
 ) -> tuple[str, dict[str, Any]]:
     """Build the legacy single-topic shape through the batched SQL builder."""
     return build_ngram_batch_sql(
@@ -234,6 +244,9 @@ def build_ngram_sql(
         coverage_table=coverage_table,
         domain_country_table=domain_country_table,
         include_denominator=include_denominator,
+        political_signals=political_signals,
+        official_domains=official_domains,
+        article_sample_size=article_sample_size,
     )
 
 
@@ -244,6 +257,9 @@ def build_ngram_batch_sql(
     coverage_table: str = DEFAULT_COVERAGE_TABLE,
     domain_country_table: str = DEFAULT_DOMAIN_COUNTRY_TABLE,
     include_denominator: bool = False,
+    political_signals: dict[str, list[str | dict[str, Any]]] | None = None,
+    official_domains: dict[str, list[str]] | None = None,
+    article_sample_size: int = 0,
 ) -> tuple[str, dict[str, Any]]:
     """Build one scan that independently deduplicates URLs for every topic."""
     for table in (ngram_table, coverage_table, domain_country_table):
@@ -251,6 +267,19 @@ def build_ngram_batch_sql(
             raise ValueError(f"invalid BigQuery table identifier: {table!r}")
     if not phrases_by_topic or any(not values for values in phrases_by_topic.values()):
         raise ValueError("each NGram topic must contain at least one phrase")
+    if article_sample_size < 0 or article_sample_size > 100:
+        raise ValueError("article sample size must be between 0 and 100")
+    if political_signals:
+        return _build_political_ngram_batch_sql(
+            phrases_by_topic=phrases_by_topic,
+            political_signals=political_signals,
+            official_domains=official_domains or {},
+            article_sample_size=article_sample_size,
+            ngram_table=ngram_table,
+            coverage_table=coverage_table,
+            domain_country_table=domain_country_table,
+            include_denominator=include_denominator,
+        )
 
     parameters: dict[str, Any] = {}
     topic_clauses: list[tuple[int, str]] = []
@@ -414,6 +443,310 @@ ORDER BY topic_id, day, country_id
     return sql, parameters
 
 
+def _build_political_ngram_batch_sql(
+    *,
+    phrases_by_topic: dict[str, list[str | dict[str, Any]]],
+    political_signals: dict[str, list[str | dict[str, Any]]],
+    official_domains: dict[str, list[str]],
+    article_sample_size: int,
+    ngram_table: str,
+    coverage_table: str,
+    domain_country_table: str,
+    include_denominator: bool,
+) -> tuple[str, dict[str, Any]]:
+    """Build the main topic scan with URL-level political co-occurrence flags."""
+    required = {"political_actor", "government_action", "party_politics"}
+    missing = required - set(political_signals)
+    if missing:
+        raise ValueError(
+            "political signals are missing: " + ", ".join(sorted(missing))
+        )
+    if any(not values for values in political_signals.values()):
+        raise ValueError("each political signal must contain at least one phrase")
+
+    parameters: dict[str, Any] = {}
+    phrase_index = 0
+    topic_clauses: list[tuple[int, str]] = []
+    topic_ids = sorted(phrases_by_topic)
+    for topic_index, topic_id in enumerate(topic_ids):
+        parameters[f"topic_id_{topic_index}"] = topic_id
+        clauses = []
+        for phrase in _normalize_phrase_specs(phrases_by_topic[topic_id]):
+            clause, values = _phrase_sql_clause(phrase, phrase_index)
+            parameters.update(values)
+            clauses.append(clause)
+            phrase_index += 1
+        topic_clauses.append((topic_index, " OR ".join(clauses)))
+
+    signal_clauses: dict[str, str] = {}
+    for signal_id in sorted(political_signals):
+        clauses = []
+        for phrase in _normalize_phrase_specs(political_signals[signal_id]):
+            clause, values = _phrase_sql_clause(phrase, phrase_index)
+            parameters.update(values)
+            clauses.append(clause)
+            phrase_index += 1
+        signal_clauses[signal_id] = " OR ".join(clauses)
+
+    topic_filter = "\n      OR ".join(f"({clause})" for _, clause in topic_clauses)
+    political_filter = "\n      OR ".join(
+        f"({clause})" for clause in signal_clauses.values()
+    )
+    topic_array = "ARRAY_CONCAT(\n        " + ",\n        ".join(
+        "IF(("
+        + clause
+        + f"), ARRAY<STRING>[@topic_id_{topic_index}], ARRAY<STRING>[] )"
+        for topic_index, clause in topic_clauses
+    ) + "\n      )"
+    parameters["topic_ids"] = topic_ids
+
+    official_country_ids: list[str] = []
+    official_domain_values: list[str] = []
+    for country_id in sorted(official_domains):
+        for domain in official_domains[country_id]:
+            official_country_ids.append(country_id)
+            official_domain_values.append(domain.lower().lstrip("."))
+    parameters["official_country_ids"] = official_country_ids
+    parameters["official_domains"] = official_domain_values
+
+    coverage_ctes = ""
+    monitored_expression = "CAST(NULL AS INT64)"
+    coverage_join = ""
+    if include_denominator:
+        coverage_ctes = f""",
+coverage_urls AS (
+  SELECT DISTINCT DATE(date) AS day, url, LOWER(NET.HOST(url)) AS host
+  FROM `{coverage_table}`
+  WHERE DATE(date) BETWEEN @start_date AND @end_date
+),
+coverage_attributed AS (
+  SELECT day, url, domains.country_label
+  FROM coverage_urls
+  JOIN unambiguous_domains AS domains
+    ON host = domains.domain OR ENDS_WITH(host, CONCAT('.', domains.domain))
+  QUALIFY ROW_NUMBER() OVER (
+    PARTITION BY day, url ORDER BY LENGTH(domains.domain) DESC
+  ) = 1
+),
+country_coverage AS (
+  SELECT day, countries.country_id, COUNT(DISTINCT url) AS monitored_count
+  FROM coverage_attributed
+  JOIN requested_countries AS countries USING (country_label)
+  GROUP BY day, country_id
+)"""
+        monitored_expression = "COALESCE(coverage.monitored_count, 0)"
+        coverage_join = "LEFT JOIN country_coverage AS coverage USING (day, country_id)"
+
+    article_catalog_cte = ""
+    enriched_source = "country_article_signals"
+    sample_expression = "'[]'"
+    if article_sample_size:
+        article_catalog_cte = f""",
+article_catalog AS (
+  SELECT
+    catalog.url,
+    ARRAY_AGG(
+      STRUCT(catalog.domain, catalog.title, catalog.`desc` AS description,
+        catalog.lang, catalog.author)
+      ORDER BY catalog.date DESC LIMIT 1
+    )[SAFE_OFFSET(0)] AS article
+  FROM `{coverage_table}` AS catalog
+  JOIN (SELECT DISTINCT url FROM country_article_signals) AS matched USING (url)
+  WHERE DATE(catalog.date) BETWEEN @start_date AND @end_date
+  GROUP BY catalog.url
+),
+enriched_country_articles AS (
+  SELECT signals.*, catalog.article
+  FROM country_article_signals AS signals
+  LEFT JOIN article_catalog AS catalog USING (url)
+)"""
+        enriched_source = "enriched_country_articles"
+        sample_expression = f"""TO_JSON_STRING(ARRAY_AGG(STRUCT(
+      url AS url,
+      COALESCE(article.domain, host) AS domain,
+      article.title AS title,
+      article.description AS description,
+      COALESCE(article.lang, lang) AS lang,
+      article.author AS author,
+      political_actor AS political_actor,
+      government_action AS government_action,
+      party_politics AS party_politics,
+      official_source AS official_source
+    ) ORDER BY FARM_FINGERPRINT(url) LIMIT {article_sample_size}))"""
+
+    sql = f"""
+WITH requested_countries AS (
+  SELECT country_id, country_label
+  FROM UNNEST(@country_ids) AS country_id WITH OFFSET AS position
+  JOIN UNNEST(@country_labels) AS country_label WITH OFFSET AS label_position
+    ON position = label_position
+),
+requested_topics AS (
+  SELECT topic_id FROM UNNEST(@topic_ids) AS topic_id
+),
+requested_official_domains AS (
+  SELECT country_id, domain
+  FROM UNNEST(@official_country_ids) AS country_id WITH OFFSET AS position
+  JOIN UNNEST(@official_domains) AS domain WITH OFFSET AS domain_position
+    ON position = domain_position
+),
+unambiguous_domains AS (
+  SELECT LOWER(Domain) AS domain, ANY_VALUE(CountryHumanName) AS country_label
+  FROM `{domain_country_table}`
+  WHERE Domain IS NOT NULL AND CountryHumanName IS NOT NULL
+  GROUP BY domain
+  HAVING COUNT(DISTINCT CountryHumanName) = 1
+),
+attribution_domains AS (
+  SELECT domain, country_label, 1 AS priority FROM unambiguous_domains
+  UNION ALL
+  SELECT official.domain, countries.country_label, 0 AS priority
+  FROM requested_official_domains AS official
+  JOIN requested_countries AS countries USING (country_id)
+),
+signal_rows AS (
+  SELECT
+    DATE(date) AS day,
+    url,
+    LOWER(NET.HOST(url)) AS host,
+    lang,
+    {topic_array} AS topic_ids,
+    ({signal_clauses['political_actor']}) AS political_actor,
+    ({signal_clauses['government_action']}) AS government_action,
+    ({signal_clauses['party_politics']}) AS party_politics
+  FROM `{ngram_table}`
+  WHERE DATE(date) BETWEEN @start_date AND @end_date
+    AND (({topic_filter}) OR ({political_filter}))
+),
+article_signal_aggregates AS (
+  SELECT
+    day,
+    url,
+    host,
+    ARRAY_AGG(DISTINCT lang ORDER BY lang LIMIT 1)[SAFE_OFFSET(0)] AS lang,
+    ARRAY_CONCAT_AGG(topic_ids) AS all_topic_ids,
+    LOGICAL_OR(political_actor) AS political_actor,
+    LOGICAL_OR(government_action) AS government_action,
+    LOGICAL_OR(party_politics) AS party_politics
+  FROM signal_rows
+  GROUP BY day, url, host
+),
+article_signals AS (
+  SELECT
+    * EXCEPT(all_topic_ids),
+    ARRAY(
+      SELECT DISTINCT topic_id FROM UNNEST(all_topic_ids) AS topic_id
+    ) AS topic_ids
+  FROM article_signal_aggregates
+),
+matched_urls AS (
+  SELECT topic_id, day, url, host, lang,
+    political_actor, government_action, party_politics
+  FROM article_signals
+  CROSS JOIN UNNEST(topic_ids) AS topic_id
+),
+matched_attributed AS (
+  SELECT matched.*, domains.country_label
+  FROM matched_urls AS matched
+  JOIN attribution_domains AS domains
+    ON host = domains.domain OR ENDS_WITH(host, CONCAT('.', domains.domain))
+  QUALIFY ROW_NUMBER() OVER (
+    PARTITION BY topic_id, day, url
+    ORDER BY LENGTH(domains.domain) DESC, domains.priority
+  ) = 1
+),
+country_article_signals AS (
+  SELECT
+    matched.topic_id, matched.day, matched.url, matched.host, matched.lang,
+    countries.country_id, matched.political_actor, matched.government_action,
+    matched.party_politics,
+    EXISTS(
+      SELECT 1 FROM requested_official_domains AS official
+      WHERE official.country_id = countries.country_id
+        AND (
+          matched.host = official.domain
+          OR ENDS_WITH(matched.host, CONCAT('.', official.domain))
+        )
+    ) AS official_source
+  FROM matched_attributed AS matched
+  JOIN requested_countries AS countries USING (country_label)
+){article_catalog_cte},
+mapping_stats AS (
+  SELECT
+    topics.topic_id,
+    COUNT(DISTINCT matched.url) AS total_matched_urls,
+    COUNT(DISTINCT attributed.url) AS attributed_matched_urls
+  FROM requested_topics AS topics
+  LEFT JOIN matched_urls AS matched USING (topic_id)
+  LEFT JOIN matched_attributed AS attributed USING (topic_id, day, url)
+  GROUP BY topic_id
+),
+country_matches AS (
+  SELECT
+    topic_id, day, country_id,
+    COUNT(*) AS matched_count,
+    COUNTIF(
+      political_actor OR government_action OR party_politics OR official_source
+    ) AS political_count,
+    COUNTIF(political_actor) AS political_actor_count,
+    COUNTIF(government_action) AS government_action_count,
+    COUNTIF(party_politics) AS party_politics_count,
+    COUNTIF(official_source) AS official_source_count,
+    {sample_expression} AS article_samples_json
+  FROM {enriched_source}
+  GROUP BY topic_id, day, country_id
+),
+country_language_matches AS (
+  SELECT topic_id, day, country_id, lang, COUNT(*) AS matched_count
+  FROM country_article_signals
+  GROUP BY topic_id, day, country_id, lang
+),
+country_language_breakdown AS (
+  SELECT topic_id, day, country_id,
+    TO_JSON_STRING(ARRAY_AGG(STRUCT(lang, matched_count) ORDER BY lang))
+      AS language_counts_json
+  FROM country_language_matches
+  GROUP BY topic_id, day, country_id
+),
+country_mapping_support AS (
+  SELECT countries.country_id, COUNT(domains.domain) AS mapped_domain_count
+  FROM requested_countries AS countries
+  LEFT JOIN unambiguous_domains AS domains USING (country_label)
+  GROUP BY country_id
+){coverage_ctes},
+calendar AS (
+  SELECT day FROM UNNEST(GENERATE_DATE_ARRAY(@start_date, @end_date)) AS day
+)
+SELECT
+  topics.topic_id,
+  calendar.day,
+  countries.country_id,
+  COALESCE(matches.matched_count, 0) AS matched_count,
+  {monitored_expression} AS monitored_count,
+  COALESCE(matches.political_count, 0) AS political_count,
+  COALESCE(matches.political_actor_count, 0) AS political_actor_count,
+  COALESCE(matches.government_action_count, 0) AS government_action_count,
+  COALESCE(matches.party_politics_count, 0) AS party_politics_count,
+  COALESCE(matches.official_source_count, 0) AS official_source_count,
+  COALESCE(matches.article_samples_json, '[]') AS article_samples_json,
+  mapping_stats.total_matched_urls,
+  mapping_stats.attributed_matched_urls,
+  support.mapped_domain_count,
+  COALESCE(language_breakdown.language_counts_json, '[]') AS language_counts_json
+FROM calendar
+CROSS JOIN requested_topics AS topics
+CROSS JOIN requested_countries AS countries
+JOIN mapping_stats USING (topic_id)
+LEFT JOIN country_matches AS matches USING (topic_id, day, country_id)
+LEFT JOIN country_language_breakdown AS language_breakdown
+  USING (topic_id, day, country_id)
+JOIN country_mapping_support AS support USING (country_id)
+{coverage_join}
+ORDER BY topic_id, day, country_id
+""".strip()
+    return sql, parameters
+
+
 def _phrase_sql_clause(
     phrase: dict[str, Any], index: int
 ) -> tuple[str, dict[str, Any]]:
@@ -523,6 +856,9 @@ def prepare_ngram_query(
     coverage_table: str = DEFAULT_COVERAGE_TABLE,
     domain_country_table: str = DEFAULT_DOMAIN_COUNTRY_TABLE,
     include_denominator: bool = False,
+    political_signals: dict[str, list[str | dict[str, Any]]] | None = None,
+    official_domains: dict[str, list[str]] | None = None,
+    article_sample_size: int = 0,
 ) -> tuple[str, dict[str, Any]]:
     return prepare_ngram_batch_query(
         window,
@@ -532,6 +868,9 @@ def prepare_ngram_query(
         coverage_table=coverage_table,
         domain_country_table=domain_country_table,
         include_denominator=include_denominator,
+        political_signals=political_signals,
+        official_domains=official_domains,
+        article_sample_size=article_sample_size,
     )
 
 
@@ -544,6 +883,9 @@ def prepare_ngram_batch_query(
     coverage_table: str = DEFAULT_COVERAGE_TABLE,
     domain_country_table: str = DEFAULT_DOMAIN_COUNTRY_TABLE,
     include_denominator: bool = False,
+    political_signals: dict[str, list[str | dict[str, Any]]] | None = None,
+    official_domains: dict[str, list[str]] | None = None,
+    article_sample_size: int = 0,
 ) -> tuple[str, dict[str, Any]]:
     sql, phrase_parameters = build_ngram_batch_sql(
         phrases_by_topic=phrases_by_topic,
@@ -551,6 +893,9 @@ def prepare_ngram_batch_query(
         coverage_table=coverage_table,
         domain_country_table=domain_country_table,
         include_denominator=include_denominator,
+        political_signals=political_signals,
+        official_domains=official_domains,
+        article_sample_size=article_sample_size,
     )
     return sql, {
         **phrase_parameters,
@@ -568,6 +913,9 @@ def estimate_ngram_windows(
     country_labels: dict[str, str],
     phrases_by_topic: dict[str, list[str | dict[str, Any]]],
     include_denominator: bool = False,
+    political_signals: dict[str, list[str | dict[str, Any]]] | None = None,
+    official_domains: dict[str, list[str]] | None = None,
+    article_sample_size: int = 0,
 ) -> list[dict[str, Any]]:
     estimates: list[dict[str, Any]] = []
     for window in windows:
@@ -581,6 +929,9 @@ def estimate_ngram_windows(
             phrases_by_topic=selected_phrases,
             country_labels=country_labels,
             include_denominator=include_denominator,
+            political_signals=political_signals,
+            official_domains=official_domains,
+            article_sample_size=article_sample_size,
         )
         estimates.append(
             {
@@ -702,6 +1053,9 @@ class GDELTNGramsProvider:
         coverage_table: str = DEFAULT_COVERAGE_TABLE,
         domain_country_table: str = DEFAULT_DOMAIN_COUNTRY_TABLE,
         include_denominator: bool = False,
+        political_signals: dict[str, list[str | dict[str, Any]]] | None = None,
+        official_domains: dict[str, list[str]] | None = None,
+        article_sample_size: int = 0,
         executor: BigQueryExecutor | None = None,
         response_sink: Callable[[dict[str, Any]], None] | None = None,
         timeline_sink: NGramWindowSink | None = None,
@@ -719,6 +1073,9 @@ class GDELTNGramsProvider:
         self.coverage_table = coverage_table
         self.domain_country_table = domain_country_table
         self.include_denominator = include_denominator
+        self.political_signals = political_signals
+        self.official_domains = official_domains or {}
+        self.article_sample_size = article_sample_size
         self.executor = executor or GoogleBigQueryExecutor(
             project=billing_project, location=location
         )
@@ -736,11 +1093,11 @@ class GDELTNGramsProvider:
         for window in windows:
             self._emit("started", window)
             try:
-                trends = self._collect_window(window)
+                trends, samples = self._collect_window(window)
                 log = self._log(window, "success", len(trends))
                 result.requests.append(log)
                 result.trends.extend(trends)
-                self._emit("success", window, log, trends)
+                self._emit("success", window, log, [*trends, *samples])
             except Exception as exc:
                 log = self._log(window, "failed", 0, error=str(exc))
                 result.requests.append(log)
@@ -748,7 +1105,9 @@ class GDELTNGramsProvider:
                 raise ProviderCollectionError(str(exc), result) from exc
         return result
 
-    def _collect_window(self, window: GDELTWindow) -> list[DailyTrend]:
+    def _collect_window(
+        self, window: GDELTWindow
+    ) -> tuple[list[DailyTrend], list[PoliticalArticleSample]]:
         selected_phrases = (
             self.topic_phrases
             if window.query.topic_id == BATCH_TOPIC_ID
@@ -766,6 +1125,9 @@ class GDELTNGramsProvider:
             coverage_table=self.coverage_table,
             domain_country_table=self.domain_country_table,
             include_denominator=self.include_denominator,
+            political_signals=self.political_signals,
+            official_domains=self.official_domains,
+            article_sample_size=self.article_sample_size,
         )
         estimated_bytes = self.executor.estimate(sql, parameters)
         if estimated_bytes > self.maximum_bytes_billed:
@@ -787,6 +1149,9 @@ class GDELTNGramsProvider:
                     "source": SOURCE,
                     "query": window.query.model_dump(mode="json"),
                     "topic_phrases": selected_phrases,
+                    "political_signals": self.political_signals,
+                    "official_domains": self.official_domains,
+                    "article_sample_size": self.article_sample_size,
                     "start": window.start.isoformat(),
                     "end": window.end.isoformat(),
                     "estimated_bytes_processed": estimated_bytes,
@@ -802,6 +1167,13 @@ class GDELTNGramsProvider:
             job=job,
             collected_at=collected_at,
             include_denominator=self.include_denominator,
+            political_signals=self.political_signals,
+            official_domains=self.official_domains,
+        )
+        samples = parse_political_article_samples(
+            rows=rows,
+            collected_at=collected_at,
+            sample_size=self.article_sample_size,
         )
         expected = (
             (window.end.date() - window.start.date()).days + 1
@@ -816,7 +1188,7 @@ class GDELTNGramsProvider:
         returned_topics = {trend.topic_id for trend in trends}
         if returned_topics != set(selected_phrases):
             raise ValueError("BigQuery returned unexpected topic dimensions")
-        return trends
+        return trends, samples
 
     @staticmethod
     def _log(
@@ -843,7 +1215,7 @@ class GDELTNGramsProvider:
         event: str,
         window: GDELTWindow,
         log: RequestLog | None = None,
-        trends: list[DailyTrend] | None = None,
+        trends: list[DailyTrend | PoliticalArticleSample] | None = None,
     ) -> None:
         if self.timeline_sink:
             self.timeline_sink(event, window, log, trends or [], [])
@@ -866,6 +1238,8 @@ def parse_ngram_rows(
     job: dict[str, Any],
     collected_at: datetime,
     include_denominator: bool = False,
+    political_signals: dict[str, list[str | dict[str, Any]]] | None = None,
+    official_domains: dict[str, list[str]] | None = None,
 ) -> list[DailyTrend]:
     return parse_ngram_batch_rows(
         rows=rows,
@@ -875,6 +1249,8 @@ def parse_ngram_rows(
         job=job,
         collected_at=collected_at,
         include_denominator=include_denominator,
+        political_signals=political_signals,
+        official_domains=official_domains,
     )
 
 
@@ -887,6 +1263,8 @@ def parse_ngram_batch_rows(
     job: dict[str, Any],
     collected_at: datetime,
     include_denominator: bool = False,
+    political_signals: dict[str, list[str | dict[str, Any]]] | None = None,
+    official_domains: dict[str, list[str]] | None = None,
 ) -> list[DailyTrend]:
     trends: list[DailyTrend] = []
     seen: set[tuple[str, date, str]] = set()
@@ -916,6 +1294,22 @@ def parse_ngram_batch_rows(
         attributed_matched = int(row.get("attributed_matched_urls", 0))
         mapped_domain_count = int(row.get("mapped_domain_count", 0))
         language_counts = json.loads(row.get("language_counts_json") or "[]")
+        political_enabled = political_signals is not None
+        political_count = (
+            int(row.get("political_count", 0)) if political_enabled else None
+        )
+        political_actor_count = (
+            int(row.get("political_actor_count", 0)) if political_enabled else None
+        )
+        government_action_count = (
+            int(row.get("government_action_count", 0)) if political_enabled else None
+        )
+        party_politics_count = (
+            int(row.get("party_politics_count", 0)) if political_enabled else None
+        )
+        official_source_count = (
+            int(row.get("official_source_count", 0)) if political_enabled else None
+        )
         if matched < 0 or (monitored is not None and monitored < 0):
             raise ValueError("NGram counts must be non-negative")
         share = matched / monitored if monitored else None
@@ -940,6 +1334,16 @@ def parse_ngram_batch_rows(
                 matched_count=matched,
                 country_monitored_count=monitored,
                 country_attention_share=share,
+                political_count=political_count,
+                political_actor_count=political_actor_count,
+                government_action_count=government_action_count,
+                party_politics_count=party_politics_count,
+                official_source_count=official_source_count,
+                political_share_of_matched=(
+                    political_count / matched
+                    if political_count is not None and matched
+                    else (0.0 if political_count is not None else None)
+                ),
                 collected_at=collected_at,
                 metadata={
                     "collection_mode": "webngrams_distinct_urls",
@@ -966,7 +1370,9 @@ def parse_ngram_batch_rows(
                         "unpunctuated_lower_and_title_case_pilot"
                     ),
                     "country_attribution": (
-                        "gdelt_domainsbycountry_alllangs_april2015_longest_suffix"
+                        "gdelt_2015_map_plus_configured_official_domain_overrides"
+                        if political_signals is not None
+                        else "gdelt_domainsbycountry_alllangs_april2015_longest_suffix"
                     ),
                     "country_map_limitations": (
                         "2015 snapshot; ambiguous and unmapped domains excluded"
@@ -985,9 +1391,89 @@ def parse_ngram_batch_rows(
                         if include_denominator
                         else None
                     ),
+                    "political_classifier": (
+                        {
+                            "scope": "full_article_webngrams_url_cooccurrence",
+                            "signals": {
+                                signal_id: _normalize_phrase_specs(signal_phrases)
+                                for signal_id, signal_phrases in political_signals.items()
+                            },
+                            "political_union": (
+                                "political_actor OR government_action OR "
+                                "party_politics OR official_source"
+                            ),
+                            "counts_are_census": True,
+                            "official_domains": official_domains or {},
+                        }
+                        if political_signals is not None
+                        else None
+                    ),
                     "estimated_bytes_processed": estimated_bytes,
                     "bigquery_job": job,
                 },
             )
         )
     return trends
+
+
+def parse_political_article_samples(
+    *,
+    rows: Iterable[dict[str, Any]],
+    collected_at: datetime,
+    sample_size: int,
+) -> list[PoliticalArticleSample]:
+    """Parse bounded deterministic URL samples returned beside exact counts."""
+    if sample_size <= 0:
+        return []
+    samples: list[PoliticalArticleSample] = []
+    seen: set[tuple[str, date, str, str]] = set()
+    for row in rows:
+        day = row.get("day")
+        if isinstance(day, datetime):
+            day = day.date()
+        if not isinstance(day, date):
+            day = date.fromisoformat(str(day))
+        topic_id = str(row["topic_id"])
+        country_id = str(row["country_id"])
+        raw_samples = json.loads(row.get("article_samples_json") or "[]")
+        for item in raw_samples:
+            url = str(item["url"])
+            key = (topic_id, day, country_id, url)
+            if key in seen:
+                continue
+            seen.add(key)
+            identity = "|".join(
+                [
+                    "gdelt-ngrams-political-sample-v1",
+                    topic_id,
+                    country_id,
+                    day.isoformat(),
+                    url,
+                ]
+            )
+            samples.append(
+                PoliticalArticleSample(
+                    record_id=sha256(identity.encode("utf-8")).hexdigest(),
+                    date=day,
+                    topic_id=topic_id,
+                    geography=country_id,
+                    url=url,
+                    domain=item.get("domain"),
+                    title=item.get("title"),
+                    description=item.get("description"),
+                    language=item.get("lang"),
+                    author=item.get("author"),
+                    political_actor=bool(item.get("political_actor")),
+                    government_action=bool(item.get("government_action")),
+                    party_politics=bool(item.get("party_politics")),
+                    official_source=bool(item.get("official_source")),
+                    collected_at=collected_at,
+                    metadata={
+                        "sample_method": "farm_fingerprint_url",
+                        "sample_limit_per_topic_country_day": sample_size,
+                        "validation_sample_only": True,
+                        "counts_must_not_be_inferred_from_sample": True,
+                    },
+                )
+            )
+    return samples
