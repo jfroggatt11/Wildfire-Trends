@@ -264,6 +264,20 @@ generic political phrase signals still apply in all configured languages worldwi
 Changing the requested output from five to all countries has little scan-cost effect
 because BigQuery identifies topic URLs before country attribution.
 
+Export any stored date range to a single reviewable CSV without querying BigQuery:
+
+```bash
+climate-attention export-articles \
+  --start 2025-01-01 \
+  --end 2025-01-01 \
+  --data-dir data \
+  --output data/exports/political-classifications-2025-01-01.csv
+```
+
+The CSV includes every article row plus a computed `political` union flag and the
+four component flags. Add `--political-only`, `--topics`, or `--countries` to produce
+a narrower review file. Exporting reads local Parquet only and incurs no API cost.
+
 Every date-window job is dry-run again immediately before execution and is rejected
 if its estimate exceeds the frozen cap. The default query is counts-only: it scans
 the NGram table once for all selected topics, reconstructs configured literal phrases

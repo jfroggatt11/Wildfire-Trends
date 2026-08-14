@@ -359,6 +359,22 @@ def build_parser() -> argparse.ArgumentParser:
         "--output", type=Path
     )
 
+    export_articles = subparsers.add_parser(
+        "export-articles",
+        help="export stored matched articles and political flags to CSV",
+    )
+    export_articles.add_argument("--start", type=_iso_date)
+    export_articles.add_argument("--end", type=_iso_date)
+    export_articles.add_argument("--topics", nargs="+")
+    export_articles.add_argument("--countries", nargs="+")
+    export_articles.add_argument(
+        "--political-only",
+        action="store_true",
+        help="only export rows matching at least one political signal",
+    )
+    export_articles.add_argument("--data-dir", type=Path, default=Path("data"))
+    export_articles.add_argument("--output", type=Path, required=True)
+
     aggregate = subparsers.add_parser(
         "aggregate", aliases=["rebuild-aggregates"], help="rebuild daily Parquet"
     )
@@ -409,6 +425,8 @@ def main(argv: list[str] | None = None) -> int:
             return _collect_gdacs(args)
         if args.command == "compare-sources":
             return _compare_sources(args)
+        if args.command == "export-articles":
+            return _export_articles(args)
         if args.command in {"aggregate", "rebuild-aggregates"}:
             return _aggregate(args.data_dir)
         if args.command == "runs":
@@ -1347,7 +1365,7 @@ def _execute_timeline_run(
     else:
         print(
             f"Trend run {state.run_id} complete: "
-            f"{state.records_newly_stored} new daily point(s)."
+            f"{state.records_newly_stored} new stored row(s) across its datasets."
         )
     print(
         f"Windows: {counts}. Manifest: {manifest_path}. "
@@ -1416,6 +1434,62 @@ def _aggregate(data_dir: Path) -> int:
     observations = aggregate_daily(records)
     path = storage.write_daily(observations)
     print(f"Wrote {len(observations)} daily row(s) from {len(records)} record(s) to {path}.")
+    return 0
+
+
+def _export_articles(args: argparse.Namespace) -> int:
+    if args.start and args.end and args.end < args.start:
+        raise ValueError("article export end date must not precede start date")
+    storage = LocalParquetStorage(args.data_dir)
+    articles = storage.read_matched_articles(
+        source="gdelt_ngrams",
+        topics=set(args.topics) if args.topics else None,
+        geographies=set(args.countries) if args.countries else None,
+        start=args.start,
+        end=args.end,
+    )
+    if args.political_only:
+        articles = [article for article in articles if article.political]
+    fields = (
+        "record_id",
+        "date",
+        "source",
+        "topic_id",
+        "geography",
+        "url",
+        "domain",
+        "published_at",
+        "outlet_name",
+        "outlet_logo",
+        "outlet_twitter",
+        "title",
+        "image_url",
+        "description",
+        "language",
+        "author",
+        "political",
+        "political_actor",
+        "government_action",
+        "party_politics",
+        "official_source",
+        "collected_at",
+        "metadata_json",
+    )
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    with args.output.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields)
+        writer.writeheader()
+        for article in articles:
+            row = article.model_dump(exclude={"metadata"})
+            row["political"] = article.political
+            for field in ("date", "published_at", "collected_at"):
+                value = row.get(field)
+                row[field] = value.isoformat() if value is not None else ""
+            row["metadata_json"] = json.dumps(
+                article.metadata, ensure_ascii=False, sort_keys=True, default=str
+            )
+            writer.writerow(row)
+    print(f"Exported {len(articles)} article classification row(s) to {args.output}.")
     return 0
 
 

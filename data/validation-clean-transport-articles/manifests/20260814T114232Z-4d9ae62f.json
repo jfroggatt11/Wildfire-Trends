@@ -1,0 +1,3705 @@
+{
+  "config": {
+    "original_path": "config/topics.multilingual.example.yaml",
+    "sha256": "535056ab21e42d04ef5fd71a6e8ffba9e34f6e3aa20942326aff501252bc5564",
+    "snapshot_path": "data/validation-clean-transport-articles/runs/20260814T114232Z-4d9ae62f/config.yaml"
+  },
+  "country_config": {
+    "original_path": "config/countries.world.yaml",
+    "sha256": "fa323f249e2f8a55d4856b4df788a3b5d0a8645d91799a1f199d3a3a4c608590",
+    "snapshot_path": "data/validation-clean-transport-articles/runs/20260814T114232Z-4d9ae62f/countries.yaml"
+  },
+  "error": null,
+  "expanded_queries": [
+    {
+      "exclude_terms": [],
+      "expression": "clean_transport",
+      "geographies": [],
+      "geography": null,
+      "include_terms": [],
+      "language": null,
+      "query_id": "topics_distinct_urls",
+      "topic_id": "ngram_topic_batch"
+    }
+  ],
+  "finished_at": "2026-08-14T11:54:11.054221+00:00",
+  "manifest_version": 2,
+  "provider_options": {
+    "article_sample_size": -1,
+    "batch_topics": true,
+    "billing_project": "wildfire-trends-505214",
+    "country_labels": {
+      "afghanistan": "Afghanistan",
+      "albania": "Albania",
+      "algeria": "Algeria",
+      "andorra": "Andorra",
+      "angola": "Angola",
+      "antiguaandbarbuda": "Antigua and Barbuda",
+      "argentina": "Argentina",
+      "armenia": "Armenia",
+      "australia": "Australia",
+      "austria": "Austria",
+      "azerbaijan": "Azerbaijan",
+      "bahamas": "Bahamas",
+      "bahrain": "Bahrain",
+      "bangladesh": "Bangladesh",
+      "barbados": "Barbados",
+      "belarus": "Belarus",
+      "belgium": "Belgium",
+      "belize": "Belize",
+      "benin": "Benin",
+      "bhutan": "Bhutan",
+      "bolivia": "Bolivia",
+      "bosniaandherzegovina": "Bosnia-Herzegovina",
+      "botswana": "Botswana",
+      "brazil": "Brazil",
+      "brunei": "Brunei",
+      "bulgaria": "Bulgaria",
+      "burkinafaso": "Burkina Faso",
+      "burundi": "Burundi",
+      "caboverde": "Cape Verde",
+      "cambodia": "Cambodia",
+      "cameroon": "Cameroon",
+      "canada": "Canada",
+      "centralafricanrepublic": "Central African Republic",
+      "chad": "Chad",
+      "chile": "Chile",
+      "china": "China",
+      "colombia": "Colombia",
+      "comoros": "Comoros",
+      "costarica": "Costa Rica",
+      "croatia": "Croatia",
+      "cuba": "Cuba",
+      "cyprus": "Cyprus",
+      "czechrepublic": "Czech Republic",
+      "democraticrepublicofthecongo": "Democratic Republic of the Congo",
+      "denmark": "Denmark",
+      "djibouti": "Djibouti",
+      "dominica": "Dominica",
+      "dominicanrepublic": "Dominican Republic",
+      "ecuador": "Ecuador",
+      "egypt": "Egypt",
+      "elsalvador": "El Salvador",
+      "equatorialguinea": "Equatorial Guinea",
+      "eritrea": "Eritrea",
+      "estonia": "Estonia",
+      "eswatini": "Eswatini",
+      "ethiopia": "Ethiopia",
+      "fiji": "Fiji",
+      "finland": "Finland",
+      "france": "France",
+      "gabon": "Gabon",
+      "gambia": "Gambia",
+      "georgia": "Georgia",
+      "germany": "Germany",
+      "ghana": "Ghana",
+      "greece": "Greece",
+      "grenada": "Grenada",
+      "guatemala": "Guatemala",
+      "guinea": "Guinea",
+      "guineabissau": "Guinea-Bissau",
+      "guyana": "Guyana",
+      "haiti": "Haiti",
+      "honduras": "Honduras",
+      "hungary": "Hungary",
+      "iceland": "Iceland",
+      "india": "India",
+      "indonesia": "Indonesia",
+      "iran": "Iran",
+      "iraq": "Iraq",
+      "ireland": "Ireland",
+      "israel": "Israel",
+      "italy": "Italy",
+      "ivorycoast": "Ivory Coast",
+      "jamaica": "Jamaica",
+      "japan": "Japan",
+      "jordan": "Jordan",
+      "kazakhstan": "Kazakhstan",
+      "kenya": "Kenya",
+      "kiribati": "Kiribati",
+      "kosovo": "Kosovo",
+      "kuwait": "Kuwait",
+      "kyrgyzstan": "Kyrgyzstan",
+      "laos": "Laos",
+      "latvia": "Latvia",
+      "lebanon": "Lebanon",
+      "lesotho": "Lesotho",
+      "liberia": "Liberia",
+      "libya": "Libya",
+      "liechtenstein": "Liechtenstein",
+      "lithuania": "Lithuania",
+      "luxembourg": "Luxembourg",
+      "madagascar": "Madagascar",
+      "malawi": "Malawi",
+      "malaysia": "Malaysia",
+      "maldives": "Maldives",
+      "mali": "Mali",
+      "malta": "Malta",
+      "marshallislands": "Marshall Islands",
+      "mauritania": "Mauritania",
+      "mauritius": "Mauritius",
+      "mexico": "Mexico",
+      "micronesia": "Micronesia",
+      "moldova": "Moldova",
+      "monaco": "Monaco",
+      "mongolia": "Mongolia",
+      "montenegro": "Montenegro",
+      "morocco": "Morocco",
+      "mozambique": "Mozambique",
+      "myanmar": "Myanmar",
+      "namibia": "Namibia",
+      "nauru": "Nauru",
+      "nepal": "Nepal",
+      "netherlands": "Netherlands",
+      "newzealand": "New Zealand",
+      "nicaragua": "Nicaragua",
+      "niger": "Niger",
+      "nigeria": "Nigeria",
+      "northkorea": "North Korea",
+      "northmacedonia": "Macedonia",
+      "norway": "Norway",
+      "oman": "Oman",
+      "pakistan": "Pakistan",
+      "palau": "Palau",
+      "palestine": "Palestine",
+      "panama": "Panama",
+      "papuanewguinea": "Papua New Guinea",
+      "paraguay": "Paraguay",
+      "peru": "Peru",
+      "philippines": "Philippines",
+      "poland": "Poland",
+      "portugal": "Portugal",
+      "qatar": "Qatar",
+      "republicofthecongo": "Republic of the Congo",
+      "romania": "Romania",
+      "russia": "Russia",
+      "rwanda": "Rwanda",
+      "saintkittsandnevis": "Saint Kitts and Nevis",
+      "saintlucia": "Saint Lucia",
+      "saintvincentandthegrenadines": "Saint Vincent and the Grenadines",
+      "samoa": "Samoa",
+      "sanmarino": "San Marino",
+      "saotomeandprincipe": "Sao Tome and Principe",
+      "saudiarabia": "Saudi Arabia",
+      "senegal": "Senegal",
+      "serbia": "Serbia",
+      "seychelles": "Seychelles",
+      "sierraleone": "Sierra Leone",
+      "singapore": "Singapore",
+      "slovakia": "Slovakia",
+      "slovenia": "Slovenia",
+      "solomonislands": "Solomon Islands",
+      "somalia": "Somalia",
+      "southafrica": "South Africa",
+      "southkorea": "South Korea",
+      "southsudan": "South Sudan",
+      "spain": "Spain",
+      "srilanka": "Sri Lanka",
+      "sudan": "Sudan",
+      "suriname": "Suriname",
+      "sweden": "Sweden",
+      "switzerland": "Switzerland",
+      "syria": "Syria",
+      "taiwan": "Taiwan",
+      "tajikistan": "Tajikistan",
+      "tanzania": "Tanzania",
+      "thailand": "Thailand",
+      "timorleste": "Timor-Leste",
+      "togo": "Togo",
+      "tonga": "Tonga",
+      "trinidadandtobago": "Trinidad and Tobago",
+      "tunisia": "Tunisia",
+      "turkey": "Turkey",
+      "turkmenistan": "Turkmenistan",
+      "tuvalu": "Tuvalu",
+      "uganda": "Uganda",
+      "ukraine": "Ukraine",
+      "unitedarabemirates": "United Arab Emirates",
+      "unitedkingdom": "United Kingdom",
+      "unitedstates": "United States",
+      "uruguay": "Uruguay",
+      "uzbekistan": "Uzbekistan",
+      "vanuatu": "Vanuatu",
+      "vaticancity": "Vatican City",
+      "venezuela": "Venezuela",
+      "vietnam": "Vietnam",
+      "yemen": "Yemen",
+      "zambia": "Zambia",
+      "zimbabwe": "Zimbabwe"
+    },
+    "include_denominator": false,
+    "location": "US",
+    "maximum_bytes_billed": 30000000000,
+    "official_domains": {
+      "france": [
+        "gouvernement.fr",
+        "elysee.fr",
+        "assemblee-nationale.fr",
+        "senat.fr",
+        "renaissancefrance.fr",
+        "republicains.fr",
+        "rassemblementnational.fr",
+        "lafranceinsoumise.fr",
+        "lesecologistes.fr"
+      ],
+      "germany": [
+        "bundesregierung.de",
+        "bundestag.de",
+        "bundesrat.de",
+        "spd.de",
+        "cdu.de",
+        "csu.de",
+        "gruene.de",
+        "afd.de",
+        "fdp.de",
+        "die-linke.de"
+      ],
+      "italy": [
+        "governo.it",
+        "camera.it",
+        "senato.it",
+        "partitodemocratico.it",
+        "fratelli-italia.it",
+        "movimento5stelle.eu",
+        "legaonline.it",
+        "forza-italia.it"
+      ],
+      "spain": [
+        "lamoncloa.gob.es",
+        "congreso.es",
+        "senado.es",
+        "psoe.es",
+        "pp.es",
+        "voxespana.es",
+        "movimiento-sumar.es"
+      ],
+      "unitedkingdom": [
+        "gov.uk",
+        "parliament.uk",
+        "labour.org.uk",
+        "conservatives.com",
+        "libdems.org.uk",
+        "greenparty.org.uk",
+        "reformparty.uk"
+      ]
+    },
+    "political_config": {
+      "path": "config/political_signals.europe5.yaml",
+      "sha256": "65bab82bd15022ee7f527d2ae7e4248b456bbfd2fc6317876155bc1011937d90"
+    },
+    "political_signals": {
+      "government_action": [
+        {
+          "language": "en",
+          "notes": null,
+          "segmentation": "space",
+          "text": "government policy",
+          "translation_status": "validated"
+        },
+        {
+          "language": "en",
+          "notes": null,
+          "segmentation": "space",
+          "text": "climate policy",
+          "translation_status": "validated"
+        },
+        {
+          "language": "en",
+          "notes": null,
+          "segmentation": "space",
+          "text": "new law",
+          "translation_status": "validated"
+        },
+        {
+          "language": "en",
+          "notes": null,
+          "segmentation": "space",
+          "text": "legislation",
+          "translation_status": "validated"
+        },
+        {
+          "language": "en",
+          "notes": null,
+          "segmentation": "space",
+          "text": "regulation",
+          "translation_status": "validated"
+        },
+        {
+          "language": "en",
+          "notes": null,
+          "segmentation": "space",
+          "text": "government subsidy",
+          "translation_status": "validated"
+        },
+        {
+          "language": "en",
+          "notes": null,
+          "segmentation": "space",
+          "text": "emissions target",
+          "translation_status": "validated"
+        },
+        {
+          "language": "en",
+          "notes": null,
+          "segmentation": "space",
+          "text": "government ban",
+          "translation_status": "validated"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "política gubernamental",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "política climática",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "nueva ley",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "legislación",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "regulación",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "subvención pública",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "objetivo de emisiones",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "prohibición gubernamental",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "política governamental",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "política climática",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "nova lei",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "legislação",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "regulamentação",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "subsídio público",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "meta de emissões",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "proibição governamental",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "politique gouvernementale",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "politique climatique",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "nouvelle loi",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "législation",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "réglementation",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "subvention publique",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "objectif d'émissions",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "interdiction gouvernementale",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Regierungspolitik",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Klimapolitik",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "neues Gesetz",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Gesetzgebung",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Regulierung",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "staatliche Subvention",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Emissionsziel",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "staatliches Verbot",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "politica governativa",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "politica climatica",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "nuova legge",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "legislazione",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "regolamentazione",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "sussidio pubblico",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "obiettivo di emissioni",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "divieto governativo",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "государственная политика",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "климатическая политика",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "новый закон",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "законодательство",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "регулирование",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "государственная субсидия",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "цель по выбросам",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "правительственный запрет",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "سياسة حكومية",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "سياسة المناخ",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "قانون جديد",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "تشريع",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "تنظيم حكومي",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "دعم حكومي",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "هدف الانبعاثات",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "حظر حكومي",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "政府政策",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "气候政策",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "新法律",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "立法",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "监管",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "政府补贴",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "排放目标",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "政府禁令",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "政府方針",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "気候政策",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "新法",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "法制化",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "規制",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "政府補助金",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "排出目標",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "政府による禁止",
+          "translation_status": "draft"
+        }
+      ],
+      "party_politics": [
+        {
+          "language": "en",
+          "notes": null,
+          "segmentation": "space",
+          "text": "governing party",
+          "translation_status": "validated"
+        },
+        {
+          "language": "en",
+          "notes": null,
+          "segmentation": "space",
+          "text": "opposition party",
+          "translation_status": "validated"
+        },
+        {
+          "language": "en",
+          "notes": null,
+          "segmentation": "space",
+          "text": "election campaign",
+          "translation_status": "validated"
+        },
+        {
+          "language": "en",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Labour Party",
+          "translation_status": "validated"
+        },
+        {
+          "language": "en",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Conservative Party",
+          "translation_status": "validated"
+        },
+        {
+          "language": "en",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Liberal Democrats",
+          "translation_status": "validated"
+        },
+        {
+          "language": "en",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Green Party",
+          "translation_status": "validated"
+        },
+        {
+          "language": "en",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Reform UK",
+          "translation_status": "validated"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "partido gobernante",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "partido de oposición",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "campaña electoral",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Partido Socialista",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Partido Popular",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "partido Vox",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "movimiento Sumar",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "partido do governo",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "partido da oposição",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "campanha eleitoral",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "parti au pouvoir",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "parti d'opposition",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "campagne électorale",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Renaissance parti",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Les Républicains",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Rassemblement National",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "La France Insoumise",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Les Écologistes",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Regierungspartei",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Oppositionspartei",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Wahlkampf",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Sozialdemokratische Partei",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Christlich Demokratische Union",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Bündnis 90 Die Grünen",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Alternative für Deutschland",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Freie Demokratische Partei",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Die Linke",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "partito di governo",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "partito di opposizione",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "campagna elettorale",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Partito Democratico",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Fratelli d'Italia",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Movimento 5 Stelle",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "partito della Lega",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Forza Italia",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "правящая партия",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "оппозиционная партия",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "избирательная кампания",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "الحزب الحاكم",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "حزب المعارضة",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "حملة انتخابية",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "执政党",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "反对党",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "竞选活动",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "与党",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "野党",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "選挙運動",
+          "translation_status": "draft"
+        }
+      ],
+      "political_actor": [
+        {
+          "language": "en",
+          "notes": null,
+          "segmentation": "space",
+          "text": "government",
+          "translation_status": "validated"
+        },
+        {
+          "language": "en",
+          "notes": null,
+          "segmentation": "space",
+          "text": "minister",
+          "translation_status": "validated"
+        },
+        {
+          "language": "en",
+          "notes": null,
+          "segmentation": "space",
+          "text": "parliament",
+          "translation_status": "validated"
+        },
+        {
+          "language": "en",
+          "notes": null,
+          "segmentation": "space",
+          "text": "prime minister",
+          "translation_status": "validated"
+        },
+        {
+          "language": "en",
+          "notes": null,
+          "segmentation": "space",
+          "text": "president",
+          "translation_status": "validated"
+        },
+        {
+          "language": "en",
+          "notes": null,
+          "segmentation": "space",
+          "text": "political party",
+          "translation_status": "validated"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "gobierno",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "ministro",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "ministra",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "parlamento",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "primer ministro",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "primera ministra",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "presidente",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "presidenta",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "partido político",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "governo",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "ministro",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "ministra",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "parlamento",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "primeiro-ministro",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "primeira-ministra",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "presidente",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "partido político",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "gouvernement",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "ministre",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "parlement",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "premier ministre",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "présidente",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "président",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "parti politique",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Regierung",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Minister",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Ministerin",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Parlament",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Bundeskanzler",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Bundeskanzlerin",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Präsident",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Präsidentin",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "politische Partei",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "governo",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "ministro",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "ministra",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "parlamento",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "presidente",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "partito politico",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "правительство",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "министр",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "парламент",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "премьер-министр",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "президент",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "политическая партия",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "الحكومة",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "وزير",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "وزيرة",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "البرلمان",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "رئيس الوزراء",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "الرئيس",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "حزب سياسي",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "政府",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "部长",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "议会",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "总理",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "总统",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "政党",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "政府",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "大臣",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "国会",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "首相",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "大統領",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "政党",
+          "translation_status": "draft"
+        }
+      ]
+    },
+    "save_all_articles": true,
+    "topic_phrases": {
+      "clean_transport": [
+        {
+          "language": "en",
+          "notes": null,
+          "segmentation": "space",
+          "text": "clean transport",
+          "translation_status": "validated"
+        },
+        {
+          "language": "en",
+          "notes": null,
+          "segmentation": "space",
+          "text": "sustainable transport",
+          "translation_status": "validated"
+        },
+        {
+          "language": "en",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transport decarbonisation",
+          "translation_status": "validated"
+        },
+        {
+          "language": "en",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transport decarbonization",
+          "translation_status": "validated"
+        },
+        {
+          "language": "en",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transport emissions",
+          "translation_status": "validated"
+        },
+        {
+          "language": "en",
+          "notes": "clean-mobility expansion candidate",
+          "segmentation": "space",
+          "text": "clean mobility",
+          "translation_status": "draft"
+        },
+        {
+          "language": "en",
+          "notes": "clean-mobility expansion candidate",
+          "segmentation": "space",
+          "text": "sustainable mobility",
+          "translation_status": "draft"
+        },
+        {
+          "language": "en",
+          "notes": "low-carbon expansion candidate",
+          "segmentation": "space",
+          "text": "low-carbon transport",
+          "translation_status": "draft"
+        },
+        {
+          "language": "en",
+          "notes": "low-carbon expansion candidate",
+          "segmentation": "space",
+          "text": "low carbon transport",
+          "translation_status": "draft"
+        },
+        {
+          "language": "en",
+          "notes": "emissions expansion candidate",
+          "segmentation": "space",
+          "text": "low-emission transport",
+          "translation_status": "draft"
+        },
+        {
+          "language": "en",
+          "notes": "emissions expansion candidate",
+          "segmentation": "space",
+          "text": "low emission transport",
+          "translation_status": "draft"
+        },
+        {
+          "language": "en",
+          "notes": "zero-emission expansion candidate",
+          "segmentation": "space",
+          "text": "zero-emission transport",
+          "translation_status": "draft"
+        },
+        {
+          "language": "en",
+          "notes": "zero-emission expansion candidate",
+          "segmentation": "space",
+          "text": "zero emission transport",
+          "translation_status": "draft"
+        },
+        {
+          "language": "en",
+          "notes": "electrification expansion candidate",
+          "segmentation": "space",
+          "text": "transport electrification",
+          "translation_status": "draft"
+        },
+        {
+          "language": "en",
+          "notes": "electrification expansion candidate",
+          "segmentation": "space",
+          "text": "electric mobility",
+          "translation_status": "draft"
+        },
+        {
+          "language": "en",
+          "notes": "modal-shift expansion candidate",
+          "segmentation": "space",
+          "text": "active travel",
+          "translation_status": "draft"
+        },
+        {
+          "language": "en",
+          "notes": "modal-shift expansion candidate",
+          "segmentation": "space",
+          "text": "modal shift",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transporte limpio",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transporte sostenible",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "descarbonización del transporte",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "emisiones del transporte",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "movilidad limpia",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "movilidad sostenible",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transporte bajo en carbono",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transporte de bajas emisiones",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transporte de cero emisiones",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "electrificación del transporte",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "movilidad eléctrica",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "movilidad activa",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "cambio modal",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transporte limpo",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transporte sustentável",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "descarbonização dos transportes",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "emissões dos transportes",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "mobilidade limpa",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "mobilidade sustentável",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transporte de baixo carbono",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transporte de baixas emissões",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transporte de emissão zero",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "eletrificação dos transportes",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "mobilidade elétrica",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "mobilidade ativa",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "mudança modal",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transport propre",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transport durable",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "décarbonation des transports",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "émissions des transports",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "mobilité propre",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "mobilité durable",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transport bas carbone",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transport à faibles émissions",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transport zéro émission",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "électrification des transports",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "mobilité électrique",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "mobilité active",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "report modal",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "sauberer Verkehr",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "nachhaltiger Verkehr",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Dekarbonisierung des Verkehrs",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Verkehrsemissionen",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "saubere Mobilität",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "nachhaltige Mobilität",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "klimafreundlicher Verkehr",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "emissionsarmer Verkehr",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "emissionsfreier Verkehr",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Elektrifizierung des Verkehrs",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Elektromobilität",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "aktive Mobilität",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Verkehrsverlagerung",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "trasporto pulito",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "trasporto sostenibile",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "decarbonizzazione dei trasporti",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "emissioni dei trasporti",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "mobilità pulita",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "mobilità sostenibile",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "trasporto a basse emissioni",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "trasporto a zero emissioni",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "elettrificazione dei trasporti",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "mobilità elettrica",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "mobilità attiva",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "trasferimento modale",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "чистый транспорт",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "устойчивый транспорт",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "декарбонизация транспорта",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "выбросы транспорта",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "чистая мобильность",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "устойчивая мобильность",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "низкоуглеродный транспорт",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "транспорт с низким уровнем выбросов",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "транспорт с нулевым уровнем выбросов",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "электрификация транспорта",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "электрическая мобильность",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "активная мобильность",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "смена вида транспорта",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "النقل النظيف",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "النقل المستدام",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "إزالة الكربون من النقل",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "انبعاثات النقل",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "التنقل النظيف",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "التنقل المستدام",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "النقل منخفض الكربون",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "النقل منخفض الانبعاثات",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "النقل عديم الانبعاثات",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "كهربة النقل",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "التنقل الكهربائي",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "التنقل النشط",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "التحول بين وسائل النقل",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "清洁交通",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "可持续交通",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "交通脱碳",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "交通排放",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "绿色出行",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "可持续出行",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "低碳交通",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "低排放交通",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "零排放交通",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "交通电气化",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "电动出行",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "主动出行",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "交通方式转变",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "クリーン交通",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "持続可能な交通",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "交通の脱炭素化",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "交通排出量",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "クリーンモビリティ",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "持続可能なモビリティ",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "低炭素交通",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "低排出交通",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "ゼロエミッション交通",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "交通の電動化",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "電動モビリティ",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "アクティブモビリティ",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "モーダルシフト",
+          "translation_status": "draft"
+        }
+      ]
+    }
+  },
+  "requested_date_range": {
+    "end": "2025-01-01",
+    "start": "2025-01-01"
+  },
+  "requests": [
+    {
+      "attempts": 1,
+      "end": "2025-01-01T23:59:59.999999Z",
+      "error": null,
+      "http_status": null,
+      "parent_window_id": null,
+      "query_id": "topics_distinct_urls",
+      "records_returned": 197,
+      "start": "2025-01-01T00:00:00Z",
+      "status": "success",
+      "topic_id": "ngram_topic_batch",
+      "window_id": "333ea005c4a0fe362bd352d1c5c704d0c0900fae66e7dc0760bbdacb3ba1d79e"
+    }
+  ],
+  "run_id": "20260814T114232Z-4d9ae62f",
+  "software": {
+    "package": "climate-attention",
+    "python": "3.14.3",
+    "version": "0.1.0"
+  },
+  "source": "gdelt_ngrams",
+  "started_at": "2026-08-14T11:42:32.539618+00:00",
+  "status": "complete",
+  "summary": {
+    "failed_windows": 0,
+    "pending_windows": 0,
+    "records_collected": 197,
+    "records_newly_stored": 402,
+    "running_windows": 0,
+    "split_windows": 0,
+    "success_windows": 1
+  },
+  "topics": [
+    {
+      "description": "Low-carbon mobility, transport decarbonisation, electrification, zero-emission movement, and modal shift.",
+      "enabled": true,
+      "exclude_terms": [],
+      "geographies": [],
+      "id": "clean_transport",
+      "include_terms": [],
+      "label": "Clean transport",
+      "languages": [],
+      "ngram_phrases": [
+        {
+          "language": "en",
+          "notes": null,
+          "segmentation": "space",
+          "text": "clean transport",
+          "translation_status": "validated"
+        },
+        {
+          "language": "en",
+          "notes": null,
+          "segmentation": "space",
+          "text": "sustainable transport",
+          "translation_status": "validated"
+        },
+        {
+          "language": "en",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transport decarbonisation",
+          "translation_status": "validated"
+        },
+        {
+          "language": "en",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transport decarbonization",
+          "translation_status": "validated"
+        },
+        {
+          "language": "en",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transport emissions",
+          "translation_status": "validated"
+        },
+        {
+          "language": "en",
+          "notes": "clean-mobility expansion candidate",
+          "segmentation": "space",
+          "text": "clean mobility",
+          "translation_status": "draft"
+        },
+        {
+          "language": "en",
+          "notes": "clean-mobility expansion candidate",
+          "segmentation": "space",
+          "text": "sustainable mobility",
+          "translation_status": "draft"
+        },
+        {
+          "language": "en",
+          "notes": "low-carbon expansion candidate",
+          "segmentation": "space",
+          "text": "low-carbon transport",
+          "translation_status": "draft"
+        },
+        {
+          "language": "en",
+          "notes": "low-carbon expansion candidate",
+          "segmentation": "space",
+          "text": "low carbon transport",
+          "translation_status": "draft"
+        },
+        {
+          "language": "en",
+          "notes": "emissions expansion candidate",
+          "segmentation": "space",
+          "text": "low-emission transport",
+          "translation_status": "draft"
+        },
+        {
+          "language": "en",
+          "notes": "emissions expansion candidate",
+          "segmentation": "space",
+          "text": "low emission transport",
+          "translation_status": "draft"
+        },
+        {
+          "language": "en",
+          "notes": "zero-emission expansion candidate",
+          "segmentation": "space",
+          "text": "zero-emission transport",
+          "translation_status": "draft"
+        },
+        {
+          "language": "en",
+          "notes": "zero-emission expansion candidate",
+          "segmentation": "space",
+          "text": "zero emission transport",
+          "translation_status": "draft"
+        },
+        {
+          "language": "en",
+          "notes": "electrification expansion candidate",
+          "segmentation": "space",
+          "text": "transport electrification",
+          "translation_status": "draft"
+        },
+        {
+          "language": "en",
+          "notes": "electrification expansion candidate",
+          "segmentation": "space",
+          "text": "electric mobility",
+          "translation_status": "draft"
+        },
+        {
+          "language": "en",
+          "notes": "modal-shift expansion candidate",
+          "segmentation": "space",
+          "text": "active travel",
+          "translation_status": "draft"
+        },
+        {
+          "language": "en",
+          "notes": "modal-shift expansion candidate",
+          "segmentation": "space",
+          "text": "modal shift",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transporte limpio",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transporte sostenible",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "descarbonización del transporte",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "emisiones del transporte",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "movilidad limpia",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "movilidad sostenible",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transporte bajo en carbono",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transporte de bajas emisiones",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transporte de cero emisiones",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "electrificación del transporte",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "movilidad eléctrica",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "movilidad activa",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "cambio modal",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transporte limpo",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transporte sustentável",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "descarbonização dos transportes",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "emissões dos transportes",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "mobilidade limpa",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "mobilidade sustentável",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transporte de baixo carbono",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transporte de baixas emissões",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transporte de emissão zero",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "eletrificação dos transportes",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "mobilidade elétrica",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "mobilidade ativa",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "mudança modal",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transport propre",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transport durable",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "décarbonation des transports",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "émissions des transports",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "mobilité propre",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "mobilité durable",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transport bas carbone",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transport à faibles émissions",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transport zéro émission",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "électrification des transports",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "mobilité électrique",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "mobilité active",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "report modal",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "sauberer Verkehr",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "nachhaltiger Verkehr",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Dekarbonisierung des Verkehrs",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Verkehrsemissionen",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "saubere Mobilität",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "nachhaltige Mobilität",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "klimafreundlicher Verkehr",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "emissionsarmer Verkehr",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "emissionsfreier Verkehr",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Elektrifizierung des Verkehrs",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Elektromobilität",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "aktive Mobilität",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Verkehrsverlagerung",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "trasporto pulito",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "trasporto sostenibile",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "decarbonizzazione dei trasporti",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "emissioni dei trasporti",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "mobilità pulita",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "mobilità sostenibile",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "trasporto a basse emissioni",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "trasporto a zero emissioni",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "elettrificazione dei trasporti",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "mobilità elettrica",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "mobilità attiva",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "trasferimento modale",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "чистый транспорт",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "устойчивый транспорт",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "декарбонизация транспорта",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "выбросы транспорта",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "чистая мобильность",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "устойчивая мобильность",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "низкоуглеродный транспорт",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "транспорт с низким уровнем выбросов",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "транспорт с нулевым уровнем выбросов",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "электрификация транспорта",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "электрическая мобильность",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "активная мобильность",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "смена вида транспорта",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "النقل النظيف",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "النقل المستدام",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "إزالة الكربون من النقل",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "انبعاثات النقل",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "التنقل النظيف",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "التنقل المستدام",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "النقل منخفض الكربون",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "النقل منخفض الانبعاثات",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "النقل عديم الانبعاثات",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "كهربة النقل",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "التنقل الكهربائي",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "التنقل النشط",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "التحول بين وسائل النقل",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "清洁交通",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "可持续交通",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "交通脱碳",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "交通排放",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "绿色出行",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "可持续出行",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "低碳交通",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "低排放交通",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "零排放交通",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "交通电气化",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "电动出行",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "主动出行",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "交通方式转变",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "クリーン交通",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "持続可能な交通",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "交通の脱炭素化",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "交通排出量",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "クリーンモビリティ",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "持続可能なモビリティ",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "低炭素交通",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "低排出交通",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "ゼロエミッション交通",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "交通の電動化",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "電動モビリティ",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "アクティブモビリティ",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "モーダルシフト",
+          "translation_status": "draft"
+        }
+      ],
+      "notes": "Generic public-transport, rail, cycling, and vehicle coverage is excluded unless it explicitly invokes a clean, sustainable, low-carbon, electrification, emissions, active-mobility, or modal-shift concept.",
+      "queries": [
+        {
+          "enabled": true,
+          "exclude_terms": null,
+          "expression": "\"clean transport\"",
+          "geographies": null,
+          "id": "q_6448321abb24",
+          "include_terms": null,
+          "languages": null,
+          "notes": null
+        },
+        {
+          "enabled": true,
+          "exclude_terms": null,
+          "expression": "\"sustainable transport\"",
+          "geographies": null,
+          "id": "q_864cf4c404a3",
+          "include_terms": null,
+          "languages": null,
+          "notes": null
+        },
+        {
+          "enabled": true,
+          "exclude_terms": null,
+          "expression": "\"transport decarbonisation\"",
+          "geographies": null,
+          "id": "q_1b32d2ed4c59",
+          "include_terms": null,
+          "languages": null,
+          "notes": null
+        },
+        {
+          "enabled": true,
+          "exclude_terms": null,
+          "expression": "\"transport decarbonization\"",
+          "geographies": null,
+          "id": "q_8f7ac48ee0db",
+          "include_terms": null,
+          "languages": null,
+          "notes": null
+        },
+        {
+          "enabled": true,
+          "exclude_terms": null,
+          "expression": "\"transport emissions\"",
+          "geographies": null,
+          "id": "q_c5335b2083b6",
+          "include_terms": null,
+          "languages": null,
+          "notes": null
+        }
+      ]
+    }
+  ]
+}

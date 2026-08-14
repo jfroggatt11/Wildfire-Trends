@@ -1,0 +1,2187 @@
+{
+  "config_sha256": "535056ab21e42d04ef5fd71a6e8ffba9e34f6e3aa20942326aff501252bc5564",
+  "config_snapshot_path": "data/validation-clean-transport/runs/20260814T111649Z-628f897a/config.yaml",
+  "country_config_path": "config/countries.world.yaml",
+  "country_config_sha256": "fa323f249e2f8a55d4856b4df788a3b5d0a8645d91799a1f199d3a3a4c608590",
+  "country_config_snapshot_path": "data/validation-clean-transport/runs/20260814T111649Z-628f897a/countries.yaml",
+  "created_at": "2026-08-14T11:16:49.132064Z",
+  "error": null,
+  "finished_at": "2026-08-14T11:22:17.157097Z",
+  "original_config_path": "config/topics.multilingual.example.yaml",
+  "provider_options": {
+    "article_sample_size": 0,
+    "batch_topics": true,
+    "billing_project": "wildfire-trends-505214",
+    "country_labels": {
+      "afghanistan": "Afghanistan",
+      "albania": "Albania",
+      "algeria": "Algeria",
+      "andorra": "Andorra",
+      "angola": "Angola",
+      "antiguaandbarbuda": "Antigua and Barbuda",
+      "argentina": "Argentina",
+      "armenia": "Armenia",
+      "australia": "Australia",
+      "austria": "Austria",
+      "azerbaijan": "Azerbaijan",
+      "bahamas": "Bahamas",
+      "bahrain": "Bahrain",
+      "bangladesh": "Bangladesh",
+      "barbados": "Barbados",
+      "belarus": "Belarus",
+      "belgium": "Belgium",
+      "belize": "Belize",
+      "benin": "Benin",
+      "bhutan": "Bhutan",
+      "bolivia": "Bolivia",
+      "bosniaandherzegovina": "Bosnia-Herzegovina",
+      "botswana": "Botswana",
+      "brazil": "Brazil",
+      "brunei": "Brunei",
+      "bulgaria": "Bulgaria",
+      "burkinafaso": "Burkina Faso",
+      "burundi": "Burundi",
+      "caboverde": "Cape Verde",
+      "cambodia": "Cambodia",
+      "cameroon": "Cameroon",
+      "canada": "Canada",
+      "centralafricanrepublic": "Central African Republic",
+      "chad": "Chad",
+      "chile": "Chile",
+      "china": "China",
+      "colombia": "Colombia",
+      "comoros": "Comoros",
+      "costarica": "Costa Rica",
+      "croatia": "Croatia",
+      "cuba": "Cuba",
+      "cyprus": "Cyprus",
+      "czechrepublic": "Czech Republic",
+      "democraticrepublicofthecongo": "Democratic Republic of the Congo",
+      "denmark": "Denmark",
+      "djibouti": "Djibouti",
+      "dominica": "Dominica",
+      "dominicanrepublic": "Dominican Republic",
+      "ecuador": "Ecuador",
+      "egypt": "Egypt",
+      "elsalvador": "El Salvador",
+      "equatorialguinea": "Equatorial Guinea",
+      "eritrea": "Eritrea",
+      "estonia": "Estonia",
+      "eswatini": "Eswatini",
+      "ethiopia": "Ethiopia",
+      "fiji": "Fiji",
+      "finland": "Finland",
+      "france": "France",
+      "gabon": "Gabon",
+      "gambia": "Gambia",
+      "georgia": "Georgia",
+      "germany": "Germany",
+      "ghana": "Ghana",
+      "greece": "Greece",
+      "grenada": "Grenada",
+      "guatemala": "Guatemala",
+      "guinea": "Guinea",
+      "guineabissau": "Guinea-Bissau",
+      "guyana": "Guyana",
+      "haiti": "Haiti",
+      "honduras": "Honduras",
+      "hungary": "Hungary",
+      "iceland": "Iceland",
+      "india": "India",
+      "indonesia": "Indonesia",
+      "iran": "Iran",
+      "iraq": "Iraq",
+      "ireland": "Ireland",
+      "israel": "Israel",
+      "italy": "Italy",
+      "ivorycoast": "Ivory Coast",
+      "jamaica": "Jamaica",
+      "japan": "Japan",
+      "jordan": "Jordan",
+      "kazakhstan": "Kazakhstan",
+      "kenya": "Kenya",
+      "kiribati": "Kiribati",
+      "kosovo": "Kosovo",
+      "kuwait": "Kuwait",
+      "kyrgyzstan": "Kyrgyzstan",
+      "laos": "Laos",
+      "latvia": "Latvia",
+      "lebanon": "Lebanon",
+      "lesotho": "Lesotho",
+      "liberia": "Liberia",
+      "libya": "Libya",
+      "liechtenstein": "Liechtenstein",
+      "lithuania": "Lithuania",
+      "luxembourg": "Luxembourg",
+      "madagascar": "Madagascar",
+      "malawi": "Malawi",
+      "malaysia": "Malaysia",
+      "maldives": "Maldives",
+      "mali": "Mali",
+      "malta": "Malta",
+      "marshallislands": "Marshall Islands",
+      "mauritania": "Mauritania",
+      "mauritius": "Mauritius",
+      "mexico": "Mexico",
+      "micronesia": "Micronesia",
+      "moldova": "Moldova",
+      "monaco": "Monaco",
+      "mongolia": "Mongolia",
+      "montenegro": "Montenegro",
+      "morocco": "Morocco",
+      "mozambique": "Mozambique",
+      "myanmar": "Myanmar",
+      "namibia": "Namibia",
+      "nauru": "Nauru",
+      "nepal": "Nepal",
+      "netherlands": "Netherlands",
+      "newzealand": "New Zealand",
+      "nicaragua": "Nicaragua",
+      "niger": "Niger",
+      "nigeria": "Nigeria",
+      "northkorea": "North Korea",
+      "northmacedonia": "Macedonia",
+      "norway": "Norway",
+      "oman": "Oman",
+      "pakistan": "Pakistan",
+      "palau": "Palau",
+      "palestine": "Palestine",
+      "panama": "Panama",
+      "papuanewguinea": "Papua New Guinea",
+      "paraguay": "Paraguay",
+      "peru": "Peru",
+      "philippines": "Philippines",
+      "poland": "Poland",
+      "portugal": "Portugal",
+      "qatar": "Qatar",
+      "republicofthecongo": "Republic of the Congo",
+      "romania": "Romania",
+      "russia": "Russia",
+      "rwanda": "Rwanda",
+      "saintkittsandnevis": "Saint Kitts and Nevis",
+      "saintlucia": "Saint Lucia",
+      "saintvincentandthegrenadines": "Saint Vincent and the Grenadines",
+      "samoa": "Samoa",
+      "sanmarino": "San Marino",
+      "saotomeandprincipe": "Sao Tome and Principe",
+      "saudiarabia": "Saudi Arabia",
+      "senegal": "Senegal",
+      "serbia": "Serbia",
+      "seychelles": "Seychelles",
+      "sierraleone": "Sierra Leone",
+      "singapore": "Singapore",
+      "slovakia": "Slovakia",
+      "slovenia": "Slovenia",
+      "solomonislands": "Solomon Islands",
+      "somalia": "Somalia",
+      "southafrica": "South Africa",
+      "southkorea": "South Korea",
+      "southsudan": "South Sudan",
+      "spain": "Spain",
+      "srilanka": "Sri Lanka",
+      "sudan": "Sudan",
+      "suriname": "Suriname",
+      "sweden": "Sweden",
+      "switzerland": "Switzerland",
+      "syria": "Syria",
+      "taiwan": "Taiwan",
+      "tajikistan": "Tajikistan",
+      "tanzania": "Tanzania",
+      "thailand": "Thailand",
+      "timorleste": "Timor-Leste",
+      "togo": "Togo",
+      "tonga": "Tonga",
+      "trinidadandtobago": "Trinidad and Tobago",
+      "tunisia": "Tunisia",
+      "turkey": "Turkey",
+      "turkmenistan": "Turkmenistan",
+      "tuvalu": "Tuvalu",
+      "uganda": "Uganda",
+      "ukraine": "Ukraine",
+      "unitedarabemirates": "United Arab Emirates",
+      "unitedkingdom": "United Kingdom",
+      "unitedstates": "United States",
+      "uruguay": "Uruguay",
+      "uzbekistan": "Uzbekistan",
+      "vanuatu": "Vanuatu",
+      "vaticancity": "Vatican City",
+      "venezuela": "Venezuela",
+      "vietnam": "Vietnam",
+      "yemen": "Yemen",
+      "zambia": "Zambia",
+      "zimbabwe": "Zimbabwe"
+    },
+    "include_denominator": false,
+    "location": "US",
+    "maximum_bytes_billed": 16000000000,
+    "official_domains": {},
+    "political_config": null,
+    "political_signals": null,
+    "save_all_articles": false,
+    "topic_phrases": {
+      "clean_transport": [
+        {
+          "language": "en",
+          "notes": null,
+          "segmentation": "space",
+          "text": "clean transport",
+          "translation_status": "validated"
+        },
+        {
+          "language": "en",
+          "notes": null,
+          "segmentation": "space",
+          "text": "sustainable transport",
+          "translation_status": "validated"
+        },
+        {
+          "language": "en",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transport decarbonisation",
+          "translation_status": "validated"
+        },
+        {
+          "language": "en",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transport decarbonization",
+          "translation_status": "validated"
+        },
+        {
+          "language": "en",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transport emissions",
+          "translation_status": "validated"
+        },
+        {
+          "language": "en",
+          "notes": "clean-mobility expansion candidate",
+          "segmentation": "space",
+          "text": "clean mobility",
+          "translation_status": "draft"
+        },
+        {
+          "language": "en",
+          "notes": "clean-mobility expansion candidate",
+          "segmentation": "space",
+          "text": "sustainable mobility",
+          "translation_status": "draft"
+        },
+        {
+          "language": "en",
+          "notes": "low-carbon expansion candidate",
+          "segmentation": "space",
+          "text": "low-carbon transport",
+          "translation_status": "draft"
+        },
+        {
+          "language": "en",
+          "notes": "low-carbon expansion candidate",
+          "segmentation": "space",
+          "text": "low carbon transport",
+          "translation_status": "draft"
+        },
+        {
+          "language": "en",
+          "notes": "emissions expansion candidate",
+          "segmentation": "space",
+          "text": "low-emission transport",
+          "translation_status": "draft"
+        },
+        {
+          "language": "en",
+          "notes": "emissions expansion candidate",
+          "segmentation": "space",
+          "text": "low emission transport",
+          "translation_status": "draft"
+        },
+        {
+          "language": "en",
+          "notes": "zero-emission expansion candidate",
+          "segmentation": "space",
+          "text": "zero-emission transport",
+          "translation_status": "draft"
+        },
+        {
+          "language": "en",
+          "notes": "zero-emission expansion candidate",
+          "segmentation": "space",
+          "text": "zero emission transport",
+          "translation_status": "draft"
+        },
+        {
+          "language": "en",
+          "notes": "electrification expansion candidate",
+          "segmentation": "space",
+          "text": "transport electrification",
+          "translation_status": "draft"
+        },
+        {
+          "language": "en",
+          "notes": "electrification expansion candidate",
+          "segmentation": "space",
+          "text": "electric mobility",
+          "translation_status": "draft"
+        },
+        {
+          "language": "en",
+          "notes": "modal-shift expansion candidate",
+          "segmentation": "space",
+          "text": "active travel",
+          "translation_status": "draft"
+        },
+        {
+          "language": "en",
+          "notes": "modal-shift expansion candidate",
+          "segmentation": "space",
+          "text": "modal shift",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transporte limpio",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transporte sostenible",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "descarbonizaci\u00f3n del transporte",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "emisiones del transporte",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "movilidad limpia",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "movilidad sostenible",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transporte bajo en carbono",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transporte de bajas emisiones",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transporte de cero emisiones",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "electrificaci\u00f3n del transporte",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "movilidad el\u00e9ctrica",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "movilidad activa",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "cambio modal",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transporte limpo",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transporte sustent\u00e1vel",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "descarboniza\u00e7\u00e3o dos transportes",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "emiss\u00f5es dos transportes",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "mobilidade limpa",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "mobilidade sustent\u00e1vel",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transporte de baixo carbono",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transporte de baixas emiss\u00f5es",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transporte de emiss\u00e3o zero",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "eletrifica\u00e7\u00e3o dos transportes",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "mobilidade el\u00e9trica",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "mobilidade ativa",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "mudan\u00e7a modal",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transport propre",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transport durable",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "d\u00e9carbonation des transports",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u00e9missions des transports",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "mobilit\u00e9 propre",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "mobilit\u00e9 durable",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transport bas carbone",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transport \u00e0 faibles \u00e9missions",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transport z\u00e9ro \u00e9mission",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u00e9lectrification des transports",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "mobilit\u00e9 \u00e9lectrique",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "mobilit\u00e9 active",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "report modal",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "sauberer Verkehr",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "nachhaltiger Verkehr",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Dekarbonisierung des Verkehrs",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Verkehrsemissionen",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "saubere Mobilit\u00e4t",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "nachhaltige Mobilit\u00e4t",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "klimafreundlicher Verkehr",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "emissionsarmer Verkehr",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "emissionsfreier Verkehr",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Elektrifizierung des Verkehrs",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Elektromobilit\u00e4t",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "aktive Mobilit\u00e4t",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Verkehrsverlagerung",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "trasporto pulito",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "trasporto sostenibile",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "decarbonizzazione dei trasporti",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "emissioni dei trasporti",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "mobilit\u00e0 pulita",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "mobilit\u00e0 sostenibile",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "trasporto a basse emissioni",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "trasporto a zero emissioni",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "elettrificazione dei trasporti",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "mobilit\u00e0 elettrica",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "mobilit\u00e0 attiva",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "trasferimento modale",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u0447\u0438\u0441\u0442\u044b\u0439 \u0442\u0440\u0430\u043d\u0441\u043f\u043e\u0440\u0442",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u0443\u0441\u0442\u043e\u0439\u0447\u0438\u0432\u044b\u0439 \u0442\u0440\u0430\u043d\u0441\u043f\u043e\u0440\u0442",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u0434\u0435\u043a\u0430\u0440\u0431\u043e\u043d\u0438\u0437\u0430\u0446\u0438\u044f \u0442\u0440\u0430\u043d\u0441\u043f\u043e\u0440\u0442\u0430",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u0432\u044b\u0431\u0440\u043e\u0441\u044b \u0442\u0440\u0430\u043d\u0441\u043f\u043e\u0440\u0442\u0430",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u0447\u0438\u0441\u0442\u0430\u044f \u043c\u043e\u0431\u0438\u043b\u044c\u043d\u043e\u0441\u0442\u044c",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u0443\u0441\u0442\u043e\u0439\u0447\u0438\u0432\u0430\u044f \u043c\u043e\u0431\u0438\u043b\u044c\u043d\u043e\u0441\u0442\u044c",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u043d\u0438\u0437\u043a\u043e\u0443\u0433\u043b\u0435\u0440\u043e\u0434\u043d\u044b\u0439 \u0442\u0440\u0430\u043d\u0441\u043f\u043e\u0440\u0442",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u0442\u0440\u0430\u043d\u0441\u043f\u043e\u0440\u0442 \u0441 \u043d\u0438\u0437\u043a\u0438\u043c \u0443\u0440\u043e\u0432\u043d\u0435\u043c \u0432\u044b\u0431\u0440\u043e\u0441\u043e\u0432",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u0442\u0440\u0430\u043d\u0441\u043f\u043e\u0440\u0442 \u0441 \u043d\u0443\u043b\u0435\u0432\u044b\u043c \u0443\u0440\u043e\u0432\u043d\u0435\u043c \u0432\u044b\u0431\u0440\u043e\u0441\u043e\u0432",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u044d\u043b\u0435\u043a\u0442\u0440\u0438\u0444\u0438\u043a\u0430\u0446\u0438\u044f \u0442\u0440\u0430\u043d\u0441\u043f\u043e\u0440\u0442\u0430",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u044d\u043b\u0435\u043a\u0442\u0440\u0438\u0447\u0435\u0441\u043a\u0430\u044f \u043c\u043e\u0431\u0438\u043b\u044c\u043d\u043e\u0441\u0442\u044c",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u0430\u043a\u0442\u0438\u0432\u043d\u0430\u044f \u043c\u043e\u0431\u0438\u043b\u044c\u043d\u043e\u0441\u0442\u044c",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u0441\u043c\u0435\u043d\u0430 \u0432\u0438\u0434\u0430 \u0442\u0440\u0430\u043d\u0441\u043f\u043e\u0440\u0442\u0430",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u0627\u0644\u0646\u0642\u0644 \u0627\u0644\u0646\u0638\u064a\u0641",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u0627\u0644\u0646\u0642\u0644 \u0627\u0644\u0645\u0633\u062a\u062f\u0627\u0645",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u0625\u0632\u0627\u0644\u0629 \u0627\u0644\u0643\u0631\u0628\u0648\u0646 \u0645\u0646 \u0627\u0644\u0646\u0642\u0644",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u0627\u0646\u0628\u0639\u0627\u062b\u0627\u062a \u0627\u0644\u0646\u0642\u0644",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u0627\u0644\u062a\u0646\u0642\u0644 \u0627\u0644\u0646\u0638\u064a\u0641",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u0627\u0644\u062a\u0646\u0642\u0644 \u0627\u0644\u0645\u0633\u062a\u062f\u0627\u0645",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u0627\u0644\u0646\u0642\u0644 \u0645\u0646\u062e\u0641\u0636 \u0627\u0644\u0643\u0631\u0628\u0648\u0646",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u0627\u0644\u0646\u0642\u0644 \u0645\u0646\u062e\u0641\u0636 \u0627\u0644\u0627\u0646\u0628\u0639\u0627\u062b\u0627\u062a",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u0627\u0644\u0646\u0642\u0644 \u0639\u062f\u064a\u0645 \u0627\u0644\u0627\u0646\u0628\u0639\u0627\u062b\u0627\u062a",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u0643\u0647\u0631\u0628\u0629 \u0627\u0644\u0646\u0642\u0644",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u0627\u0644\u062a\u0646\u0642\u0644 \u0627\u0644\u0643\u0647\u0631\u0628\u0627\u0626\u064a",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u0627\u0644\u062a\u0646\u0642\u0644 \u0627\u0644\u0646\u0634\u0637",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u0627\u0644\u062a\u062d\u0648\u0644 \u0628\u064a\u0646 \u0648\u0633\u0627\u0626\u0644 \u0627\u0644\u0646\u0642\u0644",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "\u6e05\u6d01\u4ea4\u901a",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "\u53ef\u6301\u7eed\u4ea4\u901a",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "\u4ea4\u901a\u8131\u78b3",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "\u4ea4\u901a\u6392\u653e",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "\u7eff\u8272\u51fa\u884c",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "\u53ef\u6301\u7eed\u51fa\u884c",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "\u4f4e\u78b3\u4ea4\u901a",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "\u4f4e\u6392\u653e\u4ea4\u901a",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "\u96f6\u6392\u653e\u4ea4\u901a",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "\u4ea4\u901a\u7535\u6c14\u5316",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "\u7535\u52a8\u51fa\u884c",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "\u4e3b\u52a8\u51fa\u884c",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "\u4ea4\u901a\u65b9\u5f0f\u8f6c\u53d8",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "\u30af\u30ea\u30fc\u30f3\u4ea4\u901a",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "\u6301\u7d9a\u53ef\u80fd\u306a\u4ea4\u901a",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "\u4ea4\u901a\u306e\u8131\u70ad\u7d20\u5316",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "\u4ea4\u901a\u6392\u51fa\u91cf",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "\u30af\u30ea\u30fc\u30f3\u30e2\u30d3\u30ea\u30c6\u30a3",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "\u6301\u7d9a\u53ef\u80fd\u306a\u30e2\u30d3\u30ea\u30c6\u30a3",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "\u4f4e\u70ad\u7d20\u4ea4\u901a",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "\u4f4e\u6392\u51fa\u4ea4\u901a",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "\u30bc\u30ed\u30a8\u30df\u30c3\u30b7\u30e7\u30f3\u4ea4\u901a",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "\u4ea4\u901a\u306e\u96fb\u52d5\u5316",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "\u96fb\u52d5\u30e2\u30d3\u30ea\u30c6\u30a3",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "\u30a2\u30af\u30c6\u30a3\u30d6\u30e2\u30d3\u30ea\u30c6\u30a3",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "\u30e2\u30fc\u30c0\u30eb\u30b7\u30d5\u30c8",
+          "translation_status": "draft"
+        }
+      ]
+    }
+  },
+  "records_newly_stored": 197,
+  "requested_end": "2025-01-01",
+  "requested_start": "2025-01-01",
+  "run_id": "20260814T111649Z-628f897a",
+  "source": "gdelt_ngrams",
+  "state_version": 1,
+  "status": "complete",
+  "topics": [
+    {
+      "description": "Low-carbon mobility, transport decarbonisation, electrification, zero-emission movement, and modal shift.",
+      "enabled": true,
+      "exclude_terms": [],
+      "geographies": [],
+      "id": "clean_transport",
+      "include_terms": [],
+      "label": "Clean transport",
+      "languages": [],
+      "ngram_phrases": [
+        {
+          "language": "en",
+          "notes": null,
+          "segmentation": "space",
+          "text": "clean transport",
+          "translation_status": "validated"
+        },
+        {
+          "language": "en",
+          "notes": null,
+          "segmentation": "space",
+          "text": "sustainable transport",
+          "translation_status": "validated"
+        },
+        {
+          "language": "en",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transport decarbonisation",
+          "translation_status": "validated"
+        },
+        {
+          "language": "en",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transport decarbonization",
+          "translation_status": "validated"
+        },
+        {
+          "language": "en",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transport emissions",
+          "translation_status": "validated"
+        },
+        {
+          "language": "en",
+          "notes": "clean-mobility expansion candidate",
+          "segmentation": "space",
+          "text": "clean mobility",
+          "translation_status": "draft"
+        },
+        {
+          "language": "en",
+          "notes": "clean-mobility expansion candidate",
+          "segmentation": "space",
+          "text": "sustainable mobility",
+          "translation_status": "draft"
+        },
+        {
+          "language": "en",
+          "notes": "low-carbon expansion candidate",
+          "segmentation": "space",
+          "text": "low-carbon transport",
+          "translation_status": "draft"
+        },
+        {
+          "language": "en",
+          "notes": "low-carbon expansion candidate",
+          "segmentation": "space",
+          "text": "low carbon transport",
+          "translation_status": "draft"
+        },
+        {
+          "language": "en",
+          "notes": "emissions expansion candidate",
+          "segmentation": "space",
+          "text": "low-emission transport",
+          "translation_status": "draft"
+        },
+        {
+          "language": "en",
+          "notes": "emissions expansion candidate",
+          "segmentation": "space",
+          "text": "low emission transport",
+          "translation_status": "draft"
+        },
+        {
+          "language": "en",
+          "notes": "zero-emission expansion candidate",
+          "segmentation": "space",
+          "text": "zero-emission transport",
+          "translation_status": "draft"
+        },
+        {
+          "language": "en",
+          "notes": "zero-emission expansion candidate",
+          "segmentation": "space",
+          "text": "zero emission transport",
+          "translation_status": "draft"
+        },
+        {
+          "language": "en",
+          "notes": "electrification expansion candidate",
+          "segmentation": "space",
+          "text": "transport electrification",
+          "translation_status": "draft"
+        },
+        {
+          "language": "en",
+          "notes": "electrification expansion candidate",
+          "segmentation": "space",
+          "text": "electric mobility",
+          "translation_status": "draft"
+        },
+        {
+          "language": "en",
+          "notes": "modal-shift expansion candidate",
+          "segmentation": "space",
+          "text": "active travel",
+          "translation_status": "draft"
+        },
+        {
+          "language": "en",
+          "notes": "modal-shift expansion candidate",
+          "segmentation": "space",
+          "text": "modal shift",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transporte limpio",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transporte sostenible",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "descarbonizaci\u00f3n del transporte",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "emisiones del transporte",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "movilidad limpia",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "movilidad sostenible",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transporte bajo en carbono",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transporte de bajas emisiones",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transporte de cero emisiones",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "electrificaci\u00f3n del transporte",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "movilidad el\u00e9ctrica",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "movilidad activa",
+          "translation_status": "draft"
+        },
+        {
+          "language": "es",
+          "notes": null,
+          "segmentation": "space",
+          "text": "cambio modal",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transporte limpo",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transporte sustent\u00e1vel",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "descarboniza\u00e7\u00e3o dos transportes",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "emiss\u00f5es dos transportes",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "mobilidade limpa",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "mobilidade sustent\u00e1vel",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transporte de baixo carbono",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transporte de baixas emiss\u00f5es",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transporte de emiss\u00e3o zero",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "eletrifica\u00e7\u00e3o dos transportes",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "mobilidade el\u00e9trica",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "mobilidade ativa",
+          "translation_status": "draft"
+        },
+        {
+          "language": "pt",
+          "notes": null,
+          "segmentation": "space",
+          "text": "mudan\u00e7a modal",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transport propre",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transport durable",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "d\u00e9carbonation des transports",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u00e9missions des transports",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "mobilit\u00e9 propre",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "mobilit\u00e9 durable",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transport bas carbone",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transport \u00e0 faibles \u00e9missions",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "transport z\u00e9ro \u00e9mission",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u00e9lectrification des transports",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "mobilit\u00e9 \u00e9lectrique",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "mobilit\u00e9 active",
+          "translation_status": "draft"
+        },
+        {
+          "language": "fr",
+          "notes": null,
+          "segmentation": "space",
+          "text": "report modal",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "sauberer Verkehr",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "nachhaltiger Verkehr",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Dekarbonisierung des Verkehrs",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Verkehrsemissionen",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "saubere Mobilit\u00e4t",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "nachhaltige Mobilit\u00e4t",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "klimafreundlicher Verkehr",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "emissionsarmer Verkehr",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "emissionsfreier Verkehr",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Elektrifizierung des Verkehrs",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Elektromobilit\u00e4t",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "aktive Mobilit\u00e4t",
+          "translation_status": "draft"
+        },
+        {
+          "language": "de",
+          "notes": null,
+          "segmentation": "space",
+          "text": "Verkehrsverlagerung",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "trasporto pulito",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "trasporto sostenibile",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "decarbonizzazione dei trasporti",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "emissioni dei trasporti",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "mobilit\u00e0 pulita",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "mobilit\u00e0 sostenibile",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "trasporto a basse emissioni",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "trasporto a zero emissioni",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "elettrificazione dei trasporti",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "mobilit\u00e0 elettrica",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "mobilit\u00e0 attiva",
+          "translation_status": "draft"
+        },
+        {
+          "language": "it",
+          "notes": null,
+          "segmentation": "space",
+          "text": "trasferimento modale",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u0447\u0438\u0441\u0442\u044b\u0439 \u0442\u0440\u0430\u043d\u0441\u043f\u043e\u0440\u0442",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u0443\u0441\u0442\u043e\u0439\u0447\u0438\u0432\u044b\u0439 \u0442\u0440\u0430\u043d\u0441\u043f\u043e\u0440\u0442",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u0434\u0435\u043a\u0430\u0440\u0431\u043e\u043d\u0438\u0437\u0430\u0446\u0438\u044f \u0442\u0440\u0430\u043d\u0441\u043f\u043e\u0440\u0442\u0430",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u0432\u044b\u0431\u0440\u043e\u0441\u044b \u0442\u0440\u0430\u043d\u0441\u043f\u043e\u0440\u0442\u0430",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u0447\u0438\u0441\u0442\u0430\u044f \u043c\u043e\u0431\u0438\u043b\u044c\u043d\u043e\u0441\u0442\u044c",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u0443\u0441\u0442\u043e\u0439\u0447\u0438\u0432\u0430\u044f \u043c\u043e\u0431\u0438\u043b\u044c\u043d\u043e\u0441\u0442\u044c",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u043d\u0438\u0437\u043a\u043e\u0443\u0433\u043b\u0435\u0440\u043e\u0434\u043d\u044b\u0439 \u0442\u0440\u0430\u043d\u0441\u043f\u043e\u0440\u0442",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u0442\u0440\u0430\u043d\u0441\u043f\u043e\u0440\u0442 \u0441 \u043d\u0438\u0437\u043a\u0438\u043c \u0443\u0440\u043e\u0432\u043d\u0435\u043c \u0432\u044b\u0431\u0440\u043e\u0441\u043e\u0432",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u0442\u0440\u0430\u043d\u0441\u043f\u043e\u0440\u0442 \u0441 \u043d\u0443\u043b\u0435\u0432\u044b\u043c \u0443\u0440\u043e\u0432\u043d\u0435\u043c \u0432\u044b\u0431\u0440\u043e\u0441\u043e\u0432",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u044d\u043b\u0435\u043a\u0442\u0440\u0438\u0444\u0438\u043a\u0430\u0446\u0438\u044f \u0442\u0440\u0430\u043d\u0441\u043f\u043e\u0440\u0442\u0430",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u044d\u043b\u0435\u043a\u0442\u0440\u0438\u0447\u0435\u0441\u043a\u0430\u044f \u043c\u043e\u0431\u0438\u043b\u044c\u043d\u043e\u0441\u0442\u044c",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u0430\u043a\u0442\u0438\u0432\u043d\u0430\u044f \u043c\u043e\u0431\u0438\u043b\u044c\u043d\u043e\u0441\u0442\u044c",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ru",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u0441\u043c\u0435\u043d\u0430 \u0432\u0438\u0434\u0430 \u0442\u0440\u0430\u043d\u0441\u043f\u043e\u0440\u0442\u0430",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u0627\u0644\u0646\u0642\u0644 \u0627\u0644\u0646\u0638\u064a\u0641",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u0627\u0644\u0646\u0642\u0644 \u0627\u0644\u0645\u0633\u062a\u062f\u0627\u0645",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u0625\u0632\u0627\u0644\u0629 \u0627\u0644\u0643\u0631\u0628\u0648\u0646 \u0645\u0646 \u0627\u0644\u0646\u0642\u0644",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u0627\u0646\u0628\u0639\u0627\u062b\u0627\u062a \u0627\u0644\u0646\u0642\u0644",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u0627\u0644\u062a\u0646\u0642\u0644 \u0627\u0644\u0646\u0638\u064a\u0641",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u0627\u0644\u062a\u0646\u0642\u0644 \u0627\u0644\u0645\u0633\u062a\u062f\u0627\u0645",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u0627\u0644\u0646\u0642\u0644 \u0645\u0646\u062e\u0641\u0636 \u0627\u0644\u0643\u0631\u0628\u0648\u0646",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u0627\u0644\u0646\u0642\u0644 \u0645\u0646\u062e\u0641\u0636 \u0627\u0644\u0627\u0646\u0628\u0639\u0627\u062b\u0627\u062a",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u0627\u0644\u0646\u0642\u0644 \u0639\u062f\u064a\u0645 \u0627\u0644\u0627\u0646\u0628\u0639\u0627\u062b\u0627\u062a",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u0643\u0647\u0631\u0628\u0629 \u0627\u0644\u0646\u0642\u0644",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u0627\u0644\u062a\u0646\u0642\u0644 \u0627\u0644\u0643\u0647\u0631\u0628\u0627\u0626\u064a",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u0627\u0644\u062a\u0646\u0642\u0644 \u0627\u0644\u0646\u0634\u0637",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ar",
+          "notes": null,
+          "segmentation": "space",
+          "text": "\u0627\u0644\u062a\u062d\u0648\u0644 \u0628\u064a\u0646 \u0648\u0633\u0627\u0626\u0644 \u0627\u0644\u0646\u0642\u0644",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "\u6e05\u6d01\u4ea4\u901a",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "\u53ef\u6301\u7eed\u4ea4\u901a",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "\u4ea4\u901a\u8131\u78b3",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "\u4ea4\u901a\u6392\u653e",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "\u7eff\u8272\u51fa\u884c",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "\u53ef\u6301\u7eed\u51fa\u884c",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "\u4f4e\u78b3\u4ea4\u901a",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "\u4f4e\u6392\u653e\u4ea4\u901a",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "\u96f6\u6392\u653e\u4ea4\u901a",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "\u4ea4\u901a\u7535\u6c14\u5316",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "\u7535\u52a8\u51fa\u884c",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "\u4e3b\u52a8\u51fa\u884c",
+          "translation_status": "draft"
+        },
+        {
+          "language": "zh",
+          "notes": null,
+          "segmentation": "character",
+          "text": "\u4ea4\u901a\u65b9\u5f0f\u8f6c\u53d8",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "\u30af\u30ea\u30fc\u30f3\u4ea4\u901a",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "\u6301\u7d9a\u53ef\u80fd\u306a\u4ea4\u901a",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "\u4ea4\u901a\u306e\u8131\u70ad\u7d20\u5316",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "\u4ea4\u901a\u6392\u51fa\u91cf",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "\u30af\u30ea\u30fc\u30f3\u30e2\u30d3\u30ea\u30c6\u30a3",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "\u6301\u7d9a\u53ef\u80fd\u306a\u30e2\u30d3\u30ea\u30c6\u30a3",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "\u4f4e\u70ad\u7d20\u4ea4\u901a",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "\u4f4e\u6392\u51fa\u4ea4\u901a",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "\u30bc\u30ed\u30a8\u30df\u30c3\u30b7\u30e7\u30f3\u4ea4\u901a",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "\u4ea4\u901a\u306e\u96fb\u52d5\u5316",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "\u96fb\u52d5\u30e2\u30d3\u30ea\u30c6\u30a3",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "\u30a2\u30af\u30c6\u30a3\u30d6\u30e2\u30d3\u30ea\u30c6\u30a3",
+          "translation_status": "draft"
+        },
+        {
+          "language": "ja",
+          "notes": null,
+          "segmentation": "character",
+          "text": "\u30e2\u30fc\u30c0\u30eb\u30b7\u30d5\u30c8",
+          "translation_status": "draft"
+        }
+      ],
+      "notes": "Generic public-transport, rail, cycling, and vehicle coverage is excluded unless it explicitly invokes a clean, sustainable, low-carbon, electrification, emissions, active-mobility, or modal-shift concept.",
+      "queries": [
+        {
+          "enabled": true,
+          "exclude_terms": null,
+          "expression": "\"clean transport\"",
+          "geographies": null,
+          "id": "q_6448321abb24",
+          "include_terms": null,
+          "languages": null,
+          "notes": null
+        },
+        {
+          "enabled": true,
+          "exclude_terms": null,
+          "expression": "\"sustainable transport\"",
+          "geographies": null,
+          "id": "q_864cf4c404a3",
+          "include_terms": null,
+          "languages": null,
+          "notes": null
+        },
+        {
+          "enabled": true,
+          "exclude_terms": null,
+          "expression": "\"transport decarbonisation\"",
+          "geographies": null,
+          "id": "q_1b32d2ed4c59",
+          "include_terms": null,
+          "languages": null,
+          "notes": null
+        },
+        {
+          "enabled": true,
+          "exclude_terms": null,
+          "expression": "\"transport decarbonization\"",
+          "geographies": null,
+          "id": "q_8f7ac48ee0db",
+          "include_terms": null,
+          "languages": null,
+          "notes": null
+        },
+        {
+          "enabled": true,
+          "exclude_terms": null,
+          "expression": "\"transport emissions\"",
+          "geographies": null,
+          "id": "q_c5335b2083b6",
+          "include_terms": null,
+          "languages": null,
+          "notes": null
+        }
+      ]
+    }
+  ],
+  "updated_at": "2026-08-14T11:22:17.157097Z",
+  "windows": {
+    "333ea005c4a0fe362bd352d1c5c704d0c0900fae66e7dc0760bbdacb3ba1d79e": {
+      "attempts": 1,
+      "end": "2025-01-01T23:59:59.999999Z",
+      "error": null,
+      "http_status": null,
+      "parent_window_id": null,
+      "query": {
+        "exclude_terms": [],
+        "expression": "clean_transport",
+        "geographies": [],
+        "geography": null,
+        "include_terms": [],
+        "language": null,
+        "query_id": "topics_distinct_urls",
+        "topic_id": "ngram_topic_batch"
+      },
+      "records_returned": 197,
+      "start": "2025-01-01T00:00:00Z",
+      "status": "success",
+      "updated_at": "2026-08-14T11:22:17.155830Z",
+      "window_id": "333ea005c4a0fe362bd352d1c5c704d0c0900fae66e7dc0760bbdacb3ba1d79e"
+    }
+  }
+}

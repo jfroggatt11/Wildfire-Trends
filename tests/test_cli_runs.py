@@ -1,18 +1,21 @@
 from __future__ import annotations
 
-from datetime import date
+import csv
+from datetime import date, datetime, timezone
 
 from climate_attention.cli import _execute_gdelt_run, _execute_timeline_run, main
 from climate_attention.config import config_hash
 from climate_attention.models import (
     CollectionRequest,
     DailyTrend,
+    PoliticalArticleSample,
     QuerySpec,
     RequestLog,
     Topic,
 )
 from climate_attention.run_state import RunStore
 from climate_attention.sources.gdelt import plan_gdelt_windows
+from climate_attention.storage import LocalParquetStorage
 
 
 def _state(tmp_path):
@@ -314,3 +317,48 @@ def test_collect_ngrams_plan_only_freezes_billing_cap_and_queries(tmp_path, caps
     }
     assert state.provider_options["include_denominator"] is False
     assert state.provider_options["batch_topics"] is True
+
+
+def test_export_articles_writes_reviewable_political_csv(tmp_path, capsys):
+    data_dir = tmp_path / "data"
+    storage = LocalParquetStorage(data_dir)
+    storage.write_matched_articles(
+        [
+            PoliticalArticleSample(
+                record_id="article-1",
+                date=date(2025, 1, 1),
+                topic_id="climate_change",
+                geography="italy",
+                url="https://example.it/climate",
+                title="Climate policy",
+                language="it",
+                political_actor=True,
+                collected_at=datetime(2025, 1, 2, tzinfo=timezone.utc),
+                metadata={"complete_article_panel": True},
+            )
+        ]
+    )
+    output = tmp_path / "exports" / "articles.csv"
+
+    assert main(
+        [
+            "export-articles",
+            "--start",
+            "2025-01-01",
+            "--end",
+            "2025-01-01",
+            "--data-dir",
+            str(data_dir),
+            "--output",
+            str(output),
+        ]
+    ) == 0
+
+    with output.open(encoding="utf-8", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+    assert len(rows) == 1
+    assert rows[0]["political"] == "True"
+    assert rows[0]["political_actor"] == "True"
+    assert rows[0]["title"] == "Climate policy"
+    assert '"complete_article_panel": true' in rows[0]["metadata_json"]
+    assert "Exported 1 article classification row" in capsys.readouterr().out
