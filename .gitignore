@@ -8,6 +8,10 @@ __pycache__/
 .pytest_cache/
 *.egg-info/
 .coverage
+frontend/node_modules/
+frontend/dist/
+frontend/playwright-report/
+frontend/test-results/
 data/raw/
 data/trends/
 data/processed/

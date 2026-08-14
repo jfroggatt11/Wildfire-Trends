@@ -15,6 +15,42 @@ their 250-result API limit makes them unsuitable as the authoritative count.
 The BigQuery-backed Web NGrams mode provides a scalable, distinct-URL comparison
 series and is being validated before it replaces any canonical API measure.
 
+## Frontend MVP
+
+`frontend/` contains the Netlify-ready Climate Attention Atlas: a React and
+TypeScript map explorer for GDACS events, media-market comparisons, article evidence,
+research hypotheses, and methodology. It deliberately shows an unavailable state
+instead of estimating an event effect when the continuous daily panel is incomplete.
+
+Export the current Parquet datasets to compact browser assets, then run the app:
+
+```bash
+.venv/bin/python scripts/export_frontend_data.py
+cd frontend
+npm install
+npm run dev
+```
+
+The root `netlify.toml` builds and publishes the Vite app. The exported article
+geography is the publishing outlet's country; the MVP does not present articles as
+precise event-location pins or claim that candidate articles are event-linked.
+
+Run the frontend unit and browser regression suites with:
+
+```bash
+cd frontend
+npm test
+npm run test:e2e
+```
+
+The end-to-end tests automatically use an installed Chrome or Chromium. If
+neither is available, install Playwright's managed browser once with
+`npm run test:e2e:install`.
+
+The browser suite covers media-scope combinations, date entry and empty/reversed
+ranges, hazard and alert filters, event selection, embedded previews, and every
+event-detail tab.
+
 ## Installation
 
 Python 3.11 or newer is required.
