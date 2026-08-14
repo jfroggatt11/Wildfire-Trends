@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from climate_attention.aggregation import aggregate_daily
 from climate_attention.storage import LocalParquetStorage
 from climate_attention.models import (
+    ArticleMatchEvidence,
     DailyCountryCoverage,
     DailyTrend,
     PoliticalArticleSample,
@@ -137,6 +138,20 @@ def test_political_counts_and_article_samples_round_trip(tmp_path):
         title="Climate policy",
         image_url="https://example.it/image.jpg",
         political_actor=True,
+        match_evidence=[
+            ArticleMatchEvidence(
+                evidence_kind="topic",
+                dimension_id="climate_change",
+                phrase="climate change",
+                phrase_language="en",
+                segmentation="space",
+                ngram="climate",
+                pre="about",
+                post="change policy",
+                context="about climate change policy",
+            )
+        ],
+        match_evidence_total=1,
         collected_at=collected_at,
         metadata={"validation_sample_only": True},
     )

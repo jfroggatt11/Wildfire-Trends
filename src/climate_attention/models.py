@@ -291,6 +291,20 @@ class DailyTrend(StrictModel):
         return value.astimezone(timezone.utc)
 
 
+class ArticleMatchEvidence(StrictModel):
+    """One representative GDELT NGram context for a matched configured phrase."""
+
+    evidence_kind: Literal["topic", "political_signal"]
+    dimension_id: str = Field(pattern=ID_PATTERN)
+    phrase: str = Field(min_length=1)
+    phrase_language: str | None = None
+    segmentation: Literal["space", "character"]
+    ngram: str | None = None
+    pre: str | None = None
+    post: str | None = None
+    context: str | None = None
+
+
 class MatchedArticle(StrictModel):
     """A topic-matched article and all retained GDELT Article List metadata."""
 
@@ -314,6 +328,9 @@ class MatchedArticle(StrictModel):
     government_action: bool = False
     party_politics: bool = False
     official_source: bool = False
+    match_evidence: list[ArticleMatchEvidence] = Field(default_factory=list)
+    match_evidence_total: int = Field(default=0, ge=0)
+    match_evidence_truncated: bool = False
     collected_at: datetime = Field(default_factory=utc_now)
     metadata: dict[str, Any] = Field(default_factory=dict)
 

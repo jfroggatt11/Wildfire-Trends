@@ -1,0 +1,130 @@
+schema_version: 1
+
+# Research seed taxonomy for Web NGrams. English entries mirror the canonical
+# topic queries. Other translations are drafts and require native-speaker review
+# before inferential use. Language codes follow GDELT Web NGrams (ISO 639-1/639-2).
+topics:
+  climate_change:
+    label: Climate change
+    enabled: true
+    description: General public and media language about anthropogenic climate change.
+    queries:
+      - '"climate change"'
+      - '"global warming"'
+      - '"climate crisis"'
+    ngram_phrases:
+      en:
+        translation_status: validated
+        phrases: [climate change, global warming, climate crisis]
+      es: [cambio climático, calentamiento global, crisis climática]
+      pt: [mudanças climáticas, alteração climática, aquecimento global, crise climática]
+      fr: [changement climatique, réchauffement climatique, crise climatique]
+      de: [Klimawandel, globale Erwärmung, Klimakrise]
+      it: [cambiamento climatico, riscaldamento globale, crisi climatica]
+      ru: [изменение климата, глобальное потепление, климатический кризис]
+      ar: [تغير المناخ, الاحتباس الحراري, أزمة المناخ]
+      zh:
+        segmentation: character
+        phrases: [气候变化, 全球变暖, 气候危机]
+      ja:
+        segmentation: character
+        phrases: [気候変動, 地球温暖化, 気候危機]
+
+  electric_vehicles:
+    label: Electric vehicles
+    enabled: true
+    queries:
+      - '"electric vehicle"'
+      - '"electric vehicles"'
+      - '"electric car"'
+      - '"electric cars"'
+    ngram_phrases:
+      en:
+        translation_status: validated
+        phrases: [electric vehicle, electric vehicles, electric car, electric cars]
+      es: [vehículo eléctrico, vehículos eléctricos, coche eléctrico, coches eléctricos]
+      pt: [veículo elétrico, veículos elétricos, carro elétrico, carros elétricos]
+      fr: [véhicule électrique, véhicules électriques, voiture électrique, voitures électriques]
+      de: [Elektrofahrzeug, Elektrofahrzeuge, Elektroauto, Elektroautos]
+      it: [veicolo elettrico, veicoli elettrici, auto elettrica, auto elettriche]
+      ru: [электромобиль, электромобили, электрический автомобиль]
+      ar: [سيارة كهربائية, سيارات كهربائية, مركبة كهربائية, مركبات كهربائية]
+      zh:
+        segmentation: character
+        phrases: [电动汽车, 电动车]
+      ja:
+        segmentation: character
+        phrases: [電気自動車]
+
+  clean_energy:
+    label: Clean energy
+    enabled: true
+    description: Renewable and low-carbon energy technologies and deployment.
+    queries:
+      - '"clean energy"'
+      - '"renewable energy"'
+      - '"solar power"'
+      - '"wind power"'
+    ngram_phrases:
+      en:
+        translation_status: validated
+        phrases: [clean energy, renewable energy, solar power, wind power]
+      es: [energía limpia, energía renovable, energía solar, energía eólica]
+      pt: [energia limpa, energia renovável, energia solar, energia eólica]
+      fr: [énergie propre, énergie renouvelable, énergie solaire, énergie éolienne]
+      de: [saubere Energie, erneuerbare Energie, Solarenergie, Windenergie]
+      it: [energia pulita, energia rinnovabile, energia solare, energia eolica]
+      ru: [чистая энергия, возобновляемая энергия, солнечная энергия, ветровая энергия]
+      ar: [الطاقة النظيفة, الطاقة المتجددة, الطاقة الشمسية, طاقة الرياح]
+      zh:
+        segmentation: character
+        phrases: [清洁能源, 可再生能源, 太阳能, 风能]
+      ja:
+        segmentation: character
+        phrases: [クリーンエネルギー, 再生可能エネルギー, 太陽光発電, 風力発電]
+
+  clean_transport:
+    label: Clean transport
+    enabled: true
+    description: Low-carbon mobility, transport decarbonisation, electrification, zero-emission movement, and modal shift.
+    notes: Generic public-transport, rail, cycling, and vehicle coverage is excluded unless it explicitly invokes a clean, sustainable, low-carbon, electrification, emissions, active-mobility, or modal-shift concept.
+    queries:
+      - '"clean transport"'
+      - '"sustainable transport"'
+      - '"transport decarbonisation"'
+      - '"transport decarbonization"'
+      - '"transport emissions"'
+    ngram_phrases:
+      en:
+        translation_status: validated
+        phrases:
+          - clean transport
+          - sustainable transport
+          - transport decarbonisation
+          - transport decarbonization
+          - transport emissions
+          - {text: clean mobility, translation_status: draft, notes: clean-mobility expansion candidate}
+          - {text: sustainable mobility, translation_status: draft, notes: clean-mobility expansion candidate}
+          - {text: low-carbon transport, translation_status: draft, notes: low-carbon expansion candidate}
+          - {text: low carbon transport, translation_status: draft, notes: low-carbon expansion candidate}
+          - {text: low-emission transport, translation_status: draft, notes: emissions expansion candidate}
+          - {text: low emission transport, translation_status: draft, notes: emissions expansion candidate}
+          - {text: zero-emission transport, translation_status: draft, notes: zero-emission expansion candidate}
+          - {text: zero emission transport, translation_status: draft, notes: zero-emission expansion candidate}
+          - {text: transport electrification, translation_status: draft, notes: electrification expansion candidate}
+          - {text: electric mobility, translation_status: draft, notes: electrification expansion candidate}
+          - {text: active travel, translation_status: draft, notes: modal-shift expansion candidate}
+          - {text: modal shift, translation_status: draft, notes: modal-shift expansion candidate}
+      es: [transporte limpio, transporte sostenible, descarbonización del transporte, emisiones del transporte, movilidad limpia, movilidad sostenible, transporte bajo en carbono, transporte de bajas emisiones, transporte de cero emisiones, electrificación del transporte, movilidad eléctrica, movilidad activa, cambio modal]
+      pt: [transporte limpo, transporte sustentável, descarbonização dos transportes, emissões dos transportes, mobilidade limpa, mobilidade sustentável, transporte de baixo carbono, transporte de baixas emissões, transporte de emissão zero, eletrificação dos transportes, mobilidade elétrica, mobilidade ativa, mudança modal]
+      fr: [transport propre, transport durable, décarbonation des transports, émissions des transports, mobilité propre, mobilité durable, transport bas carbone, transport à faibles émissions, transport zéro émission, électrification des transports, mobilité électrique, mobilité active, report modal]
+      de: [sauberer Verkehr, nachhaltiger Verkehr, Dekarbonisierung des Verkehrs, Verkehrsemissionen, saubere Mobilität, nachhaltige Mobilität, klimafreundlicher Verkehr, emissionsarmer Verkehr, emissionsfreier Verkehr, Elektrifizierung des Verkehrs, Elektromobilität, aktive Mobilität, Verkehrsverlagerung]
+      it: [trasporto pulito, trasporto sostenibile, decarbonizzazione dei trasporti, emissioni dei trasporti, mobilità pulita, mobilità sostenibile, trasporto a basse emissioni, trasporto a zero emissioni, elettrificazione dei trasporti, mobilità elettrica, mobilità attiva, trasferimento modale]
+      ru: [чистый транспорт, устойчивый транспорт, декарбонизация транспорта, выбросы транспорта, чистая мобильность, устойчивая мобильность, низкоуглеродный транспорт, транспорт с низким уровнем выбросов, транспорт с нулевым уровнем выбросов, электрификация транспорта, электрическая мобильность, активная мобильность, смена вида транспорта]
+      ar: [النقل النظيف, النقل المستدام, إزالة الكربون من النقل, انبعاثات النقل, التنقل النظيف, التنقل المستدام, النقل منخفض الكربون, النقل منخفض الانبعاثات, النقل عديم الانبعاثات, كهربة النقل, التنقل الكهربائي, التنقل النشط, التحول بين وسائل النقل]
+      zh:
+        segmentation: character
+        phrases: [清洁交通, 可持续交通, 交通脱碳, 交通排放, 绿色出行, 可持续出行, 低碳交通, 低排放交通, 零排放交通, 交通电气化, 电动出行, 主动出行, 交通方式转变]
+      ja:
+        segmentation: character
+        phrases: [クリーン交通, 持続可能な交通, 交通の脱炭素化, 交通排出量, クリーンモビリティ, 持続可能なモビリティ, 低炭素交通, 低排出交通, ゼロエミッション交通, 交通の電動化, 電動モビリティ, アクティブモビリティ, モーダルシフト]

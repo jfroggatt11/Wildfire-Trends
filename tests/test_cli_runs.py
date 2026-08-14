@@ -6,6 +6,7 @@ from datetime import date, datetime, timezone
 from climate_attention.cli import _execute_gdelt_run, _execute_timeline_run, main
 from climate_attention.config import config_hash
 from climate_attention.models import (
+    ArticleMatchEvidence,
     CollectionRequest,
     DailyTrend,
     PoliticalArticleSample,
@@ -333,6 +334,17 @@ def test_export_articles_writes_reviewable_political_csv(tmp_path, capsys):
                 title="Climate policy",
                 language="it",
                 political_actor=True,
+                match_evidence=[
+                    ArticleMatchEvidence(
+                        evidence_kind="topic",
+                        dimension_id="climate_change",
+                        phrase="climate change",
+                        phrase_language="en",
+                        segmentation="space",
+                        context="about climate change policy",
+                    )
+                ],
+                match_evidence_total=1,
                 collected_at=datetime(2025, 1, 2, tzinfo=timezone.utc),
                 metadata={"complete_article_panel": True},
             )
@@ -360,5 +372,7 @@ def test_export_articles_writes_reviewable_political_csv(tmp_path, capsys):
     assert rows[0]["political"] == "True"
     assert rows[0]["political_actor"] == "True"
     assert rows[0]["title"] == "Climate policy"
+    assert rows[0]["matched_topic_phrases"] == "climate change"
+    assert "about climate change policy" in rows[0]["match_evidence_json"]
     assert '"complete_article_panel": true' in rows[0]["metadata_json"]
     assert "Exported 1 article classification row" in capsys.readouterr().out

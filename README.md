@@ -256,7 +256,11 @@ climate-attention collect-ngrams \
 
 Matched articles are written under `data/articles`. Retained fields are publication
 time, URL, domain, outlet name/logo/Twitter handle, title, image, description,
-language, author, topic/country and political flags. GAL may have no value for some
+language, author, topic/country and political flags. Each article also retains one
+deterministically selected NGram context per matched topic or political phrase:
+the phrase, configured language and segmentation, plus GDELT's `pre`, `ngram`, and
+`post` fields. Up to 100 distinct phrase contexts are stored per article-topic row;
+the exact total and a truncation flag are recorded. GAL may have no value for some
 fields, which are then stored as null. The political translations and official-domain
 registry are research seeds and must be audited before inferential analysis. The
 official-domain flag currently has curated coverage only for the five pilot countries;
@@ -274,8 +278,10 @@ climate-attention export-articles \
   --output data/exports/political-classifications-2025-01-01.csv
 ```
 
-The CSV includes every article row plus a computed `political` union flag and the
-four component flags. Add `--political-only`, `--topics`, or `--countries` to produce
+The CSV includes every article row, compact `matched_topic_phrases` and
+`matched_political_phrases` columns, full `match_evidence_json`, a computed
+`political` union flag, and the four component flags. Add `--political-only`,
+`--topics`, or `--countries` to produce
 a narrower review file. Exporting reads local Parquet only and incurs no API cost.
 
 Every date-window job is dry-run again immediately before execution and is rejected

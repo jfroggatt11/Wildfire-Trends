@@ -182,7 +182,11 @@ screen, not a claim that a politician caused or endorsed the underlying event. A
 deterministic hash-ordered sample can be joined to GAL for review, or `--save-articles`
 can retain the complete matched panel. Available GAL fields are publication time,
 URL/domain, outlet name/logo/Twitter handle, title, image, description, language and
-author. No GKG/Knowledge Graph table is queried. Exact daily counts are a census of
+author. The panel also retains one deterministic representative `pre`/`ngram`/`post`
+context for each distinct configured phrase that matched the article, covering both
+topic membership and political-signal classification. Evidence is capped at 100
+phrases per article-topic row with the uncapped total and truncation status retained.
+No GKG/Knowledge Graph table is queried. Exact daily counts are a census of
 matched indexed URLs; a bounded sample must only be used to audit classifier error.
 
 Country attribution uses GDELT's multilingual April 2015 domain-country table.

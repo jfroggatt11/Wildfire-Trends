@@ -124,7 +124,9 @@ def test_political_sql_counts_url_level_signals_and_samples_articles():
     )
 
     assert sql.count("`gdelt-bq.gdeltv2.webngrams`") == 1
-    assert "LOGICAL_OR(political_actor)" in sql
+    assert "LOGICAL_OR(dimension_id = 'political_actor')" in sql
+    assert "phrase_catalog AS" in sql
+    assert "matched_topic_phrases" not in sql
     assert "COUNTIF(" in sql
     assert "article_samples_json" in sql
     assert "FARM_FINGERPRINT(url)" in sql
@@ -170,6 +172,21 @@ def test_political_parser_keeps_exact_counts_separate_from_validation_sample():
                         "government_action": False,
                         "party_politics": False,
                         "official_source": False,
+                        "match_evidence": [
+                            {
+                                "evidence_kind": "topic",
+                                "dimension_id": "climate_change",
+                                "phrase": "climate change",
+                                "phrase_language": "en",
+                                "segmentation": "space",
+                                "ngram": "climate",
+                                "pre": "the",
+                                "post": "change debate",
+                                "context": "the climate change debate",
+                            }
+                        ],
+                        "match_evidence_total": 1,
+                        "match_evidence_truncated": False,
                     }
                 ]
             ),
@@ -206,6 +223,9 @@ def test_political_parser_keeps_exact_counts_separate_from_validation_sample():
     )
     assert samples[0].outlet_name == "Example News"
     assert samples[0].image_url == "https://example.it/image.jpg"
+    assert samples[0].match_evidence[0].phrase == "climate change"
+    assert samples[0].match_evidence[0].context == "the climate change debate"
+    assert samples[0].match_evidence_total == 1
     assert samples[0].metadata["validation_sample_only"] is True
 
 

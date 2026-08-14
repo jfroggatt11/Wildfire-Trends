@@ -162,6 +162,9 @@ POLITICAL_ARTICLE_SCHEMA = pa.schema(
         ("government_action", pa.bool_()),
         ("party_politics", pa.bool_()),
         ("official_source", pa.bool_()),
+        ("match_evidence_json", pa.string()),
+        ("match_evidence_total", pa.int64()),
+        ("match_evidence_truncated", pa.bool_()),
         ("collected_at", pa.timestamp("us", tz="UTC")),
         ("metadata_json", pa.string()),
     ]
@@ -728,6 +731,8 @@ class LocalParquetStorage(AttentionStorage):
         samples: list[PoliticalArticleSample] = []
         for row in rows:
             row["metadata"] = json.loads(row.pop("metadata_json"))
+            evidence = row.pop("match_evidence_json", "[]")
+            row["match_evidence"] = json.loads(evidence or "[]")
             samples.append(PoliticalArticleSample.model_validate(row))
         return samples
 
@@ -778,7 +783,13 @@ def _event_to_row(event: HazardEvent) -> dict[str, Any]:
 
 
 def _political_article_to_row(sample: PoliticalArticleSample) -> dict[str, Any]:
-    row = sample.model_dump(exclude={"metadata"})
+    row = sample.model_dump(exclude={"metadata", "match_evidence"})
+    row["match_evidence_json"] = json.dumps(
+        [item.model_dump(mode="json") for item in sample.match_evidence],
+        ensure_ascii=False,
+        sort_keys=True,
+        default=str,
+    )
     row["metadata_json"] = json.dumps(
         sample.metadata, ensure_ascii=False, sort_keys=True, default=str
     )

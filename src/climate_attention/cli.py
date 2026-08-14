@@ -1472,6 +1472,11 @@ def _export_articles(args: argparse.Namespace) -> int:
         "government_action",
         "party_politics",
         "official_source",
+        "matched_topic_phrases",
+        "matched_political_phrases",
+        "match_evidence_total",
+        "match_evidence_truncated",
+        "match_evidence_json",
         "collected_at",
         "metadata_json",
     )
@@ -1480,8 +1485,28 @@ def _export_articles(args: argparse.Namespace) -> int:
         writer = csv.DictWriter(handle, fieldnames=fields)
         writer.writeheader()
         for article in articles:
-            row = article.model_dump(exclude={"metadata"})
+            row = article.model_dump(exclude={"metadata", "match_evidence"})
             row["political"] = article.political
+            row["matched_topic_phrases"] = " | ".join(
+                dict.fromkeys(
+                    item.phrase
+                    for item in article.match_evidence
+                    if item.evidence_kind == "topic"
+                )
+            )
+            row["matched_political_phrases"] = " | ".join(
+                dict.fromkeys(
+                    item.phrase
+                    for item in article.match_evidence
+                    if item.evidence_kind == "political_signal"
+                )
+            )
+            row["match_evidence_json"] = json.dumps(
+                [item.model_dump(mode="json") for item in article.match_evidence],
+                ensure_ascii=False,
+                sort_keys=True,
+                default=str,
+            )
             for field in ("date", "published_at", "collected_at"):
                 value = row.get(field)
                 row[field] = value.isoformat() if value is not None else ""

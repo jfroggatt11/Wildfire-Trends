@@ -464,41 +464,112 @@ def _build_political_ngram_batch_sql(
     if any(not values for values in political_signals.values()):
         raise ValueError("each political signal must contain at least one phrase")
 
-    parameters: dict[str, Any] = {}
-    phrase_index = 0
-    topic_clauses: list[tuple[int, str]] = []
     topic_ids = sorted(phrases_by_topic)
-    for topic_index, topic_id in enumerate(topic_ids):
-        parameters[f"topic_id_{topic_index}"] = topic_id
-        clauses = []
-        for phrase in _normalize_phrase_specs(phrases_by_topic[topic_id]):
-            clause, values = _phrase_sql_clause(phrase, phrase_index)
-            parameters.update(values)
-            clauses.append(clause)
-            phrase_index += 1
-        topic_clauses.append((topic_index, " OR ".join(clauses)))
+    catalog: dict[str, list[str]] = {
+        "anchors": [],
+        "kinds": [],
+        "dimensions": [],
+        "phrases": [],
+        "languages": [],
+        "segmentations": [],
+        "segmentation_types": [],
+        "patterns": [],
+    }
+    for evidence_kind, dimensions in (
+        ("topic", phrases_by_topic),
+        ("political_signal", political_signals),
+    ):
+        for dimension_id in sorted(dimensions):
+            for phrase in _normalize_phrase_specs(dimensions[dimension_id]):
+                _, values = _phrase_sql_clause(phrase, 0)
+                for anchor in values["anchor_variants_0"]:
+                    catalog["anchors"].append(anchor)
+                    catalog["kinds"].append(evidence_kind)
+                    catalog["dimensions"].append(dimension_id)
+                    catalog["phrases"].append(phrase["text"])
+                    catalog["languages"].append(phrase.get("language") or "")
+                    catalog["segmentations"].append(phrase["segmentation"])
+                    catalog["segmentation_types"].append(
+                        str(values["segmentation_type_0"])
+                    )
+                    catalog["patterns"].append(values["pattern_0"])
 
-    signal_clauses: dict[str, str] = {}
-    for signal_id in sorted(political_signals):
-        clauses = []
-        for phrase in _normalize_phrase_specs(political_signals[signal_id]):
-            clause, values = _phrase_sql_clause(phrase, phrase_index)
-            parameters.update(values)
-            clauses.append(clause)
-            phrase_index += 1
-        signal_clauses[signal_id] = " OR ".join(clauses)
-
-    topic_filter = "\n      OR ".join(f"({clause})" for _, clause in topic_clauses)
-    political_filter = "\n      OR ".join(
-        f"({clause})" for clause in signal_clauses.values()
+    parameters: dict[str, Any] = {
+        "topic_ids": topic_ids,
+        "catalog_anchors": catalog["anchors"],
+        "catalog_anchor_filter": list(dict.fromkeys(catalog["anchors"])),
+        "catalog_kinds": catalog["kinds"],
+        "catalog_dimensions": catalog["dimensions"],
+        "catalog_phrases": catalog["phrases"],
+        "catalog_languages": catalog["languages"],
+        "catalog_segmentations": catalog["segmentations"],
+        "catalog_segmentation_types": catalog["segmentation_types"],
+        "catalog_patterns": catalog["patterns"],
+    }
+    evidence_aggregate = ""
+    country_evidence_select = ""
+    article_signal_exclusions = "all_topic_ids"
+    matched_urls_ctes = """,
+matched_urls AS (
+  SELECT * FROM matched_urls_base
+    )"""
+    if article_sample_size != 0:
+        country_evidence_select = ", matched.match_evidence, matched.match_evidence_total"
+        evidence_aggregate = """,
+    ARRAY_AGG(STRUCT(
+      evidence_kind AS evidence_kind,
+      dimension_id AS dimension_id,
+      phrase AS phrase,
+      phrase_language AS phrase_language,
+      segmentation AS segmentation,
+      ngram AS ngram,
+      pre AS pre,
+      post AS post,
+      context AS context
+    ) ORDER BY evidence_kind, dimension_id, phrase) AS all_evidence"""
+        article_signal_exclusions = "all_topic_ids, all_evidence"
+        matched_urls_ctes = """,
+article_evidence AS (
+  SELECT aggregates.day, aggregates.url, evidence.*
+  FROM article_signal_aggregates AS aggregates
+  CROSS JOIN UNNEST(all_evidence) AS evidence
+  QUALIFY ROW_NUMBER() OVER (
+    PARTITION BY aggregates.day, aggregates.url, evidence.evidence_kind,
+      evidence.dimension_id, evidence.phrase, evidence.phrase_language,
+      evidence.segmentation
+    ORDER BY FARM_FINGERPRINT(CONCAT(
+      COALESCE(evidence.pre, ''), COALESCE(evidence.ngram, ''),
+      COALESCE(evidence.post, '')
+    ))
+  ) = 1
+),
+matched_urls AS (
+  SELECT
+    matched.topic_id, matched.day, matched.url, matched.host, matched.lang,
+    matched.political_actor, matched.government_action, matched.party_politics,
+    ARRAY_AGG(STRUCT(
+      evidence.evidence_kind AS evidence_kind,
+      evidence.dimension_id AS dimension_id,
+      evidence.phrase AS phrase,
+      evidence.phrase_language AS phrase_language,
+      evidence.segmentation AS segmentation,
+      evidence.ngram AS ngram,
+      evidence.pre AS pre,
+      evidence.post AS post,
+      evidence.context AS context
+    ) ORDER BY evidence.evidence_kind, evidence.dimension_id, evidence.phrase
+      LIMIT 100) AS match_evidence,
+    COUNT(*) AS match_evidence_total
+  FROM matched_urls_base AS matched
+  JOIN article_evidence AS evidence
+    ON matched.day = evidence.day AND matched.url = evidence.url
+    AND (
+      evidence.evidence_kind = 'political_signal'
+      OR evidence.dimension_id = matched.topic_id
     )
-    topic_array = "ARRAY_CONCAT(\n        " + ",\n        ".join(
-        "IF(("
-        + clause
-        + f"), ARRAY<STRING>[@topic_id_{topic_index}], ARRAY<STRING>[] )"
-        for topic_index, clause in topic_clauses
-    ) + "\n      )"
-    parameters["topic_ids"] = topic_ids
+  GROUP BY topic_id, day, url, host, lang, political_actor,
+    government_action, party_politics
+)"""
 
     official_country_ids: list[str] = []
     official_domain_values: list[str] = []
@@ -582,7 +653,11 @@ enriched_country_articles AS (
       political_actor AS political_actor,
       government_action AS government_action,
       party_politics AS party_politics,
-      official_source AS official_source
+      official_source AS official_source,
+      match_evidence AS match_evidence,
+      match_evidence_total AS match_evidence_total,
+      match_evidence_total > ARRAY_LENGTH(match_evidence)
+        AS match_evidence_truncated
     ) ORDER BY FARM_FINGERPRINT(url){article_limit}))"""
 
     sql = f"""
@@ -615,19 +690,71 @@ attribution_domains AS (
   FROM requested_official_domains AS official
   JOIN requested_countries AS countries USING (country_id)
 ),
+phrase_catalog AS (
+  SELECT
+    anchor,
+    kind AS evidence_kind,
+    dimension AS dimension_id,
+    phrase,
+    NULLIF(language, '') AS phrase_language,
+    segmentation,
+    CAST(segmentation_type AS INT64) AS segmentation_type,
+    pattern
+  FROM UNNEST(@catalog_anchors) AS anchor WITH OFFSET AS position
+  JOIN UNNEST(@catalog_kinds) AS kind WITH OFFSET AS kind_position
+    ON position = kind_position
+  JOIN UNNEST(@catalog_dimensions) AS dimension WITH OFFSET AS dimension_position
+    ON position = dimension_position
+  JOIN UNNEST(@catalog_phrases) AS phrase WITH OFFSET AS phrase_position
+    ON position = phrase_position
+  JOIN UNNEST(@catalog_languages) AS language WITH OFFSET AS language_position
+    ON position = language_position
+  JOIN UNNEST(@catalog_segmentations) AS segmentation
+    WITH OFFSET AS segmentation_position ON position = segmentation_position
+  JOIN UNNEST(@catalog_segmentation_types) AS segmentation_type
+    WITH OFFSET AS type_position ON position = type_position
+  JOIN UNNEST(@catalog_patterns) AS pattern WITH OFFSET AS pattern_position
+    ON position = pattern_position
+),
 signal_rows AS (
   SELECT
-    DATE(date) AS day,
-    url,
-    LOWER(NET.HOST(url)) AS host,
-    lang,
-    {topic_array} AS topic_ids,
-    ({signal_clauses['political_actor']}) AS political_actor,
-    ({signal_clauses['government_action']}) AS government_action,
-    ({signal_clauses['party_politics']}) AS party_politics
-  FROM `{ngram_table}`
-  WHERE DATE(date) BETWEEN @start_date AND @end_date
-    AND (({topic_filter}) OR ({political_filter}))
+    DATE(source.date) AS day,
+    source.url,
+    LOWER(NET.HOST(source.url)) AS host,
+    source.lang,
+    catalog.evidence_kind,
+    catalog.dimension_id,
+    catalog.phrase,
+    catalog.phrase_language,
+    catalog.segmentation,
+    source.ngram,
+    source.pre,
+    source.post,
+    CONCAT(COALESCE(source.pre, ''), ' ', source.ngram, ' ',
+      COALESCE(source.post, '')) AS context
+  FROM `{ngram_table}` AS source
+  JOIN phrase_catalog AS catalog
+    ON source.ngram = catalog.anchor
+    AND source.type = catalog.segmentation_type
+    AND (catalog.phrase_language IS NULL OR source.lang = catalog.phrase_language)
+    AND REGEXP_CONTAINS(
+      LOWER(IF(
+        catalog.segmentation = 'character',
+        CONCAT(COALESCE(source.pre, ''), source.ngram, COALESCE(source.post, '')),
+        CONCAT(COALESCE(source.pre, ''), ' ', source.ngram, ' ',
+          COALESCE(source.post, ''))
+      )),
+      catalog.pattern
+    )
+  WHERE DATE(source.date) BETWEEN @start_date AND @end_date
+    AND source.ngram IN UNNEST(@catalog_anchor_filter)
+  QUALIFY ROW_NUMBER() OVER (
+    PARTITION BY day, source.url, catalog.evidence_kind, catalog.dimension_id,
+      catalog.phrase, catalog.phrase_language, catalog.segmentation
+    ORDER BY FARM_FINGERPRINT(CONCAT(
+      COALESCE(source.pre, ''), source.ngram, COALESCE(source.post, '')
+    ))
+  ) = 1
 ),
 article_signal_aggregates AS (
   SELECT
@@ -635,27 +762,28 @@ article_signal_aggregates AS (
     url,
     host,
     ARRAY_AGG(DISTINCT lang ORDER BY lang LIMIT 1)[SAFE_OFFSET(0)] AS lang,
-    ARRAY_CONCAT_AGG(topic_ids) AS all_topic_ids,
-    LOGICAL_OR(political_actor) AS political_actor,
-    LOGICAL_OR(government_action) AS government_action,
-    LOGICAL_OR(party_politics) AS party_politics
+    ARRAY_AGG(DISTINCT IF(evidence_kind = 'topic', dimension_id, NULL)
+      IGNORE NULLS) AS all_topic_ids,
+    LOGICAL_OR(dimension_id = 'political_actor') AS political_actor,
+    LOGICAL_OR(dimension_id = 'government_action') AS government_action,
+    LOGICAL_OR(dimension_id = 'party_politics') AS party_politics{evidence_aggregate}
   FROM signal_rows
   GROUP BY day, url, host
 ),
 article_signals AS (
   SELECT
-    * EXCEPT(all_topic_ids),
+    * EXCEPT({article_signal_exclusions}),
     ARRAY(
       SELECT DISTINCT topic_id FROM UNNEST(all_topic_ids) AS topic_id
     ) AS topic_ids
   FROM article_signal_aggregates
 ),
-matched_urls AS (
+matched_urls_base AS (
   SELECT topic_id, day, url, host, lang,
     political_actor, government_action, party_politics
   FROM article_signals
   CROSS JOIN UNNEST(topic_ids) AS topic_id
-),
+){matched_urls_ctes},
 matched_attributed AS (
   SELECT matched.*, domains.country_label
   FROM matched_urls AS matched
@@ -670,7 +798,7 @@ country_article_signals AS (
   SELECT
     matched.topic_id, matched.day, matched.url, matched.host, matched.lang,
     countries.country_id, matched.political_actor, matched.government_action,
-    matched.party_politics,
+    matched.party_politics{country_evidence_select},
     EXISTS(
       SELECT 1 FROM requested_official_domains AS official
       WHERE official.country_id = countries.country_id
@@ -1488,6 +1616,14 @@ def parse_political_article_samples(
                     government_action=bool(item.get("government_action")),
                     party_politics=bool(item.get("party_politics")),
                     official_source=bool(item.get("official_source")),
+                    match_evidence=item.get("match_evidence") or [],
+                    match_evidence_total=int(
+                        item.get("match_evidence_total")
+                        or len(item.get("match_evidence") or [])
+                    ),
+                    match_evidence_truncated=bool(
+                        item.get("match_evidence_truncated")
+                    ),
                     collected_at=collected_at,
                     metadata={
                         "selection_method": (
