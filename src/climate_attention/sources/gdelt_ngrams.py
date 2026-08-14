@@ -267,8 +267,8 @@ def build_ngram_batch_sql(
             raise ValueError(f"invalid BigQuery table identifier: {table!r}")
     if not phrases_by_topic or any(not values for values in phrases_by_topic.values()):
         raise ValueError("each NGram topic must contain at least one phrase")
-    if article_sample_size < 0 or article_sample_size > 100:
-        raise ValueError("article sample size must be between 0 and 100")
+    if article_sample_size < -1 or article_sample_size > 100:
+        raise ValueError("article sample size must be -1 (all) or between 0 and 100")
     if political_signals:
         return _build_political_ngram_batch_sql(
             phrases_by_topic=phrases_by_topic,
@@ -540,13 +540,16 @@ country_coverage AS (
     article_catalog_cte = ""
     enriched_source = "country_article_signals"
     sample_expression = "'[]'"
-    if article_sample_size:
+    if article_sample_size != 0:
         article_catalog_cte = f""",
 article_catalog AS (
   SELECT
     catalog.url,
     ARRAY_AGG(
-      STRUCT(catalog.domain, catalog.title, catalog.`desc` AS description,
+      STRUCT(catalog.date AS published_at, catalog.domain,
+        catalog.outletName AS outlet_name, catalog.outletLogo AS outlet_logo,
+        catalog.outletTwitter AS outlet_twitter, catalog.title,
+        catalog.image AS image_url, catalog.`desc` AS description,
         catalog.lang, catalog.author)
       ORDER BY catalog.date DESC LIMIT 1
     )[SAFE_OFFSET(0)] AS article
@@ -561,10 +564,18 @@ enriched_country_articles AS (
   LEFT JOIN article_catalog AS catalog USING (url)
 )"""
         enriched_source = "enriched_country_articles"
+        article_limit = (
+            "" if article_sample_size == -1 else f" LIMIT {article_sample_size}"
+        )
         sample_expression = f"""TO_JSON_STRING(ARRAY_AGG(STRUCT(
       url AS url,
       COALESCE(article.domain, host) AS domain,
+      article.published_at AS published_at,
+      article.outlet_name AS outlet_name,
+      article.outlet_logo AS outlet_logo,
+      article.outlet_twitter AS outlet_twitter,
       article.title AS title,
+      article.image_url AS image_url,
       article.description AS description,
       COALESCE(article.lang, lang) AS lang,
       article.author AS author,
@@ -572,7 +583,7 @@ enriched_country_articles AS (
       government_action AS government_action,
       party_politics AS party_politics,
       official_source AS official_source
-    ) ORDER BY FARM_FINGERPRINT(url) LIMIT {article_sample_size}))"""
+    ) ORDER BY FARM_FINGERPRINT(url){article_limit}))"""
 
     sql = f"""
 WITH requested_countries AS (
@@ -1423,7 +1434,7 @@ def parse_political_article_samples(
     sample_size: int,
 ) -> list[PoliticalArticleSample]:
     """Parse bounded deterministic URL samples returned beside exact counts."""
-    if sample_size <= 0:
+    if sample_size == 0:
         return []
     samples: list[PoliticalArticleSample] = []
     seen: set[tuple[str, date, str, str]] = set()
@@ -1451,6 +1462,11 @@ def parse_political_article_samples(
                     url,
                 ]
             )
+            published_at = item.get("published_at")
+            if isinstance(published_at, str):
+                published_at = datetime.fromisoformat(
+                    published_at.replace("Z", "+00:00")
+                )
             samples.append(
                 PoliticalArticleSample(
                     record_id=sha256(identity.encode("utf-8")).hexdigest(),
@@ -1459,7 +1475,12 @@ def parse_political_article_samples(
                     geography=country_id,
                     url=url,
                     domain=item.get("domain"),
+                    published_at=published_at,
+                    outlet_name=item.get("outlet_name"),
+                    outlet_logo=item.get("outlet_logo"),
+                    outlet_twitter=item.get("outlet_twitter"),
                     title=item.get("title"),
+                    image_url=item.get("image_url"),
                     description=item.get("description"),
                     language=item.get("lang"),
                     author=item.get("author"),
@@ -1469,10 +1490,19 @@ def parse_political_article_samples(
                     official_source=bool(item.get("official_source")),
                     collected_at=collected_at,
                     metadata={
-                        "sample_method": "farm_fingerprint_url",
-                        "sample_limit_per_topic_country_day": sample_size,
-                        "validation_sample_only": True,
-                        "counts_must_not_be_inferred_from_sample": True,
+                        "selection_method": (
+                            "all_matched_articles"
+                            if sample_size == -1
+                            else "farm_fingerprint_url"
+                        ),
+                        "article_limit_per_topic_country_day": (
+                            None if sample_size == -1 else sample_size
+                        ),
+                        "complete_article_panel": sample_size == -1,
+                        "validation_sample_only": sample_size != -1,
+                        "counts_must_not_be_inferred_from_sample": sample_size != -1,
+                        "metadata_source": "gdelt_gal_article_list",
+                        "knowledge_graph_queried": False,
                     },
                 )
             )

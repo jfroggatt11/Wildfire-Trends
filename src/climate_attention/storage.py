@@ -149,7 +149,12 @@ POLITICAL_ARTICLE_SCHEMA = pa.schema(
         ("geography", pa.string()),
         ("url", pa.string()),
         ("domain", pa.string()),
+        ("published_at", pa.timestamp("us", tz="UTC")),
+        ("outlet_name", pa.string()),
+        ("outlet_logo", pa.string()),
+        ("outlet_twitter", pa.string()),
         ("title", pa.string()),
+        ("image_url", pa.string()),
         ("description", pa.string()),
         ("language", pa.string()),
         ("author", pa.string()),
@@ -526,6 +531,10 @@ class LocalParquetStorage(AttentionStorage):
             )
         return added
 
+    def write_matched_articles(self, articles: list[PoliticalArticleSample]) -> int:
+        """Persist the matched-article panel; the older sample API is retained."""
+        return self.write_political_article_samples(articles)
+
     def read_political_article_samples(
         self,
         *,
@@ -535,7 +544,7 @@ class LocalParquetStorage(AttentionStorage):
         start: date | None = None,
         end: date | None = None,
     ) -> list[PoliticalArticleSample]:
-        base = self.root / "political_articles"
+        base = self.root / "articles"
         paths = (
             (base / f"source={source}").rglob("articles.parquet")
             if source
@@ -555,6 +564,9 @@ class LocalParquetStorage(AttentionStorage):
             ),
             key=lambda item: (item.date, item.topic_id, item.geography, item.url),
         )
+
+    def read_matched_articles(self, **filters: Any) -> list[PoliticalArticleSample]:
+        return self.read_political_article_samples(**filters)
 
     def _record_path(
         self, source: str, day: date, topic_id: str, query_id: str
@@ -586,7 +598,7 @@ class LocalParquetStorage(AttentionStorage):
     ) -> Path:
         return (
             self.root
-            / "political_articles"
+            / "articles"
             / f"source={source}"
             / f"topic_id={topic_id}"
             / f"geography={geography}"

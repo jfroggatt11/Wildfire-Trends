@@ -179,9 +179,11 @@ political_share_of_matched = political_count / matched_count
 The component counts overlap by design and therefore must not be summed. Political
 phrases may occur anywhere in the indexed article text; this is a discourse-relevance
 screen, not a claim that a politician caused or endorsed the underlying event. A
-deterministic hash-ordered sample can be joined to GAL for URL, title, description,
-language, and author review. Exact daily counts are a census of matched indexed URLs;
-the bounded article sample exists only to label and audit classifier error.
+deterministic hash-ordered sample can be joined to GAL for review, or `--save-articles`
+can retain the complete matched panel. Available GAL fields are publication time,
+URL/domain, outlet name/logo/Twitter handle, title, image, description, language and
+author. No GKG/Knowledge Graph table is queried. Exact daily counts are a census of
+matched indexed URLs; a bounded sample must only be used to audit classifier error.
 
 Country attribution uses GDELT's multilingual April 2015 domain-country table.
 Ambiguous domains are discarded, the longest matching domain suffix wins for

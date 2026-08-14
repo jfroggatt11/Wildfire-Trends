@@ -128,12 +128,14 @@ not interpret correlation alone as validity: inspect country mapping coverage,
 zero-day rates, spikes, anchor-token sensitivity, and differences caused by
 original-language versus translated search.
 
-For the bounded 2025 political MVP, use `config/countries.europe5.yaml` and add
-`--political-config config/political_signals.europe5.yaml --article-sample-size 10`
+For the worldwide 2025 political MVP, use `config/countries.world.yaml` and add
+`--political-config config/political_signals.europe5.yaml --save-articles`
 to both the estimate and collection commands. Prefer 31-day windows so a failure or
 billing cap affects one month rather than the entire year. The stored political
 component counts overlap; use `political_count` for their distinct-URL union and the
-`political_articles` dataset only for manual validation. Review false positives,
+`articles` dataset for article-level reclassification and validation. The current
+official-domain registry covers only the five European pilot countries; expand it
+before treating worldwide `official_source_count` as comparable. Review false positives,
 false negatives, language balance, named-party coverage, and official-domain drift
 before extending the design globally.
 

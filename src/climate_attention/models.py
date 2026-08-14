@@ -291,8 +291,8 @@ class DailyTrend(StrictModel):
         return value.astimezone(timezone.utc)
 
 
-class PoliticalArticleSample(StrictModel):
-    """Deterministically sampled topic article used to validate political labels."""
+class MatchedArticle(StrictModel):
+    """A topic-matched article and all retained GDELT Article List metadata."""
 
     record_id: str
     date: date
@@ -301,7 +301,12 @@ class PoliticalArticleSample(StrictModel):
     geography: str
     url: str
     domain: str | None = None
+    published_at: datetime | None = None
+    outlet_name: str | None = None
+    outlet_logo: str | None = None
+    outlet_twitter: str | None = None
     title: str | None = None
+    image_url: str | None = None
     description: str | None = None
     language: str | None = None
     author: str | None = None
@@ -327,6 +332,21 @@ class PoliticalArticleSample(StrictModel):
         if value.tzinfo is None or value.utcoffset() is None:
             raise ValueError("collection timestamp must include a timezone")
         return value.astimezone(timezone.utc)
+
+    @field_validator("published_at")
+    @classmethod
+    def publication_timestamp_must_be_aware(
+        cls, value: datetime | None
+    ) -> datetime | None:
+        if value is None:
+            return None
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("publication timestamp must include a timezone")
+        return value.astimezone(timezone.utc)
+
+
+# Backward-compatible name for runs created while article output was sample-only.
+PoliticalArticleSample = MatchedArticle
 
 
 class DailyCountryCoverage(StrictModel):

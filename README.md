@@ -214,24 +214,24 @@ climate-attention collect-ngrams \
   --data-dir data
 ```
 
-### 2025 political-discourse MVP
+### Worldwide 2025 political-discourse MVP
 
-The bundled MVP uses the same four multilingual topic definitions, but limits the
-output and validation workload to the United Kingdom, France, Spain, Germany, and
-Italy. It adds three article-level signals—political actors, government action, and
-party politics—plus an explicit registry of government, parliament, and party
-domains. Exact counts and their union are stored on each daily trend row. A bounded,
-deterministic URL sample can also retain GAL title/description metadata for manual
-precision and recall review; the sample is never used to estimate the counts.
+The MVP uses the same four multilingual topic definitions and returns every country
+supported by the world configuration. It adds three article-level signals—political
+actors, government action, and party politics—plus an initial registry of government,
+parliament, and party domains for the five European pilot countries. Exact counts
+and their union are stored on each daily trend row. Every matched URL can also be
+retained with all available GDELT Article List (GAL) metadata. This does not query
+GDELT's Knowledge Graph.
 
 Estimate the full calendar year first (dry runs do not incur query charges):
 
 ```bash
 climate-attention estimate-ngrams \
   --config config/topics.multilingual.example.yaml \
-  --countries-config config/countries.europe5.yaml \
+  --countries-config config/countries.world.yaml \
   --political-config config/political_signals.europe5.yaml \
-  --article-sample-size 10 \
+  --save-articles \
   --start 2025-01-01 \
   --end 2025-12-31 \
   --window-days 31 \
@@ -243,9 +243,9 @@ Then run the identical workload with a cap just above the largest monthly estima
 ```bash
 climate-attention collect-ngrams \
   --config config/topics.multilingual.example.yaml \
-  --countries-config config/countries.europe5.yaml \
+  --countries-config config/countries.world.yaml \
   --political-config config/political_signals.europe5.yaml \
-  --article-sample-size 10 \
+  --save-articles \
   --start 2025-01-01 \
   --end 2025-12-31 \
   --window-days 31 \
@@ -254,11 +254,15 @@ climate-attention collect-ngrams \
   --data-dir data
 ```
 
-Political article samples are written under `data/political_articles`. The political
-translations and official-domain registry are research seeds and must be audited
-before inferential analysis. Selecting five countries reduces output and validation
-work, but does not proportionally reduce bytes scanned because BigQuery must still
-identify matching URLs before country attribution.
+Matched articles are written under `data/articles`. Retained fields are publication
+time, URL, domain, outlet name/logo/Twitter handle, title, image, description,
+language, author, topic/country and political flags. GAL may have no value for some
+fields, which are then stored as null. The political translations and official-domain
+registry are research seeds and must be audited before inferential analysis. The
+official-domain flag currently has curated coverage only for the five pilot countries;
+generic political phrase signals still apply in all configured languages worldwide.
+Changing the requested output from five to all countries has little scan-cost effect
+because BigQuery identifies topic URLs before country attribution.
 
 Every date-window job is dry-run again immediately before execution and is rejected
 if its estimate exceeds the frozen cap. The default query is counts-only: it scans

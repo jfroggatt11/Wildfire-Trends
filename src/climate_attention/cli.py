@@ -238,6 +238,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="deterministic validation URLs per topic/country/day (0-100)",
     )
     ngrams.add_argument(
+        "--save-articles",
+        action="store_true",
+        help="save every matched article and all available GAL metadata (no GKG)",
+    )
+    ngrams.add_argument(
         "--billing-project",
         required=True,
         help="explicit Google Cloud project used for BigQuery billing",
@@ -273,6 +278,7 @@ def build_parser() -> argparse.ArgumentParser:
     estimate_ngrams.add_argument(
         "--article-sample-size", type=_article_sample_size, default=0
     )
+    estimate_ngrams.add_argument("--save-articles", action="store_true")
     estimate_ngrams.add_argument("--billing-project", required=True)
     estimate_ngrams.add_argument("--location", default="US")
     estimate_ngrams.add_argument(
@@ -701,8 +707,11 @@ def _collect_ngrams(args: argparse.Namespace) -> int:
         if args.political_config
         else None
     )
-    if args.article_sample_size and political is None:
-        raise ValueError("--article-sample-size requires --political-config")
+    if args.save_articles and args.article_sample_size:
+        raise ValueError("use either --save-articles or --article-sample-size, not both")
+    article_output_size = -1 if args.save_articles else args.article_sample_size
+    if article_output_size and political is None:
+        raise ValueError("article output requires --political-config")
     if political is not None:
         selected_ids = {country.id for country in countries}
         unknown_domains = set(political.official_domains) - selected_ids
@@ -726,7 +735,8 @@ def _collect_ngrams(args: argparse.Namespace) -> int:
         "include_denominator": args.include_denominator,
         "political_signals": political.phrase_mapping() if political else None,
         "official_domains": political.official_domains if political else {},
-        "article_sample_size": args.article_sample_size,
+        "article_sample_size": article_output_size,
+        "save_all_articles": args.save_articles,
         "political_config": (
             {
                 "path": str(args.political_config),
@@ -758,11 +768,16 @@ def _collect_ngrams(args: argparse.Namespace) -> int:
     )
     print("All selected topics share one BigQuery scan per date window.")
     if political:
+        article_message = (
+            "Every matched article will be saved with GAL metadata; the "
+            "Knowledge Graph is not queried."
+            if args.save_articles
+            else f"Validation sample: {args.article_sample_size} URL(s) per "
+            "topic/country/day."
+        )
         print(
             "Political actor, government-action, party-politics, and official-source "
-            "counts are computed over distinct topic URLs. "
-            f"Validation sample: {args.article_sample_size} URL(s) per "
-            "topic/country/day."
+            f"counts are computed over distinct topic URLs. {article_message}"
         )
     print(
         "Each job is dry-run first and cannot exceed the configured per-job "
@@ -796,8 +811,11 @@ def _estimate_ngrams(args: argparse.Namespace) -> int:
         if args.political_config
         else None
     )
-    if args.article_sample_size and political is None:
-        raise ValueError("--article-sample-size requires --political-config")
+    if args.save_articles and args.article_sample_size:
+        raise ValueError("use either --save-articles or --article-sample-size, not both")
+    article_output_size = -1 if args.save_articles else args.article_sample_size
+    if article_output_size and political is None:
+        raise ValueError("article output requires --political-config")
     if political is not None:
         selected_ids = {country.id for country in countries}
         unknown_domains = set(political.official_domains) - selected_ids
@@ -820,7 +838,7 @@ def _estimate_ngrams(args: argparse.Namespace) -> int:
         include_denominator=args.include_denominator,
         political_signals=political.phrase_mapping() if political else None,
         official_domains=political.official_domains if political else None,
-        article_sample_size=args.article_sample_size,
+        article_sample_size=article_output_size,
     )
     for estimate in estimates:
         gb = estimate["estimated_bytes_processed"] / 1_000_000_000
@@ -1275,7 +1293,7 @@ def _execute_timeline_run(
             # denominator immediately; it also refreshes matching older rows.
             state.records_newly_stored += storage.write_country_coverages(coverages)
             state.records_newly_stored += storage.write_trends(trends)
-            state.records_newly_stored += storage.write_political_article_samples(
+            state.records_newly_stored += storage.write_matched_articles(
                 political_samples
             )
         state.apply_window_event(event, window, log, children)
@@ -1338,7 +1356,7 @@ def _execute_timeline_run(
     if state.source == "gdelt_ngrams" and state.provider_options.get(
         "article_sample_size", 0
     ):
-        print(f"Political validation articles: {storage.root / 'political_articles'}.")
+        print(f"Matched article dataset: {storage.root / 'articles'}.")
     return exit_code
 
 

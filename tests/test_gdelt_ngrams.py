@@ -157,7 +157,12 @@ def test_political_parser_keeps_exact_counts_separate_from_validation_sample():
                     {
                         "url": "https://example.it/story",
                         "domain": "example.it",
+                        "published_at": "2026-01-01T08:30:00Z",
+                        "outlet_name": "Example News",
+                        "outlet_logo": "https://example.it/logo.png",
+                        "outlet_twitter": "examplenews",
                         "title": "Story",
+                        "image_url": "https://example.it/image.jpg",
                         "description": "Description",
                         "lang": "it",
                         "author": "Reporter",
@@ -196,6 +201,11 @@ def test_political_parser_keeps_exact_counts_separate_from_validation_sample():
     assert trends[0].metadata["political_classifier"]["counts_are_census"] is True
     assert len(samples) == 1
     assert samples[0].political is True
+    assert samples[0].published_at == datetime(
+        2026, 1, 1, 8, 30, tzinfo=timezone.utc
+    )
+    assert samples[0].outlet_name == "Example News"
+    assert samples[0].image_url == "https://example.it/image.jpg"
     assert samples[0].metadata["validation_sample_only"] is True
 
 
