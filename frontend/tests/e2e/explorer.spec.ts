@@ -56,7 +56,13 @@ test('January plus Global opens articles with nullable publication timestamps', 
     await expect(page.locator('.event-error')).toHaveCount(0)
   }
 
-  for (const tab of ['Attention', 'Geography', 'Articles', 'Methods', 'Briefing']) {
+  await expect(page.getByRole('tab')).toHaveCount(2)
+  await expect(page.getByRole('tab', { name: 'Attention' })).toHaveAttribute('aria-selected', 'true')
+  for (const removedTab of ['Briefing', 'Geography', 'Methods']) {
+    await expect(page.getByRole('tab', { name: removedTab })).toHaveCount(0)
+  }
+
+  for (const tab of ['Articles', 'Attention']) {
     await page.getByRole('tab', { name: tab }).click()
     await expect(page.locator('.event-error')).toHaveCount(0)
   }
@@ -147,16 +153,14 @@ test('trackpad-style zoom stays inside the map and clusters reveal individual ev
   expect(errors).toEqual([])
 })
 
-test('map-point country is distinct from GDACS affected countries', async ({ page }) => {
+test('event drawer keeps the corrected map-point label without a geography tab', async ({ page }) => {
   const errors = collectClientErrors(page)
   await page.goto('/?event=gdacs%3AFL%3A1103661', { waitUntil: 'networkidle' })
   await expect(page.locator('.event-drawer')).toBeVisible()
   await expect(page.locator('.drawer-header h2')).toHaveText('Flood in United Kingdom')
   await expect(page.locator('.event-meta')).toContainText('Map point: United Kingdom')
-  await page.getByRole('tab', { name: 'Geography' }).click()
-  await expect(page.getByRole('heading', { name: 'United Kingdom', exact: true })).toBeVisible()
-  await expect(page.locator('.affected-geography')).toContainText('Ireland')
-  await expect(page.locator('.affected-geography')).toContainText('United Kingdom')
+  await expect(page.getByRole('tab')).toHaveCount(2)
+  await expect(page.getByRole('tab', { name: 'Geography' })).toHaveCount(0)
   expect(errors).toEqual([])
 })
 

@@ -38,7 +38,7 @@ type HazardType = 'wildfire' | 'flood' | 'tropical_cyclone'
 type AlertLevel = 'Green' | 'Orange' | 'Red'
 type MediaScope = 'affected' | 'eu27' | 'international' | 'global'
 type View = 'explore' | 'lab' | 'data' | 'methods'
-type DetailTab = 'briefing' | 'attention' | 'geography' | 'articles' | 'methods'
+type DetailTab = 'attention' | 'articles'
 
 type EventProperties = {
   id: string
@@ -297,7 +297,7 @@ function App() {
     return id
   })
   const [scope, setScope] = useState<MediaScope>('affected')
-  const [detailTab, setDetailTab] = useState<DetailTab>('briefing')
+  const [detailTab, setDetailTab] = useState<DetailTab>('attention')
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   const selectedEvent = useMemo(
@@ -307,7 +307,7 @@ function App() {
 
   const selectEvent = (id: string | null) => {
     setSelectedId(id)
-    setDetailTab('briefing')
+    setDetailTab('attention')
     try {
       const url = new URL(window.location.href)
       if (id) url.searchParams.set('event', id)
@@ -901,11 +901,8 @@ function EventDrawer({
   )
 
   const tabs: { id: DetailTab; label: string }[] = [
-    { id: 'briefing', label: 'Briefing' },
     { id: 'attention', label: 'Attention' },
-    { id: 'geography', label: 'Geography' },
     { id: 'articles', label: 'Articles' },
-    { id: 'methods', label: 'Methods' },
   ]
 
   return (
@@ -932,13 +929,8 @@ function EventDrawer({
       </div>
 
       <div className="drawer-content">
-        {tab === 'briefing' && (
-          <BriefingTab event={event} chart={chart} candidateArticleCount={candidateArticles.length} scope={scope} onScopeChange={onScopeChange} />
-        )}
         {tab === 'attention' && <AttentionTab event={event} chart={chart} scope={scope} onScopeChange={onScopeChange} />}
-        {tab === 'geography' && <GeographyTab event={event} attention={attention} scope={scope} onScopeChange={onScopeChange} geographyLabels={geographyLabels} />}
         {tab === 'articles' && <ArticlesTab articles={candidateArticles} scope={scope} geographyLabels={geographyLabels} />}
-        {tab === 'methods' && <EventMethodsTab />}
       </div>
     </aside>
   )
@@ -952,33 +944,6 @@ function ScopeSelect({ scope, onChange }: { scope: MediaScope; onChange: (scope:
         {(Object.entries(SCOPE_COPY) as [MediaScope, (typeof SCOPE_COPY)[MediaScope]][]).map(([id, item]) => <option key={id} value={id}>{item.label}</option>)}
       </select>
     </label>
-  )
-}
-
-function BriefingTab({ event, chart, candidateArticleCount, scope, onScopeChange }: { event: EventProperties; chart: ChartResult; candidateArticleCount: number; scope: MediaScope; onScopeChange: (scope: MediaScope) => void }) {
-  return (
-    <>
-      <div className="notice-card warning">
-        <CircleAlert size={17} />
-        <div><strong>Event effect not yet estimable</strong><p>This event lacks a complete 28-day attention window. The interface will calculate the briefing automatically when the continuous panel is available.</p></div>
-      </div>
-      <ScopeSelect scope={scope} onChange={onScopeChange} />
-      <section className="drawer-section">
-        <span className="eyebrow">Research readiness</span>
-        <h3>What we can say now</h3>
-        <div className="readiness-grid">
-          <div><Check size={15} /><span><strong>Physical event</strong><small>Independent GDACS record</small></span></div>
-          <div><Check size={15} /><span><strong>Geography</strong><small>{event.geographyIds.length || 0} affected market{event.geographyIds.length === 1 ? '' : 's'}</small></span></div>
-          <div className={chart.coverageDays >= 14 ? '' : 'pending'}>{chart.coverageDays >= 14 ? <Check size={15} /> : <Activity size={15} />}<span><strong>Attention window</strong><small>{chart.coverageDays} of 57+ days observed</small></span></div>
-          <div className="pending"><Activity size={15} /><span><strong>Event linkage</strong><small>Article validation pending</small></span></div>
-        </div>
-      </section>
-      <section className="drawer-section">
-        <div className="section-title-row"><div><span className="eyebrow">Candidate evidence</span><h3>Media published in the event window</h3></div><span className="count-pill">{candidateArticleCount}</span></div>
-        <p className="muted-copy">These articles match climate or transport themes in the selected media market. They are not yet verified as reporting on this event.</p>
-      </section>
-      <a className="source-link" href={event.sourceUrl} target="_blank" rel="noreferrer">Open original GDACS record <ExternalLink size={14} /></a>
-    </>
   )
 }
 
@@ -1060,53 +1025,6 @@ function EmptyChart() {
       <strong>No daily observations in this window</strong>
       <span>The event remains available for geographic exploration.</span>
     </div>
-  )
-}
-
-function GeographyTab({ event, attention, scope, onScopeChange, geographyLabels }: { event: EventProperties; attention: AttentionRow[]; scope: MediaScope; onScopeChange: (scope: MediaScope) => void; geographyLabels: Record<string, string> }) {
-  const scopeStats = useMemo(() => {
-    return (Object.keys(SCOPE_COPY) as MediaScope[]).map((id) => {
-      const rows = attention.filter((row) => row.source === 'gdelt_ngrams' && withinWindow(row.date, event) && scopeAllows(row.geography, event, id))
-      return { id, days: new Set(rows.map((row) => row.date)).size, markets: new Set(rows.map((row) => row.geography)).size }
-    })
-  }, [attention, event])
-  return (
-    <>
-      <section className="drawer-section no-top">
-        <span className="eyebrow">Media geography</span>
-        <h3>Choose whose response to measure</h3>
-        <p className="muted-copy">Event location and publishing market are deliberately kept separate.</p>
-        <div className="scope-cards">
-          {scopeStats.map((item) => (
-            <button key={item.id} className={scope === item.id ? 'active' : ''} onClick={() => onScopeChange(item.id)}>
-              <span className="radio-dot">{scope === item.id && <i />}</span>
-              <span><strong>{SCOPE_COPY[item.id].label}</strong><small>{SCOPE_COPY[item.id].description}</small></span>
-              <em>{item.markets} markets · {item.days} days</em>
-            </button>
-          ))}
-        </div>
-      </section>
-      <div className="notice-card info">
-        <Globe2 size={17} />
-        <div><strong>Outlet geography, not audience geography</strong><p>GDELT assigns each article to the publishing outlet’s source country. It does not identify where readers are located.</p></div>
-      </div>
-      <section className="drawer-section">
-        <span className="eyebrow">Mapped event point</span>
-        <h3>{event.mapCountryLabel || 'Offshore or unavailable'}</h3>
-        <p className="muted-copy">Resolved from the event coordinates against Natural Earth country boundaries.</p>
-        {event.mapCountryIso3 && <div className="country-code-row"><span>{event.mapCountryIso3}</span></div>}
-      </section>
-      <section className="drawer-section affected-geography">
-        <span className="eyebrow">Reported by GDACS</span>
-        <h3>Affected countries</h3>
-        <p className="muted-copy">These can include more countries than the single map point and are not used as its place label.</p>
-        <div className="affected-country-list">
-          {event.geographyIds.map((id) => <span key={id}>{geographyLabel(id, geographyLabels)}</span>)}
-          {!event.geographyIds.length && <span>Unavailable</span>}
-        </div>
-        <div className="country-code-row">{event.countryIso3s.map((code) => <span key={code}>{code}</span>)}</div>
-      </section>
-    </>
   )
 }
 
@@ -1220,20 +1138,6 @@ function ArticlesTab({ articles, scope, geographyLabels }: { articles: Article[]
         {filteredArticles.length > visibleArticles.length && <button className="load-more-button" onClick={() => setVisibleCount((current) => current + 20)}>Show 20 more <span>{visibleArticles.length.toLocaleString()} of {filteredArticles.length.toLocaleString()}</span></button>}
       </section>
     </>
-  )
-}
-
-function EventMethodsTab() {
-  return (
-    <section className="drawer-section no-top method-list">
-      <span className="eyebrow">Event study contract</span>
-      <h3>How this analysis will work</h3>
-      <div><span>01</span><p><strong>Independent treatment</strong>Events come from GDACS, not the news stream being analysed.</p></div>
-      <div><span>02</span><p><strong>Fixed comparison window</strong>The MVP uses 28 days before and 28 days after event onset.</p></div>
-      <div><span>03</span><p><strong>Explicit media market</strong>Every estimate states whether it represents affected-country, EU, international or global outlets.</p></div>
-      <div><span>04</span><p><strong>Eligibility before inference</strong>Incomplete windows and unsupported country mappings do not produce estimates.</p></div>
-      <div><span>05</span><p><strong>Association, not causation</strong>Simple before/after changes remain descriptive until a control design is validated.</p></div>
-    </section>
   )
 }
 
