@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from collections import Counter, defaultdict
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +13,7 @@ import pyarrow.parquet as pq
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "frontend" / "public" / "data"
+FRONTEND_ATTENTION_SOURCES = {"gdelt_ngrams"}
 
 
 def clean(value: Any) -> Any:
@@ -27,6 +28,52 @@ def write_json(name: str, payload: Any) -> None:
         json.dumps(payload, ensure_ascii=False, separators=(",", ":")),
         encoding="utf-8",
     )
+
+
+def contiguous_date_ranges(values: list[str]) -> list[dict[str, Any]]:
+    """Compress actual observed dates without implying coverage across gaps."""
+    days = sorted({date.fromisoformat(value[:10]) for value in values if value})
+    if not days:
+        return []
+    ranges: list[dict[str, Any]] = []
+    range_start = days[0]
+    previous = days[0]
+    for day in days[1:]:
+        if day != previous + timedelta(days=1):
+            ranges.append(
+                {
+                    "start": range_start.isoformat(),
+                    "end": previous.isoformat(),
+                    "dayCount": (previous - range_start).days + 1,
+                }
+            )
+            range_start = day
+        previous = day
+    ranges.append(
+        {
+            "start": range_start.isoformat(),
+            "end": previous.isoformat(),
+            "dayCount": (previous - range_start).days + 1,
+        }
+    )
+    return ranges
+
+
+def latest_requested_range(source: str) -> dict[str, Any] | None:
+    """Return the latest successful requested window for collection-window sources."""
+    manifests = ROOT / "data/manifests"
+    for path in sorted(manifests.glob("*.json"), reverse=True):
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        requested = payload.get("requested_date_range")
+        if payload.get("source") == source and requested and not payload.get("error"):
+            start = requested["start"]
+            end = requested["end"]
+            return {
+                "start": start,
+                "end": end,
+                "dayCount": (date.fromisoformat(end) - date.fromisoformat(start)).days + 1,
+            }
+    return None
 
 
 def export_events() -> list[dict[str, Any]]:
@@ -93,6 +140,8 @@ def export_attention() -> tuple[list[dict[str, Any]], dict[str, Any]]:
     dates: list[str] = []
     for path in sorted(source.rglob("*.parquet")):
         for row in pq.read_table(path).to_pylist():
+            if row["source"] not in FRONTEND_ATTENTION_SOURCES:
+                continue
             day = clean(row["date"])
             source_counts[row["source"]] += 1
             source_dates[row["source"]].append(day)
@@ -126,6 +175,8 @@ def export_attention() -> tuple[list[dict[str, Any]], dict[str, Any]]:
                 "rowCount": row_count,
                 "dateMin": min(source_dates[source_id]),
                 "dateMax": max(source_dates[source_id]),
+                "observedDayCount": len(set(source_dates[source_id])),
+                "dateRanges": contiguous_date_ranges(source_dates[source_id]),
                 "geographyCount": len(source_geographies[source_id]),
             }
             for source_id, row_count in source_counts.items()
@@ -176,14 +227,19 @@ def source_summaries(
         for feature in events
         for country in feature["properties"]["countryIso3s"]
     }
+    gdacs_requested = latest_requested_range("gdacs")
+    gdacs_ranges = [gdacs_requested] if gdacs_requested else contiguous_date_ranges(event_starts)
     summaries = [
         {
             "id": "gdacs",
             "name": "GDACS event catalogue",
             "provider": "Global Disaster Alert and Coordination System",
             "role": "Extreme-weather events",
-            "dateMin": min(event_starts) if event_starts else None,
-            "dateMax": max(event_ends) if event_ends else None,
+            "dateMin": gdacs_ranges[0]["start"] if gdacs_ranges else None,
+            "dateMax": gdacs_ranges[-1]["end"] if gdacs_ranges else None,
+            "dateRanges": gdacs_ranges,
+            "observedDayCount": sum(item["dayCount"] for item in gdacs_ranges),
+            "coverageBasis": "requested collection window",
             "recordCount": len(events),
             "recordLabel": "events",
             "geographyCount": len(event_countries),
@@ -193,27 +249,6 @@ def source_summaries(
         }
     ]
 
-    firms_path = ROOT / "data/hazards/source=firms/hazard_type=wildfire/daily.parquet"
-    if firms_path.exists():
-        firms_rows = pq.read_table(firms_path, columns=["date", "geography"]).to_pylist()
-        firms_dates = [clean(row["date"]) for row in firms_rows]
-        summaries.append(
-            {
-                "id": "firms",
-                "name": "NASA FIRMS wildfire detections",
-                "provider": "NASA Fire Information for Resource Management System",
-                "role": "Physical wildfire intensity",
-                "dateMin": min(firms_dates) if firms_dates else None,
-                "dateMax": max(firms_dates) if firms_dates else None,
-                "recordCount": len(firms_rows),
-                "recordLabel": "country-days",
-                "geographyCount": len({row["geography"] for row in firms_rows}),
-                "status": "supporting",
-                "description": "Daily country-level satellite fire detections retained as an independent physical severity layer.",
-                "sourceUrl": "https://firms.modaps.eosdis.nasa.gov/",
-            }
-        )
-
     attention_metadata = {
         "gdelt_ngrams": {
             "name": "GDELT Web NGrams 3.0",
@@ -222,22 +257,6 @@ def source_summaries(
             "status": "explorer",
             "description": "Distinct matched news URLs by UTC day, topic and publishing-outlet source country.",
             "sourceUrl": "https://blog.gdeltproject.org/announcing-the-new-web-news-ngrams-3-0-dataset/",
-        },
-        "gdelt": {
-            "name": "GDELT DOC 2.0 topic timelines",
-            "provider": "GDELT Project",
-            "role": "API comparison series",
-            "status": "validation",
-            "description": "Short-run topic attention series retained for source comparison and validation.",
-            "sourceUrl": "https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/",
-        },
-        "google_trends_unofficial": {
-            "name": "Google Trends comparison series",
-            "provider": "Unofficial Google Trends connector",
-            "role": "Search-interest validation",
-            "status": "validation",
-            "description": "Unofficial search-interest observations used only as a comparison source, not a canonical media measure.",
-            "sourceUrl": "https://trends.google.com/trends/",
         },
     }
     for source_id, coverage in attention_summary["bySource"].items():
@@ -250,6 +269,9 @@ def source_summaries(
                 **metadata,
                 "dateMin": coverage["dateMin"],
                 "dateMax": coverage["dateMax"],
+                "dateRanges": coverage["dateRanges"],
+                "observedDayCount": coverage["observedDayCount"],
+                "coverageBasis": "stored observation dates",
                 "recordCount": coverage["rowCount"],
                 "recordLabel": "daily topic-market rows",
                 "geographyCount": coverage["geographyCount"],
@@ -257,20 +279,24 @@ def source_summaries(
         )
 
     article_dates = [article["date"] for article in articles]
+    article_ranges = contiguous_date_ranges(article_dates)
     summaries.append(
         {
             "id": "gdelt_articles",
-            "name": "GDELT DOC 2.0 article sample",
+            "name": "GDELT Web NGrams article evidence",
             "provider": "GDELT Project",
             "role": "Article-level evidence",
             "dateMin": min(article_dates) if article_dates else None,
             "dateMax": max(article_dates) if article_dates else None,
+            "dateRanges": article_ranges,
+            "observedDayCount": len(set(article_dates)),
+            "coverageBasis": "stored publication dates",
             "recordCount": len(articles),
             "recordLabel": "articles",
             "geographyCount": len({article["geography"] for article in articles}),
             "status": "explorer",
             "description": "Candidate article links and political-framing signals; articles are not yet linked to individual events.",
-            "sourceUrl": "https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/",
+            "sourceUrl": "https://blog.gdeltproject.org/announcing-the-new-web-news-ngrams-3-0-dataset/",
         }
     )
     return summaries
@@ -297,6 +323,7 @@ def main() -> None:
                 "Article geography is publishing-outlet country, not event location.",
                 "Stored articles are not yet linked to individual GDACS events.",
                 "Event effects require continuous daily attention coverage around each event.",
+                "Coverage intervals use actual stored dates; gaps are never rendered as continuous coverage.",
             ],
         },
     )

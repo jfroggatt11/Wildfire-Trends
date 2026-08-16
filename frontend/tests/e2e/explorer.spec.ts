@@ -85,17 +85,23 @@ test('article links expose political totals, signals and filtering', async ({ pa
   expect(errors).toEqual([])
 })
 
-test('data summary reports every source and its stored coverage dates', async ({ page }) => {
+test('data summary reports only MVP sources and their stored coverage dates', async ({ page }) => {
   const errors = collectClientErrors(page)
   await openExplorer(page)
   await page.getByRole('button', { name: 'Data', exact: true }).click()
 
   await expect(page.getByRole('heading', { name: 'What the Atlas currently covers.' })).toBeVisible()
-  await expect(page.locator('.source-card')).toHaveCount(6)
-  await expect(page.locator('.source-timeline-row')).toHaveCount(6)
-  await expect(page.locator('[data-source="gdacs"]')).toContainText('17 Nov 2024')
-  await expect(page.locator('[data-source="firms"]')).toContainText('31 Dec 2025')
-  await expect(page.locator('[data-source="gdelt_ngrams"]')).toContainText('31 Jul 2026')
+  await expect(page.locator('.source-card')).toHaveCount(3)
+  await expect(page.locator('.source-timeline-row')).toHaveCount(3)
+  await expect(page.locator('.source-card[data-source="gdacs"]')).toContainText('1 Jan 2025 — 31 Dec 2025')
+  await expect(page.locator('.source-card[data-source="gdelt_ngrams"]')).toContainText('31 Jul 2026')
+  await expect(page.locator('.source-card[data-source="gdelt_ngrams"]')).toContainText('stored observation dates')
+  await expect(page.locator('.source-card[data-source="gdelt_ngrams"] .source-coverage-ranges span')).toHaveCount(3)
+  await expect(page.locator('.source-card[data-source="gdelt_articles"] .source-coverage-ranges span')).toHaveCount(2)
+  await expect(page.locator('.source-timeline-row[data-source="gdelt_ngrams"] .source-timeline-track span')).toHaveCount(3)
+  await expect(page.getByText('Google Trends comparison series')).toHaveCount(0)
+  await expect(page.getByText('NASA FIRMS wildfire detections')).toHaveCount(0)
+  await expect(page.getByText('GDELT DOC 2.0 topic timelines')).toHaveCount(0)
   expect((await page.locator('.source-card dd').allTextContents()).some((value) => value.includes('Open'))).toBe(false)
 
   await page.getByRole('button', { name: 'Explore', exact: true }).click()

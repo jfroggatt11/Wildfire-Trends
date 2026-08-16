@@ -343,10 +343,6 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
 .source-status i { width: 5px; height: 5px; border-radius: 50%; }
 .source-status.explorer { color: #2d6d51; background: #e3efe7; }
 .source-status.explorer i { background: #286e59; }
-.source-status.supporting { color: #805d1e; background: #f5ecd5; }
-.source-status.supporting i { background: #b17a25; }
-.source-status.validation { color: #52609a; background: #e8eaf5; }
-.source-status.validation i { background: #6575b7; }
 .source-card h3 { margin: 17px 0 3px; color: #293b33; font-family: Georgia, serif; font-size: 19px; font-weight: 500; line-height: 1.15; }
 .source-card > p { margin: 12px 0 15px; color: #718078; font-size: 9px; line-height: 1.5; }
 .source-card > p.source-provider { margin: 0; color: #89948e; font-size: 7.5px; }
@@ -354,6 +350,8 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
 .source-card dl div { display: flex; justify-content: space-between; gap: 10px; padding: 4px 0; font-size: 8px; }
 .source-card dt { color: #8b9690; }
 .source-card dd { margin: 0; color: #44554d; font-weight: 700; text-align: right; }
+.source-card dl div.source-coverage-ranges { align-items: flex-start; }
+.source-coverage-ranges dd { display: flex; flex-direction: column; gap: 3px; }
 .source-card a { display: inline-flex; align-items: center; gap: 5px; color: var(--green); font-size: 8.5px; font-weight: 800; text-decoration: none; }
 .source-card a:hover { text-decoration: underline; }
 .data-notes { display: grid; grid-template-columns: .8fr 1.2fr; gap: 30px; background: #e9eee9; }

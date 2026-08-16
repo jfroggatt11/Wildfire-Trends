@@ -100,10 +100,13 @@ type DataSourceSummary = {
   role: string
   dateMin: string | null
   dateMax: string | null
+  dateRanges: { start: string; end: string; dayCount: number }[]
+  observedDayCount: number
+  coverageBasis: string
   recordCount: number
   recordLabel: string
   geographyCount: number
-  status: 'explorer' | 'supporting' | 'validation'
+  status: 'explorer'
   description: string
   sourceUrl: string
 }
@@ -1098,9 +1101,7 @@ function MethodsView() {
 }
 
 const SOURCE_STATUS = {
-  explorer: { label: 'Used in explorer', color: '#286e59' },
-  supporting: { label: 'Supporting layer', color: '#b17a25' },
-  validation: { label: 'Validation only', color: '#6575b7' },
+  explorer: { label: 'Used in MVP', color: '#286e59' },
 } as const
 
 function DataSummary({ manifest }: { manifest: Manifest }) {
@@ -1115,15 +1116,18 @@ function DataSummary({ manifest }: { manifest: Manifest }) {
   )
   const startTime = new Date(coverageStart).getTime()
   const totalDuration = Math.max(1, new Date(coverageEnd).getTime() - startTime)
-  const explorerSources = manifest.dataSources.filter((source) => source.status === 'explorer').length
+  const providerCount = new Set(manifest.dataSources.map((source) => source.provider)).size
 
-  const rangeStyle = (source: DataSourceSummary) => {
-    const sourceStart = new Date(source.dateMin || coverageStart).getTime()
-    const sourceEnd = new Date(source.dateMax || coverageEnd).getTime()
+  const rangeStyle = (range: DataSourceSummary['dateRanges'][number]) => {
+    const sourceStart = new Date(range.start).getTime()
+    const sourceEnd = new Date(range.end).getTime()
     const left = Math.max(0, ((sourceStart - startTime) / totalDuration) * 100)
     const width = Math.max(1, ((sourceEnd - sourceStart) / totalDuration) * 100)
     return { left: `${left}%`, width: `${Math.min(width, 100 - left)}%` }
   }
+
+  const formatCoverageRange = (range: DataSourceSummary['dateRanges'][number]) =>
+    range.start === range.end ? formatDate(range.start) : `${formatDate(range.start)} — ${formatDate(range.end)}`
 
   return (
     <main className="data-summary-view">
@@ -1131,7 +1135,7 @@ function DataSummary({ manifest }: { manifest: Manifest }) {
         <div>
           <span className="eyebrow">Data summary</span>
           <h1>What the Atlas currently covers.</h1>
-          <p>Every date range below is calculated from the stored research data at export time. Sources used in the explorer are separated from supporting and validation-only streams.</p>
+          <p>Every interval below is calculated from stored research data at export time. This page includes only datasets currently used by the MVP; experimental and unused comparison sources are omitted.</p>
         </div>
         <div className="data-snapshot">
           <Database size={18} />
@@ -1142,31 +1146,28 @@ function DataSummary({ manifest }: { manifest: Manifest }) {
       <section className="data-summary-content">
         <div className="data-overview" aria-label="Data coverage overview">
           <div><strong>{manifest.dataSources.length}</strong><span>Source streams</span></div>
-          <div><strong>{explorerSources}</strong><span>Used in explorer</span></div>
+          <div><strong>{providerCount}</strong><span>Upstream providers</span></div>
           <div><strong>{formatDate(coverageStart)}</strong><span>Earliest observation</span></div>
           <div><strong>{formatDate(coverageEnd)}</strong><span>Latest observation</span></div>
         </div>
 
         <section className="source-coverage-panel" aria-labelledby="coverage-heading">
-          <div className="data-section-heading">
-            <div><span className="eyebrow">Coverage timeline</span><h2 id="coverage-heading">Dates available by source</h2></div>
-            <div className="coverage-legend">
-              {(Object.entries(SOURCE_STATUS) as [keyof typeof SOURCE_STATUS, (typeof SOURCE_STATUS)[keyof typeof SOURCE_STATUS]][]).map(([id, status]) => <span key={id}><i style={{ background: status.color }} />{status.label}</span>)}
-            </div>
-          </div>
+          <div className="data-section-heading"><div><span className="eyebrow">Coverage timeline</span><h2 id="coverage-heading">Dates available in the MVP</h2></div></div>
           <div className="source-timeline">
             <div className="source-timeline-dates"><span>{formatDate(coverageStart)}</span><span>{formatDate(coverageEnd)}</span></div>
             {manifest.dataSources.map((source) => (
-              <div className="source-timeline-row" key={source.id}>
-                <div><strong>{source.name}</strong><small>{formatDate(source.dateMin)} — {formatDate(source.dateMax)}</small></div>
-                <div className="source-timeline-track"><span style={{ ...rangeStyle(source), background: SOURCE_STATUS[source.status].color }} /></div>
+              <div className="source-timeline-row" key={source.id} data-source={source.id}>
+                <div><strong>{source.name}</strong><small>{source.observedDayCount.toLocaleString()} days · {source.dateRanges.length} interval{source.dateRanges.length === 1 ? '' : 's'}</small></div>
+                <div className="source-timeline-track">
+                  {source.dateRanges.map((range) => <span key={`${range.start}-${range.end}`} title={formatCoverageRange(range)} style={{ ...rangeStyle(range), background: SOURCE_STATUS[source.status].color }} />)}
+                </div>
               </div>
             ))}
           </div>
         </section>
 
         <section className="source-catalogue" aria-labelledby="sources-heading">
-          <div className="data-section-heading"><div><span className="eyebrow">Source catalogue</span><h2 id="sources-heading">Inputs and research roles</h2></div></div>
+          <div className="data-section-heading"><div><span className="eyebrow">Source catalogue</span><h2 id="sources-heading">Inputs currently in use</h2></div></div>
           <div className="source-card-grid">
             {manifest.dataSources.map((source) => (
               <article className="source-card" key={source.id} data-source={source.id}>
@@ -1175,7 +1176,8 @@ function DataSummary({ manifest }: { manifest: Manifest }) {
                 <p className="source-provider">{source.provider}</p>
                 <p>{source.description}</p>
                 <dl>
-                  <div><dt>Coverage</dt><dd>{formatDate(source.dateMin)} — {formatDate(source.dateMax)}</dd></div>
+                  <div className="source-coverage-ranges"><dt>Intervals</dt><dd>{source.dateRanges.map((range) => <span key={`${range.start}-${range.end}`}>{formatCoverageRange(range)}</span>)}</dd></div>
+                  <div><dt>Observed dates</dt><dd>{source.observedDayCount.toLocaleString()} · {source.coverageBasis}</dd></div>
                   <div><dt>Records</dt><dd>{source.recordCount.toLocaleString()} {source.recordLabel}</dd></div>
                   <div><dt>Geographies</dt><dd>{source.geographyCount.toLocaleString()}</dd></div>
                 </dl>
@@ -1186,7 +1188,7 @@ function DataSummary({ manifest }: { manifest: Manifest }) {
         </section>
 
         <section className="data-notes">
-          <div><Info size={18} /><span><strong>How to read this page</strong><small>Coverage means dates stored in this snapshot, not the provider’s full historical availability. Record types differ and should not be summed across sources.</small></span></div>
+          <div><Info size={18} /><span><strong>How to read this page</strong><small>Separate bars are separate stored intervals. Blank track space means no stored dates. Coverage is not the provider’s full historical availability, and unlike record types should not be summed.</small></span></div>
           <ul>{manifest.notes.map((note) => <li key={note}>{note}</li>)}</ul>
         </section>
       </section>
