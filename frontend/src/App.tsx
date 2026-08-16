@@ -29,7 +29,7 @@ import {
   X,
 } from 'lucide-react'
 import type { AttentionChartPoint } from './AttentionChart'
-import { dateWithinRange, formatDate, newestFirst } from './utils'
+import { dateWithinRange, formatDate, getPoliticalSignals, hasPoliticalSignal, newestFirst } from './utils'
 
 const AttentionChart = lazy(() => import('./AttentionChart'))
 
@@ -767,7 +767,7 @@ function EventDrawer({
         )}
         {tab === 'attention' && <AttentionTab event={event} chart={chart} scope={scope} onScopeChange={onScopeChange} />}
         {tab === 'geography' && <GeographyTab event={event} attention={attention} scope={scope} onScopeChange={onScopeChange} />}
-        {tab === 'articles' && <ArticlesTab articles={candidateArticles.slice(0, 10)} total={candidateArticles.length} scope={scope} />}
+        {tab === 'articles' && <ArticlesTab articles={candidateArticles} scope={scope} />}
         {tab === 'methods' && <EventMethodsTab />}
       </div>
     </aside>
@@ -929,7 +929,12 @@ function GeographyTab({ event, attention, scope, onScopeChange }: { event: Event
   )
 }
 
-function ArticlesTab({ articles, total, scope }: { articles: Article[]; total: number; scope: MediaScope }) {
+function ArticlesTab({ articles, scope }: { articles: Article[]; scope: MediaScope }) {
+  const [filter, setFilter] = useState<'all' | 'political'>('all')
+  const politicalTotal = useMemo(() => articles.filter(hasPoliticalSignal).length, [articles])
+  const filteredArticles = filter === 'political' ? articles.filter(hasPoliticalSignal) : articles
+  const visibleArticles = filteredArticles.slice(0, 10)
+
   return (
     <>
       <div className="notice-card info">
@@ -937,17 +942,34 @@ function ArticlesTab({ articles, total, scope }: { articles: Article[]; total: n
         <div><strong>Candidate evidence—not event-linked</strong><p>These articles match a configured climate or transport theme and fall within the event window. Place and hazard matching comes in the next data phase.</p></div>
       </div>
       <section className="drawer-section">
-        <div className="section-title-row"><div><span className="eyebrow">{SCOPE_COPY[scope].label}</span><h3>{articles.length ? 'Articles in the window' : 'No stored articles in the window'}</h3></div><span className="count-pill">{total}</span></div>
-        <div className="article-list">
-          {articles.map((article) => (
-            <a key={article.id} href={article.url} target="_blank" rel="noreferrer">
-              <div className="article-meta"><span>{article.outletName || article.domain}</span><span>{formatDate(article.publishedAt || article.date)}</span></div>
-              <strong>{article.title || 'Untitled article'}</strong>
-              <div className="article-tags"><span>{titleCase(article.topicId)}</span>{article.politicalActor && <span>Political actor</span>}{article.governmentAction && <span>Government action</span>}{article.officialSource && <span>Official source</span>}</div>
-            </a>
-          ))}
+        <div className="section-title-row"><div><span className="eyebrow">{SCOPE_COPY[scope].label}</span><h3>{articles.length ? 'Articles in the window' : 'No stored articles in the window'}</h3></div></div>
+        <div className="article-totals" aria-label="Article totals">
+          <div><strong>{articles.length.toLocaleString()}</strong><span>All articles</span></div>
+          <div className="political"><strong>{politicalTotal.toLocaleString()}</strong><span>Political</span></div>
         </div>
-        {total > articles.length && <p className="list-footnote">Showing 10 of {total.toLocaleString()} candidate articles.</p>}
+        <div className="article-filters" role="group" aria-label="Filter articles">
+          <button className={filter === 'all' ? 'active' : ''} aria-pressed={filter === 'all'} onClick={() => setFilter('all')}>All <span>{articles.length}</span></button>
+          <button className={filter === 'political' ? 'active' : ''} aria-pressed={filter === 'political'} onClick={() => setFilter('political')}>Political <span>{politicalTotal}</span></button>
+        </div>
+        <p className="article-filter-definition">Political includes articles flagged for political actors, government action, party politics or official sources.</p>
+        <div className="article-list">
+          {visibleArticles.map((article) => {
+            const politicalSignals = getPoliticalSignals(article)
+            return (
+              <a key={article.id} href={article.url} target="_blank" rel="noreferrer" data-political={politicalSignals.length > 0 ? 'true' : 'false'}>
+                <div className="article-meta">
+                  <span>{article.outletName || article.domain}</span>
+                  {politicalSignals.length > 0 && <span className="political-indicator">Political</span>}
+                  <span>{formatDate(article.publishedAt || article.date)}</span>
+                </div>
+                <strong>{article.title || 'Untitled article'}</strong>
+                <div className="article-tags"><span>{titleCase(article.topicId)}</span>{politicalSignals.map((signal) => <span className="political-tag" key={signal}>{signal}</span>)}</div>
+              </a>
+            )
+          })}
+        </div>
+        {!filteredArticles.length && articles.length > 0 && <p className="article-empty">No politically flagged articles are stored for this event window and media market.</p>}
+        {filteredArticles.length > visibleArticles.length && <p className="list-footnote">Showing 10 of {filteredArticles.length.toLocaleString()} {filter === 'political' ? 'political ' : ''}candidate articles.</p>}
       </section>
     </>
   )

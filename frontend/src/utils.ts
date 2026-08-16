@@ -24,3 +24,25 @@ export function newestFirst(
   const rightDate = right.publishedAt || right.date || ''
   return rightDate.localeCompare(leftDate)
 }
+
+export type PoliticalSignalInput = {
+  politicalActor: boolean
+  governmentAction: boolean
+  partyPolitics: boolean
+  officialSource: boolean
+}
+
+const POLITICAL_SIGNALS = [
+  ['politicalActor', 'Political actor'],
+  ['governmentAction', 'Government action'],
+  ['partyPolitics', 'Party politics'],
+  ['officialSource', 'Official source'],
+] as const
+
+export function getPoliticalSignals(article: PoliticalSignalInput) {
+  return POLITICAL_SIGNALS.filter(([field]) => article[field]).map(([, label]) => label)
+}
+
+export function hasPoliticalSignal(article: PoliticalSignalInput) {
+  return getPoliticalSignals(article).length > 0
+}

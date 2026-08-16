@@ -64,6 +64,27 @@ test('January plus Global opens articles with nullable publication timestamps', 
   expect(errors).toEqual([])
 })
 
+test('article links expose political totals, signals and filtering', async ({ page }) => {
+  const errors = collectClientErrors(page)
+  await openExplorer(page)
+  await page.locator('input[type="date"]').nth(1).fill('2025-01-31')
+  await page.locator('.scope-section select').selectOption('global')
+  await page.locator('.watchlist > button').first().click()
+  await page.getByRole('tab', { name: 'Articles' }).click()
+
+  const allTotal = Number((await page.locator('.article-totals > div').first().locator('strong').textContent())?.replaceAll(',', ''))
+  const politicalTotal = Number((await page.locator('.article-totals .political strong').textContent())?.replaceAll(',', ''))
+  expect(allTotal).toBeGreaterThan(0)
+  expect(politicalTotal).toBeGreaterThan(0)
+  expect(politicalTotal).toBeLessThanOrEqual(allTotal)
+
+  await page.getByRole('button', { name: /^Political/ }).click()
+  await expect(page.locator('.article-list > a').first()).toHaveAttribute('data-political', 'true')
+  await expect(page.locator('.article-list .political-indicator').first()).toHaveText('Political')
+  await expect(page.locator('.article-list > a[data-political="false"]')).toHaveCount(0)
+  expect(errors).toEqual([])
+})
+
 test('clearing and keyboard-editing date filters never unmounts the explorer', async ({ page }) => {
   const errors = collectClientErrors(page)
   await openExplorer(page)

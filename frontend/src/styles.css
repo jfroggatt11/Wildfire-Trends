@@ -211,13 +211,31 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
 .scope-cards em { grid-column: 2; color: #819089; font-size: 7.5px; font-style: normal; text-transform: uppercase; letter-spacing: .04em; }
 .country-code-row { display: flex; flex-wrap: wrap; gap: 5px; }
 .country-code-row span { padding: 5px 7px; border-radius: 5px; color: #4e6158; background: #e8eeea; font-size: 8px; font-weight: 800; }
+.article-totals { margin: 12px 0 9px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 7px; }
+.article-totals > div { min-height: 55px; display: flex; flex-direction: column; justify-content: center; padding: 9px 11px; border: 1px solid #dce4de; border-radius: 7px; background: white; }
+.article-totals > div.political { border-color: #dbcda9; background: #faf6e9; }
+.article-totals strong { color: #26382f; font-family: Georgia, serif; font-size: 18px; font-weight: 500; }
+.article-totals span { margin-top: 2px; color: #7a8780; font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.article-totals .political strong { color: #75571d; }
+.article-filters { display: flex; gap: 6px; }
+.article-filters button { display: inline-flex; align-items: center; gap: 6px; padding: 7px 10px; border: 1px solid #d8e0db; border-radius: 6px; color: #58675f; background: #f8faf8; font-size: 9px; font-weight: 750; cursor: pointer; }
+.article-filters button:hover { border-color: #9aaca2; }
+.article-filters button.active { border-color: #527d6c; color: white; background: var(--green); }
+.article-filters button span { min-width: 17px; padding: 2px 4px; border-radius: 9px; color: inherit; background: rgba(82, 97, 89, .1); font-size: 7px; text-align: center; }
+.article-filters button.active span { background: rgba(255, 255, 255, .16); }
+.article-filter-definition { margin: 8px 0 2px; color: #849089; font-size: 8px; line-height: 1.45; }
 .article-list { display: flex; flex-direction: column; }
 .article-list > a { padding: 13px 0; border-bottom: 1px solid #e2e7e4; color: inherit; text-decoration: none; }
+.article-list > a[data-political="true"] { padding-left: 9px; border-left: 2px solid #d2ae56; }
 .article-list > a:hover strong { color: var(--green); }
-.article-meta { display: flex; justify-content: space-between; gap: 8px; color: #8a958f; font-size: 8px; }
+.article-meta { display: flex; align-items: center; gap: 8px; color: #8a958f; font-size: 8px; }
+.article-meta > span:last-child { margin-left: auto; }
+.article-meta .political-indicator { padding: 3px 5px; border-radius: 4px; color: #725318; background: #f4e7bd; font-size: 6.5px; font-weight: 800; letter-spacing: .03em; text-transform: uppercase; }
 .article-list > a > strong { display: block; margin-top: 5px; color: #33443c; font-family: Georgia, serif; font-size: 13px; font-weight: 500; line-height: 1.3; transition: color .15s; }
 .article-tags { margin-top: 7px; display: flex; flex-wrap: wrap; gap: 4px; }
 .article-tags span { padding: 4px 6px; border-radius: 4px; color: #53665d; background: #e9eeea; font-size: 7px; font-weight: 700; }
+.article-tags span.political-tag { color: #745820; background: #f6edcf; }
+.article-empty { margin: 15px 0 0; padding: 13px; border-radius: 7px; color: #76837c; background: #f2f5f2; font-size: 9px; line-height: 1.45; text-align: center; }
 .list-footnote { margin: 12px 0 0; color: #89958f; font-size: 8px; }
 .method-list > div { display: grid; grid-template-columns: 24px 1fr; gap: 9px; padding: 13px 0; border-bottom: 1px solid #e2e7e4; }
 .method-list > div > span { color: var(--green); font-family: Georgia, serif; font-size: 13px; }

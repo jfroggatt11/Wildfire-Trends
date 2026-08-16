@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dateWithinRange, formatDate, newestFirst } from './utils'
+import { dateWithinRange, formatDate, getPoliticalSignals, hasPoliticalSignal, newestFirst } from './utils'
 
 describe('formatDate', () => {
   it('formats valid UTC dates', () => {
@@ -38,5 +38,29 @@ describe('newestFirst', () => {
       { publishedAt: null, date: '2025-01-01' },
     ]
     expect(rows.sort(newestFirst).map((row) => row.date)).toEqual(['2025-01-03', '2025-01-02', '2025-01-01'])
+  })
+})
+
+describe('political article signals', () => {
+  it('identifies and names every configured political framing signal', () => {
+    const article = {
+      politicalActor: true,
+      governmentAction: false,
+      partyPolitics: true,
+      officialSource: false,
+    }
+    expect(hasPoliticalSignal(article)).toBe(true)
+    expect(getPoliticalSignals(article)).toEqual(['Political actor', 'Party politics'])
+  })
+
+  it('does not classify an article without a political signal', () => {
+    const article = {
+      politicalActor: false,
+      governmentAction: false,
+      partyPolitics: false,
+      officialSource: false,
+    }
+    expect(hasPoliticalSignal(article)).toBe(false)
+    expect(getPoliticalSignals(article)).toEqual([])
   })
 })
