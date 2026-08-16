@@ -252,13 +252,21 @@ climate-attention collect-ngrams \
 
 ### Worldwide 2025 political-discourse MVP
 
-The MVP uses the same four multilingual topic definitions and returns every country
-supported by the world configuration. It adds three article-level signals—political
+The MVP enables two multilingual topics—climate change and electric vehicles—and
+returns every country supported by the world configuration. The clean-energy and
+clean-transport definitions remain available but disabled for historical comparison.
+It adds three article-level signals—political
 actors, government action, and party politics—plus an initial registry of government,
 parliament, and party domains for the five European pilot countries. Exact counts
 and their union are stored on each daily trend row. Every matched URL can also be
 retained with all available GDELT Article List (GAL) metadata. This does not query
 GDELT's Knowledge Graph.
+
+In an August 2026 dry-run check for 6 January 2025, the two-topic political/article
+query estimated 30.491 GB versus 34.882 GB for the previous four-topic query (12.6%
+less). A Sunday check estimated 25.215 GB versus 28.398 GB (11.2% less). The political
+signal vocabulary remains part of both scans, so halving the topic count does not
+halve billed bytes. Dry runs are non-billable and every new range must be estimated.
 
 Estimate the full calendar year first (dry runs do not incur query charges):
 

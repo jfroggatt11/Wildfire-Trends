@@ -1,5 +1,5 @@
-import { Component, Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
-import type { ErrorInfo, PointerEvent as ReactPointerEvent, ReactNode, WheelEvent as ReactWheelEvent } from 'react'
+import { Component, Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { ErrorInfo, PointerEvent as ReactPointerEvent, ReactNode } from 'react'
 import { geoNaturalEarth1, geoPath } from 'd3-geo'
 import type { Feature, FeatureCollection, Geometry, Point } from 'geojson'
 import {
@@ -20,6 +20,7 @@ import {
   Info,
   Layers3,
   Map as MapIcon,
+  MapPin,
   Menu,
   Microscope,
   Search,
@@ -48,6 +49,9 @@ type EventProperties = {
   endAt: string
   geographyIds: string[]
   countryIso3s: string[]
+  mapCountryId: string | null
+  mapCountryIso3: string | null
+  mapCountryLabel: string | null
   alertLevel: AlertLevel
   alertScore: number | null
   severity: number | null
@@ -85,7 +89,6 @@ type Article = {
   publishedAt: string | null
   outletName: string | null
   title: string | null
-  description: string | null
   language: string | null
   politicalActor: boolean
   governmentAction: boolean
@@ -122,6 +125,7 @@ type Manifest = {
     topics: Record<string, number>
   }
   articles: { count: number }
+  geographyLabels: Record<string, string>
   dataSources: DataSourceSummary[]
   analysisStatus: string
   notes: string[]
@@ -138,9 +142,7 @@ const HAZARDS: Record<
 
 const TOPICS = [
   { id: 'climate_change', label: 'Climate change', color: '#286e59' },
-  { id: 'clean_transport', label: 'Clean transport', color: '#d56743' },
   { id: 'electric_vehicles', label: 'Electric vehicles', color: '#6575b7' },
-  { id: 'clean_energy', label: 'Clean energy', color: '#c59a2b' },
 ]
 
 const EU27 = new Set([
@@ -187,6 +189,15 @@ const titleCase = (value: string) =>
   value
     .replaceAll('_', ' ')
     .replace(/\b\w/g, (character) => character.toUpperCase())
+
+const eventDisplayName = (event: EventProperties) => {
+  if (!event.mapCountryLabel || event.hazardType === 'tropical_cyclone') return event.name
+  if (event.hazardType === 'flood' && /^flood in /i.test(event.name)) return `Flood in ${event.mapCountryLabel}`
+  if (event.hazardType === 'wildfire' && /^(forest fires?|wildfires?) in /i.test(event.name)) return `Wildfire in ${event.mapCountryLabel}`
+  return event.name
+}
+
+const geographyLabel = (id: string, labels: Record<string, string>) => labels[id] || titleCase(id)
 
 const dayDifference = (date: string, origin: string) =>
   Math.round((new Date(date).getTime() - new Date(origin).getTime()) / 86_400_000)
@@ -426,7 +437,9 @@ function ExploreView({
       const matchesQuery =
         !normalizedQuery ||
         event.name.toLowerCase().includes(normalizedQuery) ||
-        event.geographyIds.some((country) => country.includes(normalizedQuery))
+        eventDisplayName(event).toLowerCase().includes(normalizedQuery) ||
+        event.mapCountryLabel?.toLowerCase().includes(normalizedQuery) ||
+        event.geographyIds.some((country) => geographyLabel(country, manifest?.geographyLabels ?? {}).toLowerCase().includes(normalizedQuery))
       return (
         matchesQuery &&
         hazards.has(event.hazardType) &&
@@ -434,7 +447,7 @@ function ExploreView({
         dateWithinRange(startDate, dateStart, dateEnd)
       )
     })
-  }, [events, query, hazards, alerts, dateStart, dateEnd])
+  }, [events, manifest, query, hazards, alerts, dateStart, dateEnd])
 
   const priorityEvents = useMemo(
     () =>
@@ -536,7 +549,7 @@ function ExploreView({
               <span className="watch-icon" style={{ color: HAZARDS[event.properties.hazardType].color }}>
                 {event.properties.hazardType === 'wildfire' ? <Flame size={16} /> : event.properties.hazardType === 'flood' ? <CloudRain size={16} /> : <Wind size={16} />}
               </span>
-              <span><strong>{event.properties.name}</strong><small>{formatDate(event.properties.startAt)} · {event.properties.alertLevel}</small></span>
+              <span><strong>{eventDisplayName(event.properties)}</strong><small>{formatDate(event.properties.startAt)} · {event.properties.alertLevel}</small></span>
               <ChevronRight size={15} />
             </button>
           ))}
@@ -575,6 +588,7 @@ function ExploreView({
             onScopeChange={onScopeChange}
             attention={attention}
             articles={articles}
+            geographyLabels={manifest?.geographyLabels ?? {}}
             tab={detailTab}
             onTabChange={onDetailTabChange}
           />
@@ -585,13 +599,19 @@ function ExploreView({
 }
 
 type AtlasTransform = { x: number; y: number; k: number }
-type AtlasMarker = { key: string; x: number; y: number; events: EventFeature[] }
+type AtlasMarker = { key: string; x: number; y: number; events: EventFeature[]; expanded?: boolean }
+
+const MAX_MAP_ZOOM = 18
 
 function AtlasMap({ world, events, selectedId, onSelectEvent }: { world: WorldGeoJSON; events: EventFeature[]; selectedId: string | null; onSelectEvent: (id: string | null) => void }) {
   const [transform, setTransform] = useState<AtlasTransform>({ x: 0, y: 0, k: 1 })
+  const [expandedIds, setExpandedIds] = useState<Set<string> | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
   const dragRef = useRef<{ pointerId: number; clientX: number; clientY: number; x: number; y: number } | null>(null)
   const projection = useMemo(() => geoNaturalEarth1().fitExtent([[22, 22], [978, 528]], world), [world])
   const path = useMemo(() => geoPath(projection), [projection])
+
+  useEffect(() => setExpandedIds(null), [events])
 
   const countryPaths = useMemo(
     () => world.features.map((feature, index) => ({ key: `${feature.properties.iso3 || feature.properties.name}-${index}`, path: path(feature) })),
@@ -601,9 +621,24 @@ function AtlasMap({ world, events, selectedId, onSelectEvent }: { world: WorldGe
   const markers = useMemo(() => {
     const gridSize = Math.max(7, 34 / transform.k)
     const buckets = new Map<string, AtlasMarker>()
+    const expanded: AtlasMarker[] = []
+    let expandedIndex = 0
     for (const event of events) {
       const point = projection(event.geometry.coordinates as [number, number])
       if (!point) continue
+      if (expandedIds?.has(event.properties.id)) {
+        const angle = expandedIndex * 2.399963
+        const radius = (13 + Math.sqrt(expandedIndex) * 7) / transform.k
+        expanded.push({
+          key: `expanded:${event.properties.id}`,
+          x: point[0] + Math.cos(angle) * radius,
+          y: point[1] + Math.sin(angle) * radius,
+          events: [event],
+          expanded: true,
+        })
+        expandedIndex += 1
+        continue
+      }
       const key = `${Math.floor(point[0] / gridSize)}:${Math.floor(point[1] / gridSize)}`
       const bucket = buckets.get(key)
       if (bucket) {
@@ -615,33 +650,62 @@ function AtlasMap({ world, events, selectedId, onSelectEvent }: { world: WorldGe
         buckets.set(key, { key, x: point[0], y: point[1], events: [event] })
       }
     }
-    return [...buckets.values()]
-  }, [events, projection, transform.k])
+    return [...buckets.values(), ...expanded]
+  }, [events, expandedIds, projection, transform.k])
 
-  const zoomAt = (factor: number, anchorX = 500, anchorY = 275) => {
+  const zoomAt = useCallback((factor: number, anchorX = 500, anchorY = 275) => {
     setTransform((current) => {
-      const nextK = Math.min(8, Math.max(1, current.k * factor))
+      const nextK = Math.min(MAX_MAP_ZOOM, Math.max(1, current.k * factor))
       const worldX = (anchorX - current.x) / current.k
       const worldY = (anchorY - current.y) / current.k
       return { k: nextK, x: anchorX - worldX * nextK, y: anchorY - worldY * nextK }
     })
-  }
+  }, [])
+
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+    const handleWheel = (event: WheelEvent) => {
+      event.preventDefault()
+      const bounds = container.getBoundingClientRect()
+      const anchorX = ((event.clientX - bounds.left) / bounds.width) * 1000
+      const anchorY = ((event.clientY - bounds.top) / bounds.height) * 550
+      const factor = Math.min(1.55, Math.max(0.65, Math.exp(-event.deltaY * 0.0025)))
+      zoomAt(factor, anchorX, anchorY)
+    }
+    let gestureScale = 1
+    const handleGestureStart = (event: Event) => {
+      event.preventDefault()
+      gestureScale = 1
+    }
+    const handleGestureChange = (event: Event) => {
+      event.preventDefault()
+      const gesture = event as Event & { scale?: number; clientX?: number; clientY?: number }
+      const nextScale = gesture.scale || 1
+      const bounds = container.getBoundingClientRect()
+      const anchorX = gesture.clientX == null ? 500 : ((gesture.clientX - bounds.left) / bounds.width) * 1000
+      const anchorY = gesture.clientY == null ? 275 : ((gesture.clientY - bounds.top) / bounds.height) * 550
+      zoomAt(nextScale / gestureScale, anchorX, anchorY)
+      gestureScale = nextScale
+    }
+    container.addEventListener('wheel', handleWheel, { passive: false })
+    container.addEventListener('gesturestart', handleGestureStart, { passive: false })
+    container.addEventListener('gesturechange', handleGestureChange, { passive: false })
+    return () => {
+      container.removeEventListener('wheel', handleWheel)
+      container.removeEventListener('gesturestart', handleGestureStart)
+      container.removeEventListener('gesturechange', handleGestureChange)
+    }
+  }, [zoomAt])
 
   const zoomToMarker = (marker: AtlasMarker) => {
-    if (marker.events.length === 1 || transform.k >= 7.5) {
+    if (marker.events.length === 1) {
       onSelectEvent(marker.events[0].properties.id)
       return
     }
-    const nextK = Math.min(8, Math.max(transform.k * 1.9, transform.k + 1))
+    setExpandedIds(new Set(marker.events.map((event) => event.properties.id)))
+    const nextK = Math.min(MAX_MAP_ZOOM, Math.max(transform.k * 2.5, 8))
     setTransform({ k: nextK, x: 500 - marker.x * nextK, y: 275 - marker.y * nextK })
-  }
-
-  const onWheel = (event: ReactWheelEvent<SVGSVGElement>) => {
-    event.preventDefault()
-    const bounds = event.currentTarget.getBoundingClientRect()
-    const anchorX = ((event.clientX - bounds.left) / bounds.width) * 1000
-    const anchorY = ((event.clientY - bounds.top) / bounds.height) * 550
-    zoomAt(event.deltaY < 0 ? 1.22 : 0.82, anchorX, anchorY)
   }
 
   const onPointerDown = (event: ReactPointerEvent<SVGSVGElement>) => {
@@ -664,13 +728,13 @@ function AtlasMap({ world, events, selectedId, onSelectEvent }: { world: WorldGe
   }
 
   return (
-    <div className="map-container atlas-svg-map">
+    <div className="map-container atlas-svg-map" ref={containerRef}>
       <svg
         viewBox="0 0 1000 550"
         preserveAspectRatio="xMidYMid meet"
         role="img"
         aria-label={`World map showing ${events.length.toLocaleString()} extreme-weather events`}
-        onWheel={onWheel}
+        data-zoom={transform.k.toFixed(3)}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -691,10 +755,13 @@ function AtlasMap({ world, events, selectedId, onSelectEvent }: { world: WorldGe
                 <g
                   key={marker.key}
                   className={isCluster ? 'atlas-marker cluster' : 'atlas-marker event'}
+                  data-count={marker.events.length}
+                  data-event-id={isCluster ? undefined : representative.properties.id}
+                  data-expanded={marker.expanded ? 'true' : 'false'}
                   transform={`translate(${marker.x} ${marker.y})`}
                   role="button"
                   tabIndex={0}
-                  aria-label={isCluster ? `${marker.events.length} events. Activate to zoom in.` : representative.properties.name}
+                  aria-label={isCluster ? `${marker.events.length} events. Activate to zoom in and separate them.` : eventDisplayName(representative.properties)}
                   onPointerDown={(event) => event.stopPropagation()}
                   onClick={() => zoomToMarker(marker)}
                   onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') zoomToMarker(marker) }}
@@ -707,7 +774,7 @@ function AtlasMap({ world, events, selectedId, onSelectEvent }: { world: WorldGe
                     strokeWidth={isCluster ? 2 / transform.k : 1.5 / transform.k}
                   />
                   {isCluster && <text y={3.2 / transform.k} fontSize={9.5 / transform.k}>{marker.events.length > 999 ? `${Math.round(marker.events.length / 100) / 10}k` : marker.events.length}</text>}
-                  <title>{isCluster ? `${marker.events.length} events` : `${representative.properties.name} · ${representative.properties.alertLevel} alert`}</title>
+                  <title>{isCluster ? `${marker.events.length} events` : `${eventDisplayName(representative.properties)} · ${representative.properties.alertLevel} alert`}</title>
                 </g>
               )
             })}
@@ -717,7 +784,7 @@ function AtlasMap({ world, events, selectedId, onSelectEvent }: { world: WorldGe
       <div className="svg-map-controls" aria-label="Map controls">
         <button onClick={() => zoomAt(1.35)} aria-label="Zoom in">+</button>
         <button onClick={() => zoomAt(0.74)} aria-label="Zoom out">−</button>
-        <button onClick={() => setTransform({ x: 0, y: 0, k: 1 })} aria-label="Reset world view"><Globe2 size={14} /></button>
+        <button onClick={() => { setExpandedIds(null); setTransform({ x: 0, y: 0, k: 1 }) }} aria-label="Reset world view"><Globe2 size={14} /></button>
       </div>
       <span className="map-attribution">Made with Natural Earth</span>
     </div>
@@ -731,6 +798,7 @@ function EventDrawer({
   onScopeChange,
   attention,
   articles,
+  geographyLabels,
   tab,
   onTabChange,
 }: {
@@ -740,11 +808,13 @@ function EventDrawer({
   onScopeChange: (scope: MediaScope) => void
   attention: AttentionRow[]
   articles: Article[]
+  geographyLabels: Record<string, string>
   tab: DetailTab
   onTabChange: (tab: DetailTab) => void
 }) {
   const hazard = HAZARDS[event.hazardType]
   const HazardIcon = hazard.icon
+  const displayName = eventDisplayName(event)
   const chart = useMemo(() => buildEventChart(event, attention, scope), [event, attention, scope])
   const candidateArticles = useMemo(
     () =>
@@ -763,14 +833,14 @@ function EventDrawer({
   ]
 
   return (
-    <aside className="event-drawer" role="dialog" aria-label={`Analysis for ${event.name}`}>
+    <aside className="event-drawer" role="dialog" aria-label={`Analysis for ${displayName}`}>
       <div className="drawer-header">
         <div className="event-kicker" style={{ color: hazard.color }}><HazardIcon size={15} /> {hazard.label}</div>
         <button className="icon-button" onClick={onClose} aria-label="Close event details"><X size={19} /></button>
-        <h2>{event.name}</h2>
+        <h2>{displayName}</h2>
         <div className="event-meta">
           <span><CalendarDays size={14} /> {formatDate(event.startAt)} — {formatDate(event.endAt)}</span>
-          <span><Globe2 size={14} /> {event.geographyIds.map(titleCase).join(', ') || 'Location unavailable'}</span>
+          <span><MapPin size={14} /> Map point: {event.mapCountryLabel || 'Offshore or unavailable'}</span>
         </div>
         <div className="status-row">
           <span className={`alert-badge ${event.alertLevel.toLowerCase()}`}>{event.alertLevel} alert</span>
@@ -790,8 +860,8 @@ function EventDrawer({
           <BriefingTab event={event} chart={chart} candidateArticleCount={candidateArticles.length} scope={scope} onScopeChange={onScopeChange} />
         )}
         {tab === 'attention' && <AttentionTab event={event} chart={chart} scope={scope} onScopeChange={onScopeChange} />}
-        {tab === 'geography' && <GeographyTab event={event} attention={attention} scope={scope} onScopeChange={onScopeChange} />}
-        {tab === 'articles' && <ArticlesTab articles={candidateArticles} scope={scope} />}
+        {tab === 'geography' && <GeographyTab event={event} attention={attention} scope={scope} onScopeChange={onScopeChange} geographyLabels={geographyLabels} />}
+        {tab === 'articles' && <ArticlesTab articles={candidateArticles} scope={scope} geographyLabels={geographyLabels} />}
         {tab === 'methods' && <EventMethodsTab />}
       </div>
     </aside>
@@ -917,7 +987,7 @@ function EmptyChart() {
   )
 }
 
-function GeographyTab({ event, attention, scope, onScopeChange }: { event: EventProperties; attention: AttentionRow[]; scope: MediaScope; onScopeChange: (scope: MediaScope) => void }) {
+function GeographyTab({ event, attention, scope, onScopeChange, geographyLabels }: { event: EventProperties; attention: AttentionRow[]; scope: MediaScope; onScopeChange: (scope: MediaScope) => void; geographyLabels: Record<string, string> }) {
   const scopeStats = useMemo(() => {
     return (Object.keys(SCOPE_COPY) as MediaScope[]).map((id) => {
       const rows = attention.filter((row) => row.source === 'gdelt_ngrams' && withinWindow(row.date, event) && scopeAllows(row.geography, event, id))
@@ -945,19 +1015,70 @@ function GeographyTab({ event, attention, scope, onScopeChange }: { event: Event
         <div><strong>Outlet geography, not audience geography</strong><p>GDELT assigns each article to the publishing outlet’s source country. It does not identify where readers are located.</p></div>
       </div>
       <section className="drawer-section">
-        <span className="eyebrow">Affected geography</span>
-        <h3>{event.geographyIds.map(titleCase).join(', ')}</h3>
+        <span className="eyebrow">Mapped event point</span>
+        <h3>{event.mapCountryLabel || 'Offshore or unavailable'}</h3>
+        <p className="muted-copy">Resolved from the event coordinates against Natural Earth country boundaries.</p>
+        {event.mapCountryIso3 && <div className="country-code-row"><span>{event.mapCountryIso3}</span></div>}
+      </section>
+      <section className="drawer-section affected-geography">
+        <span className="eyebrow">Reported by GDACS</span>
+        <h3>Affected countries</h3>
+        <p className="muted-copy">These can include more countries than the single map point and are not used as its place label.</p>
+        <div className="affected-country-list">
+          {event.geographyIds.map((id) => <span key={id}>{geographyLabel(id, geographyLabels)}</span>)}
+          {!event.geographyIds.length && <span>Unavailable</span>}
+        </div>
         <div className="country-code-row">{event.countryIso3s.map((code) => <span key={code}>{code}</span>)}</div>
       </section>
     </>
   )
 }
 
-function ArticlesTab({ articles, scope }: { articles: Article[]; scope: MediaScope }) {
-  const [filter, setFilter] = useState<'all' | 'political'>('all')
+function ArticlesTab({ articles, scope, geographyLabels }: { articles: Article[]; scope: MediaScope; geographyLabels: Record<string, string> }) {
+  const [politicalOnly, setPoliticalOnly] = useState(false)
+  const [topicFilter, setTopicFilter] = useState('all')
+  const [countryFilter, setCountryFilter] = useState('all')
+  const [articleQuery, setArticleQuery] = useState('')
+  const [visibleCount, setVisibleCount] = useState(20)
   const politicalTotal = useMemo(() => articles.filter(hasPoliticalSignal).length, [articles])
-  const filteredArticles = filter === 'political' ? articles.filter(hasPoliticalSignal) : articles
-  const visibleArticles = filteredArticles.slice(0, 10)
+  const topicCounts = useMemo(
+    () => [
+      { id: 'all', label: 'All themes', color: '#587068', all: articles.length, political: politicalTotal },
+      ...TOPICS.map((topic) => ({
+        ...topic,
+        all: articles.filter((article) => article.topicId === topic.id).length,
+        political: articles.filter((article) => article.topicId === topic.id && hasPoliticalSignal(article)).length,
+      })),
+    ],
+    [articles, politicalTotal],
+  )
+  const countryOptions = useMemo(
+    () => [...new Set(articles.map((article) => article.geography))]
+      .map((id) => ({ id, label: geographyLabel(id, geographyLabels) }))
+      .sort((a, b) => a.label.localeCompare(b.label)),
+    [articles, geographyLabels],
+  )
+  const filteredArticles = useMemo(() => {
+    const query = articleQuery.trim().toLowerCase()
+    return articles.filter((article) => {
+      if (politicalOnly && !hasPoliticalSignal(article)) return false
+      if (topicFilter !== 'all' && article.topicId !== topicFilter) return false
+      if (countryFilter !== 'all' && article.geography !== countryFilter) return false
+      if (!query) return true
+      return [article.title, article.outletName, article.domain, geographyLabel(article.geography, geographyLabels)]
+        .some((value) => value?.toLowerCase().includes(query))
+    })
+  }, [articles, politicalOnly, topicFilter, countryFilter, articleQuery, geographyLabels])
+  const visibleArticles = filteredArticles.slice(0, visibleCount)
+
+  useEffect(() => setVisibleCount(20), [articles, politicalOnly, topicFilter, countryFilter, articleQuery])
+
+  const resetArticleFilters = () => {
+    setPoliticalOnly(false)
+    setTopicFilter('all')
+    setCountryFilter('all')
+    setArticleQuery('')
+  }
 
   return (
     <>
@@ -971,29 +1092,56 @@ function ArticlesTab({ articles, scope }: { articles: Article[]; scope: MediaSco
           <div><strong>{articles.length.toLocaleString()}</strong><span>All articles</span></div>
           <div className="political"><strong>{politicalTotal.toLocaleString()}</strong><span>Political</span></div>
         </div>
+        <div className="theme-count-grid" aria-label="Article counts by theme">
+          {topicCounts.map((topic) => (
+            <button key={topic.id} className={topicFilter === topic.id ? 'active' : ''} data-topic={topic.id} aria-pressed={topicFilter === topic.id} onClick={() => setTopicFilter(topic.id)}>
+              <i style={{ background: topic.color }} />
+              <strong>{topic.label}</strong>
+              <span><b>{topic.all.toLocaleString()}</b> all</span>
+              <span><b>{topic.political.toLocaleString()}</b> political</span>
+            </button>
+          ))}
+        </div>
         <div className="article-filters" role="group" aria-label="Filter articles">
-          <button className={filter === 'all' ? 'active' : ''} aria-pressed={filter === 'all'} onClick={() => setFilter('all')}>All <span>{articles.length}</span></button>
-          <button className={filter === 'political' ? 'active' : ''} aria-pressed={filter === 'political'} onClick={() => setFilter('political')}>Political <span>{politicalTotal}</span></button>
+          <button className={!politicalOnly ? 'active' : ''} aria-pressed={!politicalOnly} onClick={() => setPoliticalOnly(false)}>All <span>{articles.length}</span></button>
+          <button className={politicalOnly ? 'active' : ''} aria-pressed={politicalOnly} onClick={() => setPoliticalOnly(true)}>Political <span>{politicalTotal}</span></button>
         </div>
         <p className="article-filter-definition">Political includes articles flagged for political actors, government action, party politics or official sources.</p>
+        <div className="article-browser-controls">
+          <label className="article-search-field">
+            <span>Search articles</span>
+            <div><Search size={14} /><input type="search" value={articleQuery} onChange={(event) => setArticleQuery(event.target.value)} placeholder="Title, outlet or keyword" /></div>
+          </label>
+          <label>
+            <span>Outlet country</span>
+            <select value={countryFilter} onChange={(event) => setCountryFilter(event.target.value)}>
+              <option value="all">All countries</option>
+              {countryOptions.map((country) => <option key={country.id} value={country.id}>{country.label}</option>)}
+            </select>
+          </label>
+        </div>
+        <div className="article-results-row">
+          <span>{filteredArticles.length.toLocaleString()} result{filteredArticles.length === 1 ? '' : 's'}</span>
+          {(politicalOnly || topicFilter !== 'all' || countryFilter !== 'all' || articleQuery) && <button onClick={resetArticleFilters}>Reset filters</button>}
+        </div>
         <div className="article-list">
           {visibleArticles.map((article) => {
             const politicalSignals = getPoliticalSignals(article)
             return (
-              <a key={article.id} href={article.url} target="_blank" rel="noreferrer" data-political={politicalSignals.length > 0 ? 'true' : 'false'}>
+              <a key={article.id} href={article.url} target="_blank" rel="noreferrer" data-political={politicalSignals.length > 0 ? 'true' : 'false'} data-topic={article.topicId} data-country={article.geography}>
                 <div className="article-meta">
                   <span>{article.outletName || article.domain}</span>
                   {politicalSignals.length > 0 && <span className="political-indicator">Political</span>}
                   <span>{formatDate(article.publishedAt || article.date)}</span>
                 </div>
                 <strong>{article.title || 'Untitled article'}</strong>
-                <div className="article-tags"><span>{titleCase(article.topicId)}</span>{politicalSignals.map((signal) => <span className="political-tag" key={signal}>{signal}</span>)}</div>
+                <div className="article-tags"><span>{titleCase(article.topicId)}</span><span>{geographyLabel(article.geography, geographyLabels)}</span>{politicalSignals.map((signal) => <span className="political-tag" key={signal}>{signal}</span>)}</div>
               </a>
             )
           })}
         </div>
-        {!filteredArticles.length && articles.length > 0 && <p className="article-empty">No politically flagged articles are stored for this event window and media market.</p>}
-        {filteredArticles.length > visibleArticles.length && <p className="list-footnote">Showing 10 of {filteredArticles.length.toLocaleString()} {filter === 'political' ? 'political ' : ''}candidate articles.</p>}
+        {!filteredArticles.length && articles.length > 0 && <p className="article-empty">No articles match the current theme, political, country and search filters.</p>}
+        {filteredArticles.length > visibleArticles.length && <button className="load-more-button" onClick={() => setVisibleCount((current) => current + 20)}>Show 20 more <span>{visibleArticles.length.toLocaleString()} of {filteredArticles.length.toLocaleString()}</span></button>}
       </section>
     </>
   )

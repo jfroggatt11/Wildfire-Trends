@@ -38,13 +38,13 @@ test('January plus Global opens articles with nullable publication timestamps', 
   await openExplorer(page)
   await page.locator('input[type="date"]').nth(1).fill('2025-01-31')
   await expect(page.locator('.map-stat strong')).toHaveText('304')
-  await expect(page.locator('.watchlist > button').first()).toContainText('Forest fires in United States')
+  await expect(page.locator('.watchlist > button').first()).toContainText('Wildfire in United States')
 
   for (const scope of ['affected', 'eu27', 'international', 'global']) {
     await page.locator('.scope-section select').selectOption(scope)
     await page.locator('.watchlist > button').first().click()
     await expect(page.locator('.event-error')).toHaveCount(0)
-    await expect(page.locator('.event-drawer')).toContainText('Forest fires in United States')
+    await expect(page.locator('.event-drawer')).toContainText('Wildfire in United States')
     await page.locator('.drawer-header .icon-button').click()
   }
 
@@ -78,10 +78,78 @@ test('article links expose political totals, signals and filtering', async ({ pa
   expect(politicalTotal).toBeGreaterThan(0)
   expect(politicalTotal).toBeLessThanOrEqual(allTotal)
 
+  await expect(page.locator('.theme-count-grid > button')).toHaveCount(5)
+  await expect(page.locator('.theme-count-grid > button[data-topic="climate_change"]')).toContainText('all')
+  await expect(page.locator('.theme-count-grid > button[data-topic="climate_change"]')).toContainText('political')
+
   await page.getByRole('button', { name: /^Political/ }).click()
   await expect(page.locator('.article-list > a').first()).toHaveAttribute('data-political', 'true')
   await expect(page.locator('.article-list .political-indicator').first()).toHaveText('Political')
   await expect(page.locator('.article-list > a[data-political="false"]')).toHaveCount(0)
+
+  await page.locator('.theme-count-grid > button[data-topic="climate_change"]').click()
+  await expect(page.locator('.article-list > a').first()).toHaveAttribute('data-topic', 'climate_change')
+  await expect(page.locator('.article-list > a:not([data-topic="climate_change"])')).toHaveCount(0)
+
+  await page.getByRole('button', { name: 'Reset filters' }).click()
+  const countrySelect = page.locator('.article-browser-controls select')
+  const countryValue = await countrySelect.locator('option').nth(1).getAttribute('value')
+  expect(countryValue).toBeTruthy()
+  await countrySelect.selectOption(countryValue!)
+  await expect(page.locator('.article-list > a').first()).toHaveAttribute('data-country', countryValue!)
+  await expect(page.locator(`.article-list > a:not([data-country="${countryValue}"])`)).toHaveCount(0)
+
+  await page.getByRole('button', { name: 'Reset filters' }).click()
+  await expect(page.locator('.article-list > a')).toHaveCount(20)
+  await page.getByRole('button', { name: /Show 20 more/ }).click()
+  await expect(page.locator('.article-list > a')).toHaveCount(40)
+
+  const firstTitle = (await page.locator('.article-list > a > strong').first().textContent()) || ''
+  const searchTerm = firstTitle.split(/\s+/).find((word) => word.length >= 5) || firstTitle
+  await page.getByLabel('Search articles').fill(searchTerm)
+  await expect(page.locator('.article-list > a').first()).toContainText(new RegExp(searchTerm, 'i'))
+  expect(errors).toEqual([])
+})
+
+test('trackpad-style zoom stays inside the map and clusters reveal individual events', async ({ page }) => {
+  const errors = collectClientErrors(page)
+  await openExplorer(page)
+  const map = page.locator('.atlas-svg-map')
+  const svg = map.locator(':scope > svg')
+  await expect(svg).toHaveAttribute('data-zoom', '1.000')
+
+  const prevented = await map.evaluate((element) => !element.dispatchEvent(new WheelEvent('wheel', {
+    bubbles: true,
+    cancelable: true,
+    clientX: element.getBoundingClientRect().left + element.clientWidth / 2,
+    clientY: element.getBoundingClientRect().top + element.clientHeight / 2,
+    deltaY: -160,
+    ctrlKey: true,
+  })))
+  expect(prevented).toBe(true)
+  await expect.poll(async () => Number(await svg.getAttribute('data-zoom'))).toBeGreaterThan(1)
+
+  await page.getByRole('button', { name: 'Reset world view' }).click()
+  // SVG paints later markers on top; target the topmost visible cluster just as a user would.
+  const cluster = page.locator('.atlas-marker.cluster').last()
+  const clusterCount = Number(await cluster.getAttribute('data-count'))
+  expect(clusterCount).toBeGreaterThan(1)
+  await cluster.click()
+  await expect.poll(async () => Number(await svg.getAttribute('data-zoom'))).toBeGreaterThanOrEqual(8)
+  await expect(page.locator('.atlas-marker.event[data-expanded="true"]')).toHaveCount(clusterCount)
+  expect(errors).toEqual([])
+})
+
+test('map-point country is distinct from GDACS affected countries', async ({ page }) => {
+  const errors = collectClientErrors(page)
+  await page.goto('/?event=gdacs%3AFL%3A1103661', { waitUntil: 'networkidle' })
+  await expect(page.locator('.event-drawer')).toBeVisible()
+  await expect(page.locator('.drawer-header h2')).toHaveText('Flood in United Kingdom')
+  await expect(page.locator('.event-meta')).toContainText('Map point: United Kingdom')
+  await page.getByRole('tab', { name: 'Geography' }).click()
+  await expect(page.getByRole('heading', { name: 'United Kingdom', exact: true })).toBeVisible()
+  await expect(page.locator('.affected-geography')).toContainText('Ireland')
+  await expect(page.locator('.affected-geography')).toContainText('United Kingdom')
   expect(errors).toEqual([])
 })
 

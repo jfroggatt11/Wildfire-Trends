@@ -139,11 +139,17 @@ before treating worldwide `official_source_count` as comparable. Review false po
 false negatives, language balance, named-party coverage, and official-domain drift
 before extending the design globally.
 
-As a concrete benchmark, the four multilingual themes over July 2026 and all 197
+As a historical benchmark, the four multilingual themes over July 2026 and all 197
 configured countries dry-ran at 587.958 GB in one batch, versus 1,080.384 GB across
 four separate topic jobs—a 45.6% reduction. A one-day batch returned exactly the same
 788 topic-country counts as the four earlier jobs. Re-estimate every new date range;
 clustering and phrase anchors mean this benchmark is not a guaranteed billing ratio.
+
+The current MVP enables only `climate_change` and `electric_vehicles`. On 6 January
+2025, its political/article dry run estimated 30.491 GB, compared with 34.882 GB for
+all four topics. On 12 January, the estimates were 25.215 GB and 28.398 GB. The
+roughly 11–13% reduction is smaller than the topic-count reduction because political
+signal matching is unchanged.
 
 ## Verify completeness
 

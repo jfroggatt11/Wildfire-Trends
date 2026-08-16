@@ -92,7 +92,7 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
 
 .map-stage { min-width: 0; position: relative; background: #edf3f0; }
 .map-container { position: absolute; inset: 0; }
-.atlas-svg-map { overflow: hidden; background: #edf3f0; }
+.atlas-svg-map { overflow: hidden; overscroll-behavior: contain; touch-action: none; background: #edf3f0; }
 .atlas-svg-map svg { width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; user-select: none; }
 .atlas-svg-map svg:active { cursor: grabbing; }
 .country-layer path { fill: #d9e4dd; stroke: #a7b8af; stroke-width: .65; vector-effect: non-scaling-stroke; }
@@ -211,6 +211,9 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
 .scope-cards em { grid-column: 2; color: #819089; font-size: 7.5px; font-style: normal; text-transform: uppercase; letter-spacing: .04em; }
 .country-code-row { display: flex; flex-wrap: wrap; gap: 5px; }
 .country-code-row span { padding: 5px 7px; border-radius: 5px; color: #4e6158; background: #e8eeea; font-size: 8px; font-weight: 800; }
+.affected-geography { margin-top: 0; }
+.affected-country-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 7px; }
+.affected-country-list span { padding: 6px 8px; border: 1px solid #d9e2dc; border-radius: 6px; color: #3f554b; background: #f7f9f7; font-size: 9px; font-weight: 700; }
 .article-totals { margin: 12px 0 9px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 7px; }
 .article-totals > div { min-height: 55px; display: flex; flex-direction: column; justify-content: center; padding: 9px 11px; border: 1px solid #dce4de; border-radius: 7px; background: white; }
 .article-totals > div.political { border-color: #dbcda9; background: #faf6e9; }
@@ -224,6 +227,24 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
 .article-filters button span { min-width: 17px; padding: 2px 4px; border-radius: 9px; color: inherit; background: rgba(82, 97, 89, .1); font-size: 7px; text-align: center; }
 .article-filters button.active span { background: rgba(255, 255, 255, .16); }
 .article-filter-definition { margin: 8px 0 2px; color: #849089; font-size: 8px; line-height: 1.45; }
+.theme-count-grid { margin: 12px 0 10px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.theme-count-grid button { position: relative; min-width: 0; display: grid; grid-template-columns: 1fr auto; gap: 3px 8px; padding: 9px 9px 8px 13px; border: 1px solid #dbe3de; border-radius: 7px; color: #68776f; background: #fff; text-align: left; cursor: pointer; }
+.theme-count-grid button:first-child { grid-column: 1 / -1; }
+.theme-count-grid button > i { position: absolute; top: 9px; bottom: 9px; left: 6px; width: 3px; border-radius: 3px; }
+.theme-count-grid button > strong { grid-column: 1 / -1; overflow: hidden; color: #374a41; font-size: 8.5px; white-space: nowrap; text-overflow: ellipsis; }
+.theme-count-grid button > span { font-size: 7px; text-transform: uppercase; letter-spacing: .025em; }
+.theme-count-grid button > span:last-child { text-align: right; }
+.theme-count-grid button b { color: #35473f; font-size: 8px; }
+.theme-count-grid button:hover { border-color: #91a59a; }
+.theme-count-grid button.active { border-color: #527d6c; background: #eff5f1; box-shadow: inset 0 0 0 1px #527d6c; }
+.article-browser-controls { margin-top: 13px; display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 7px; }
+.article-browser-controls label { min-width: 0; display: flex; flex-direction: column; gap: 4px; color: #718078; font-size: 7.5px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.article-browser-controls label > div { height: 34px; display: flex; align-items: center; gap: 6px; padding: 0 8px; border: 1px solid #d6dfd9; border-radius: 6px; color: #7c8a83; background: white; }
+.article-browser-controls input { min-width: 0; width: 100%; border: 0; outline: 0; color: #34463e; background: transparent; font-size: 9px; }
+.article-browser-controls select { min-width: 0; width: 100%; height: 34px; padding: 0 24px 0 8px; border: 1px solid #d6dfd9; border-radius: 6px; color: #34463e; background: white; font-size: 9px; }
+.article-browser-controls label:focus-within > div, .article-browser-controls select:focus { border-color: #527d6c; box-shadow: 0 0 0 2px rgba(47,116,95,.08); }
+.article-results-row { min-height: 28px; display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; border-bottom: 1px solid #e2e7e4; color: #7c8982; font-size: 8px; }
+.article-results-row button { border: 0; color: var(--green); background: transparent; font-size: 8px; font-weight: 800; cursor: pointer; }
 .article-list { display: flex; flex-direction: column; }
 .article-list > a { padding: 13px 0; border-bottom: 1px solid #e2e7e4; color: inherit; text-decoration: none; }
 .article-list > a[data-political="true"] { padding-left: 9px; border-left: 2px solid #d2ae56; }
@@ -237,6 +258,9 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
 .article-tags span.political-tag { color: #745820; background: #f6edcf; }
 .article-empty { margin: 15px 0 0; padding: 13px; border-radius: 7px; color: #76837c; background: #f2f5f2; font-size: 9px; line-height: 1.45; text-align: center; }
 .list-footnote { margin: 12px 0 0; color: #89958f; font-size: 8px; }
+.load-more-button { width: 100%; margin-top: 12px; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px; border: 1px solid #cfdad3; border-radius: 7px; color: #355649; background: #f5f8f5; font-size: 9px; font-weight: 800; cursor: pointer; }
+.load-more-button:hover { border-color: #79998b; background: #edf4ef; }
+.load-more-button span { color: #7d8b83; font-size: 7px; font-weight: 600; }
 .method-list > div { display: grid; grid-template-columns: 24px 1fr; gap: 9px; padding: 13px 0; border-bottom: 1px solid #e2e7e4; }
 .method-list > div > span { color: var(--green); font-family: Georgia, serif; font-size: 13px; }
 .method-list p { margin: 0; color: #78857e; font-size: 9px; line-height: 1.45; }

@@ -58,7 +58,8 @@ topics:
 
   clean_energy:
     label: Clean energy
-    enabled: true
+    # Retained for historical comparison, but outside the two-topic MVP.
+    enabled: false
     description: Renewable and low-carbon energy technologies and deployment.
     queries:
       - '"clean energy"'
@@ -85,7 +86,8 @@ topics:
 
   clean_transport:
     label: Clean transport
-    enabled: true
+    # Retained for historical comparison, but outside the two-topic MVP.
+    enabled: false
     description: Low-carbon mobility, transport decarbonisation, electrification, zero-emission movement, and modal shift.
     notes: Generic public-transport, rail, cycling, and vehicle coverage is excluded unless it explicitly invokes a clean, sustainable, low-carbon, electrification, emissions, active-mobility, or modal-shift concept.
     queries:

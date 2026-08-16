@@ -58,6 +58,7 @@ from .sources.firms import (
 from .sources.gdacs import GDACSProvider
 from .geography import load_country_boundaries
 from .storage import LocalParquetStorage
+from .supabase_sync import MVP_TOPICS, dotenv_value, sync_articles
 
 
 LOGGER = logging.getLogger(__name__)
@@ -375,6 +376,31 @@ def build_parser() -> argparse.ArgumentParser:
     export_articles.add_argument("--data-dir", type=Path, default=Path("data"))
     export_articles.add_argument("--output", type=Path, required=True)
 
+    sync_supabase = subparsers.add_parser(
+        "sync-supabase",
+        help="upsert the matched-article Parquet panel into Supabase Postgres",
+    )
+    sync_supabase.add_argument("--data-dir", type=Path, default=Path("data"))
+    sync_supabase.add_argument("--start", type=_iso_date)
+    sync_supabase.add_argument("--end", type=_iso_date)
+    sync_supabase.add_argument(
+        "--topics", nargs="+", choices=sorted(MVP_TOPICS), default=sorted(MVP_TOPICS)
+    )
+    sync_supabase.add_argument(
+        "--database-url",
+        help="Postgres URL; defaults to SUPABASE_DB_URL in the environment or .env",
+    )
+    sync_supabase.add_argument(
+        "--apply-migration",
+        action="store_true",
+        help="apply the bundled idempotent article schema before syncing",
+    )
+    sync_supabase.add_argument(
+        "--migration",
+        type=Path,
+        default=Path("supabase/migrations/20260816193000_create_articles.sql"),
+    )
+
     aggregate = subparsers.add_parser(
         "aggregate", aliases=["rebuild-aggregates"], help="rebuild daily Parquet"
     )
@@ -432,6 +458,8 @@ def main(argv: list[str] | None = None) -> int:
             return _compare_sources(args)
         if args.command == "export-articles":
             return _export_articles(args)
+        if args.command == "sync-supabase":
+            return _sync_supabase(args)
         if args.command in {"aggregate", "rebuild-aggregates"}:
             return _aggregate(args.data_dir)
         if args.command == "runs":
@@ -1451,6 +1479,30 @@ def _aggregate(data_dir: Path) -> int:
     observations = aggregate_daily(records)
     path = storage.write_daily(observations)
     print(f"Wrote {len(observations)} daily row(s) from {len(records)} record(s) to {path}.")
+    return 0
+
+
+def _sync_supabase(args: argparse.Namespace) -> int:
+    if args.start and args.end and args.end < args.start:
+        raise ValueError("Supabase sync end date must not precede start date")
+    database_url = args.database_url or dotenv_value("SUPABASE_DB_URL")
+    if not database_url:
+        raise ValueError(
+            "missing SUPABASE_DB_URL; add it to .env or pass --database-url"
+        )
+    copied, files = sync_articles(
+        database_url=database_url,
+        data_dir=args.data_dir,
+        migration_path=args.migration,
+        topics=set(args.topics),
+        start=args.start,
+        end=args.end,
+        apply_migration=args.apply_migration,
+    )
+    print(
+        f"Supabase article sync complete: {copied:,} row(s) upserted "
+        f"from {files:,} Parquet partition(s)."
+    )
     return 0
 
 
