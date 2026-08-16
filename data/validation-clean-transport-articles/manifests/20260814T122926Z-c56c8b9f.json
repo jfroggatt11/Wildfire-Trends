@@ -9,7 +9,7 @@
     "sha256": "fa323f249e2f8a55d4856b4df788a3b5d0a8645d91799a1f199d3a3a4c608590",
     "snapshot_path": "data/validation-clean-transport-articles/runs/20260814T122926Z-c56c8b9f/countries.yaml"
   },
-  "error": "400 POST https://bigquery.googleapis.com/bigquery/v2/projects/wildfire-trends-505214/jobs?prettyPrint=false: Dry run query timed out. Some common causes for this are accessing too many tables, or too many partitions for partitioned tables, or too many files matched for external tables.\n\nLocation: US\nJob ID: 46161544-86db-477c-8b71-41e9a827072e\n",
+  "error": null,
   "expanded_queries": [
     {
       "exclude_terms": [],
@@ -22,7 +22,7 @@
       "topic_id": "ngram_topic_batch"
     }
   ],
-  "finished_at": "2026-08-14T12:33:31.281054+00:00",
+  "finished_at": "2026-08-14T18:59:31.384319+00:00",
   "manifest_version": 2,
   "provider_options": {
     "article_sample_size": -1,
@@ -2673,15 +2673,15 @@
   },
   "requests": [
     {
-      "attempts": 1,
+      "attempts": 2,
       "end": "2025-01-01T23:59:59.999999Z",
-      "error": "400 POST https://bigquery.googleapis.com/bigquery/v2/projects/wildfire-trends-505214/jobs?prettyPrint=false: Dry run query timed out. Some common causes for this are accessing too many tables, or too many partitions for partitioned tables, or too many files matched for external tables.\n\nLocation: US\nJob ID: 46161544-86db-477c-8b71-41e9a827072e\n",
+      "error": null,
       "http_status": null,
       "parent_window_id": null,
       "query_id": "topics_distinct_urls",
-      "records_returned": 0,
+      "records_returned": 197,
       "start": "2025-01-01T00:00:00Z",
-      "status": "failed",
+      "status": "success",
       "topic_id": "ngram_topic_batch",
       "window_id": "333ea005c4a0fe362bd352d1c5c704d0c0900fae66e7dc0760bbdacb3ba1d79e"
     }
@@ -2694,15 +2694,15 @@
   },
   "source": "gdelt_ngrams",
   "started_at": "2026-08-14T12:29:26.928860+00:00",
-  "status": "failed",
+  "status": "complete",
   "summary": {
-    "failed_windows": 1,
+    "failed_windows": 0,
     "pending_windows": 0,
-    "records_collected": 0,
+    "records_collected": 197,
     "records_newly_stored": 0,
     "running_windows": 0,
     "split_windows": 0,
-    "success_windows": 0
+    "success_windows": 1
   },
   "topics": [
     {

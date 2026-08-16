@@ -391,6 +391,11 @@ def build_parser() -> argparse.ArgumentParser:
     runs_retry = run_commands.add_parser("retry", help="retry unfinished windows")
     runs_retry.add_argument("run_id")
     runs_retry.add_argument("--data-dir", type=Path, default=Path("data"))
+    runs_retry.add_argument(
+        "--maximum-gb-billed",
+        type=_positive_float,
+        help="override the per-window BigQuery cap for a GDELT NGrams run",
+    )
     _add_runtime_options(runs_retry)
     return parser
 
@@ -556,6 +561,13 @@ def _resume_run(
     }:
         raise ValueError(f"run {run_id} uses unsupported resumable source {state.source!r}")
     if option_overrides:
+        if (
+            "maximum_bytes_billed" in option_overrides
+            and state.source != "gdelt_ngrams"
+        ):
+            raise ValueError(
+                "--maximum-gb-billed can only override a GDELT NGrams run"
+            )
         # Only explicitly supplied retry options should override the frozen values.
         state.provider_options.update(option_overrides)
         store.save(state)
@@ -1421,6 +1433,11 @@ def _runs(args: argparse.Namespace) -> int:
                 "max_retries": args.max_retries,
                 "request_interval_seconds": args.request_interval,
                 "backoff_seconds": args.backoff_seconds,
+                "maximum_bytes_billed": (
+                    int(args.maximum_gb_billed * 1_000_000_000)
+                    if args.maximum_gb_billed is not None
+                    else None
+                ),
             }.items()
             if value is not None
         }

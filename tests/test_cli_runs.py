@@ -89,6 +89,42 @@ def test_runs_list_and_inspect(tmp_path, capsys):
     assert "pending" in output
 
 
+def test_runs_retry_can_raise_ngram_billing_cap(tmp_path, monkeypatch):
+    store, original = _state(tmp_path)
+    state = original.model_copy(
+        update={
+            "source": "gdelt_ngrams",
+            "provider_options": {"maximum_bytes_billed": 30_000_000_000},
+        },
+        deep=True,
+    )
+    store.save(state)
+    observed = {}
+
+    def fake_execute(current, *_):
+        observed.update(current.provider_options)
+        return 0
+
+    monkeypatch.setattr("climate_attention.cli._execute_timeline_run", fake_execute)
+
+    assert main(
+        [
+            "runs",
+            "retry",
+            "interrupt-run",
+            "--maximum-gb-billed",
+            "40",
+            "--data-dir",
+            str(tmp_path / "data"),
+        ]
+    ) == 0
+
+    assert observed["maximum_bytes_billed"] == 40_000_000_000
+    assert store.load("interrupt-run").provider_options["maximum_bytes_billed"] == (
+        40_000_000_000
+    )
+
+
 def test_timeline_execution_writes_daily_points_and_completes(tmp_path, monkeypatch):
     store, original = _state(tmp_path)
     state = original.model_copy(

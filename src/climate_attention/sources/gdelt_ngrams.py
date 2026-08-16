@@ -475,14 +475,17 @@ def _build_political_ngram_batch_sql(
         "segmentation_types": [],
         "patterns": [],
     }
+    candidate_clauses: list[str] = []
+    phrase_index = 0
     for evidence_kind, dimensions in (
         ("topic", phrases_by_topic),
         ("political_signal", political_signals),
     ):
         for dimension_id in sorted(dimensions):
             for phrase in _normalize_phrase_specs(dimensions[dimension_id]):
-                _, values = _phrase_sql_clause(phrase, 0)
-                for anchor in values["anchor_variants_0"]:
+                clause, values = _phrase_sql_clause(phrase, phrase_index)
+                candidate_clauses.append(clause)
+                for anchor in values[f"anchor_variants_{phrase_index}"]:
                     catalog["anchors"].append(anchor)
                     catalog["kinds"].append(evidence_kind)
                     catalog["dimensions"].append(dimension_id)
@@ -490,9 +493,10 @@ def _build_political_ngram_batch_sql(
                     catalog["languages"].append(phrase.get("language") or "")
                     catalog["segmentations"].append(phrase["segmentation"])
                     catalog["segmentation_types"].append(
-                        str(values["segmentation_type_0"])
+                        str(values[f"segmentation_type_{phrase_index}"])
                     )
-                    catalog["patterns"].append(values["pattern_0"])
+                    catalog["patterns"].append(values[f"pattern_{phrase_index}"])
+                phrase_index += 1
 
     parameters: dict[str, Any] = {
         "topic_ids": topic_ids,
@@ -506,6 +510,21 @@ def _build_political_ngram_batch_sql(
         "catalog_segmentation_types": catalog["segmentation_types"],
         "catalog_patterns": catalog["patterns"],
     }
+    # Rebuild only the scalar parameters used by the cluster-friendly
+    # candidate filter. Phrase order matches the catalogue loop above.
+    phrase_index = 0
+    for _, dimensions in (
+        ("topic", phrases_by_topic),
+        ("political_signal", political_signals),
+    ):
+        for dimension_id in sorted(dimensions):
+            for phrase in _normalize_phrase_specs(dimensions[dimension_id]):
+                _, values = _phrase_sql_clause(phrase, phrase_index)
+                parameters.update(values)
+                phrase_index += 1
+    candidate_filter = "\n      OR ".join(
+        f"({clause})" for clause in candidate_clauses
+    )
     evidence_aggregate = ""
     country_evidence_select = ""
     article_signal_exclusions = "all_topic_ids"
@@ -716,6 +735,15 @@ phrase_catalog AS (
   JOIN UNNEST(@catalog_patterns) AS pattern WITH OFFSET AS pattern_position
     ON position = pattern_position
 ),
+candidate_rows AS (
+  SELECT date, url, lang, type, ngram, pre, post
+  FROM `{ngram_table}`
+  WHERE DATE(date) BETWEEN @start_date AND @end_date
+    AND ngram IN UNNEST(@catalog_anchor_filter)
+    AND (
+      {candidate_filter}
+    )
+),
 signal_rows AS (
   SELECT
     DATE(source.date) AS day,
@@ -732,7 +760,7 @@ signal_rows AS (
     source.post,
     CONCAT(COALESCE(source.pre, ''), ' ', source.ngram, ' ',
       COALESCE(source.post, '')) AS context
-  FROM `{ngram_table}` AS source
+  FROM candidate_rows AS source
   JOIN phrase_catalog AS catalog
     ON source.ngram = catalog.anchor
     AND source.type = catalog.segmentation_type
@@ -746,8 +774,6 @@ signal_rows AS (
       )),
       catalog.pattern
     )
-  WHERE DATE(source.date) BETWEEN @start_date AND @end_date
-    AND source.ngram IN UNNEST(@catalog_anchor_filter)
   QUALIFY ROW_NUMBER() OVER (
     PARTITION BY day, source.url, catalog.evidence_kind, catalog.dimension_id,
       catalog.phrase, catalog.phrase_language, catalog.segmentation
@@ -1168,7 +1194,14 @@ class GoogleBigQueryExecutor:
             ),
             location=self.location,
         )
-        rows = [dict(row.items()) for row in job.result()]
+        try:
+            rows = [dict(row.items()) for row in job.result()]
+        except KeyboardInterrupt:
+            # Stopping the local CLI does not automatically stop a remote
+            # BigQuery job. Propagate the interrupt only after requesting
+            # cancellation so an abandoned query does not keep consuming slots.
+            job.cancel()
+            raise
         return rows, {
             "job_id": job.job_id,
             "total_bytes_processed": int(job.total_bytes_processed or 0),

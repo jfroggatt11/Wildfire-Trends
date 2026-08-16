@@ -6,7 +6,7 @@
   "country_config_snapshot_path": "data/validation-clean-transport-articles/runs/20260814T122926Z-c56c8b9f/countries.yaml",
   "created_at": "2026-08-14T12:29:26.928860Z",
   "error": null,
-  "finished_at": null,
+  "finished_at": "2026-08-14T18:59:31.384319Z",
   "original_config_path": "config/topics.multilingual.example.yaml",
   "provider_options": {
     "article_sample_size": -1,
@@ -2657,7 +2657,7 @@
   "run_id": "20260814T122926Z-c56c8b9f",
   "source": "gdelt_ngrams",
   "state_version": 1,
-  "status": "running",
+  "status": "complete",
   "topics": [
     {
       "description": "Low-carbon mobility, transport decarbonisation, electrification, zero-emission movement, and modal shift.",
@@ -3656,10 +3656,10 @@
       ]
     }
   ],
-  "updated_at": "2026-08-14T12:44:57.035149Z",
+  "updated_at": "2026-08-14T18:59:31.384319Z",
   "windows": {
     "333ea005c4a0fe362bd352d1c5c704d0c0900fae66e7dc0760bbdacb3ba1d79e": {
-      "attempts": 1,
+      "attempts": 2,
       "end": "2025-01-01T23:59:59.999999Z",
       "error": null,
       "http_status": null,
@@ -3674,10 +3674,10 @@
         "query_id": "topics_distinct_urls",
         "topic_id": "ngram_topic_batch"
       },
-      "records_returned": 0,
+      "records_returned": 197,
       "start": "2025-01-01T00:00:00Z",
-      "status": "running",
-      "updated_at": "2026-08-14T12:44:57.035149Z",
+      "status": "success",
+      "updated_at": "2026-08-14T18:59:31.381600Z",
       "window_id": "333ea005c4a0fe362bd352d1c5c704d0c0900fae66e7dc0760bbdacb3ba1d79e"
     }
   }

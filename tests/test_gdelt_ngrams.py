@@ -126,6 +126,9 @@ def test_political_sql_counts_url_level_signals_and_samples_articles():
     assert sql.count("`gdelt-bq.gdeltv2.webngrams`") == 1
     assert "LOGICAL_OR(dimension_id = 'political_actor')" in sql
     assert "phrase_catalog AS" in sql
+    assert "candidate_rows AS" in sql
+    assert "FROM candidate_rows AS source" in sql
+    assert "@anchor_variants_0" in sql
     assert "matched_topic_phrases" not in sql
     assert "COUNTIF(" in sql
     assert "article_samples_json" in sql
@@ -449,6 +452,34 @@ def test_bigquery_dry_run_omits_none_maximum_bytes_billed():
 
     assert "maximum_bytes_billed" not in dry_run.kwargs
     assert capped.kwargs["maximum_bytes_billed"] == 123
+
+
+def test_bigquery_query_cancels_remote_job_when_interrupted():
+    class FakeJob:
+        cancelled = False
+
+        def result(self):
+            raise KeyboardInterrupt
+
+        def cancel(self):
+            self.cancelled = True
+
+    class FakeClient:
+        def __init__(self, job):
+            self.job = job
+
+        def query(self, *args, **kwargs):
+            return self.job
+
+    executor = object.__new__(GoogleBigQueryExecutor)
+    executor.location = "US"
+    executor.client = FakeClient(job := FakeJob())
+    executor._job_config = lambda *args, **kwargs: object()
+
+    with pytest.raises(KeyboardInterrupt):
+        executor.query("SELECT 1", {}, maximum_bytes_billed=1)
+
+    assert job.cancelled is True
 
 
 def test_country_audit_is_capped_and_parameterized():
