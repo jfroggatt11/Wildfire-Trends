@@ -78,7 +78,11 @@ test('article links expose political totals, signals and filtering', async ({ pa
   expect(politicalTotal).toBeGreaterThan(0)
   expect(politicalTotal).toBeLessThanOrEqual(allTotal)
 
-  await expect(page.locator('.theme-count-grid > button')).toHaveCount(5)
+  const configuredTopicCount = await page.evaluate(async () => {
+    const manifest = await fetch('/data/manifest.json').then((response) => response.json())
+    return Object.keys(manifest.attention.topics).length
+  })
+  await expect(page.locator('.theme-count-grid > button')).toHaveCount(configuredTopicCount + 1)
   await expect(page.locator('.theme-count-grid > button[data-topic="climate_change"]')).toContainText('all')
   await expect(page.locator('.theme-count-grid > button[data-topic="climate_change"]')).toContainText('political')
 
@@ -135,7 +139,10 @@ test('trackpad-style zoom stays inside the map and clusters reveal individual ev
   const clusterCount = Number(await cluster.getAttribute('data-count'))
   expect(clusterCount).toBeGreaterThan(1)
   await cluster.click()
-  await expect.poll(async () => Number(await svg.getAttribute('data-zoom'))).toBeGreaterThanOrEqual(8)
+  await expect(map).toHaveAttribute('data-camera-animating', 'true')
+  await expect(page.locator('.atlas-marker.event[data-expanded="true"]')).toHaveCount(0)
+  await expect(map).toHaveAttribute('data-camera-animating', 'false')
+  await expect.poll(async () => Number(await svg.getAttribute('data-zoom'))).toBeGreaterThanOrEqual(7)
   await expect(page.locator('.atlas-marker.event[data-expanded="true"]')).toHaveCount(clusterCount)
   expect(errors).toEqual([])
 })

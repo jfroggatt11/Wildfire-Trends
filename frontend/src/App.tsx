@@ -599,19 +599,72 @@ function ExploreView({
 }
 
 type AtlasTransform = { x: number; y: number; k: number }
-type AtlasMarker = { key: string; x: number; y: number; events: EventFeature[]; expanded?: boolean }
+type AtlasMarker = { key: string; x: number; y: number; events: EventFeature[]; expanded?: boolean; expandedOrder?: number }
 
 const MAX_MAP_ZOOM = 18
 
 function AtlasMap({ world, events, selectedId, onSelectEvent }: { world: WorldGeoJSON; events: EventFeature[]; selectedId: string | null; onSelectEvent: (id: string | null) => void }) {
   const [transform, setTransform] = useState<AtlasTransform>({ x: 0, y: 0, k: 1 })
   const [expandedIds, setExpandedIds] = useState<Set<string> | null>(null)
+  const [frozenClusterZoom, setFrozenClusterZoom] = useState<number | null>(null)
+  const [isCameraAnimating, setIsCameraAnimating] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const dragRef = useRef<{ pointerId: number; clientX: number; clientY: number; x: number; y: number } | null>(null)
+  const animationFrameRef = useRef<number | null>(null)
+  const transformRef = useRef(transform)
   const projection = useMemo(() => geoNaturalEarth1().fitExtent([[22, 22], [978, 528]], world), [world])
   const path = useMemo(() => geoPath(projection), [projection])
 
-  useEffect(() => setExpandedIds(null), [events])
+  useEffect(() => { transformRef.current = transform }, [transform])
+
+  const cancelCameraAnimation = useCallback(() => {
+    if (animationFrameRef.current != null) cancelAnimationFrame(animationFrameRef.current)
+    animationFrameRef.current = null
+    setIsCameraAnimating(false)
+  }, [])
+
+  const animateCameraTo = useCallback((target: AtlasTransform, onComplete: () => void) => {
+    cancelCameraAnimation()
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      transformRef.current = target
+      setTransform(target)
+      onComplete()
+      return
+    }
+    const start = transformRef.current
+    const startedAt = performance.now()
+    const duration = 640
+    setIsCameraAnimating(true)
+    const step = (now: number) => {
+      const progress = Math.min(1, (now - startedAt) / duration)
+      const eased = 1 - Math.pow(1 - progress, 4)
+      const next = {
+        x: start.x + (target.x - start.x) * eased,
+        y: start.y + (target.y - start.y) * eased,
+        k: start.k + (target.k - start.k) * eased,
+      }
+      transformRef.current = next
+      setTransform(next)
+      if (progress < 1) {
+        animationFrameRef.current = requestAnimationFrame(step)
+      } else {
+        animationFrameRef.current = null
+        setIsCameraAnimating(false)
+        onComplete()
+      }
+    }
+    animationFrameRef.current = requestAnimationFrame(step)
+  }, [cancelCameraAnimation])
+
+  useEffect(() => () => {
+    if (animationFrameRef.current != null) cancelAnimationFrame(animationFrameRef.current)
+  }, [])
+
+  useEffect(() => {
+    cancelCameraAnimation()
+    setExpandedIds(null)
+    setFrozenClusterZoom(null)
+  }, [events, cancelCameraAnimation])
 
   const countryPaths = useMemo(
     () => world.features.map((feature, index) => ({ key: `${feature.properties.iso3 || feature.properties.name}-${index}`, path: path(feature) })),
@@ -619,7 +672,7 @@ function AtlasMap({ world, events, selectedId, onSelectEvent }: { world: WorldGe
   )
 
   const markers = useMemo(() => {
-    const gridSize = Math.max(7, 34 / transform.k)
+    const gridSize = Math.max(7, 34 / (frozenClusterZoom ?? transform.k))
     const buckets = new Map<string, AtlasMarker>()
     const expanded: AtlasMarker[] = []
     let expandedIndex = 0
@@ -635,6 +688,7 @@ function AtlasMap({ world, events, selectedId, onSelectEvent }: { world: WorldGe
           y: point[1] + Math.sin(angle) * radius,
           events: [event],
           expanded: true,
+          expandedOrder: expandedIndex,
         })
         expandedIndex += 1
         continue
@@ -651,16 +705,20 @@ function AtlasMap({ world, events, selectedId, onSelectEvent }: { world: WorldGe
       }
     }
     return [...buckets.values(), ...expanded]
-  }, [events, expandedIds, projection, transform.k])
+  }, [events, expandedIds, frozenClusterZoom, projection, transform.k])
 
   const zoomAt = useCallback((factor: number, anchorX = 500, anchorY = 275) => {
+    cancelCameraAnimation()
+    setFrozenClusterZoom(null)
     setTransform((current) => {
       const nextK = Math.min(MAX_MAP_ZOOM, Math.max(1, current.k * factor))
       const worldX = (anchorX - current.x) / current.k
       const worldY = (anchorY - current.y) / current.k
-      return { k: nextK, x: anchorX - worldX * nextK, y: anchorY - worldY * nextK }
+      const next = { k: nextK, x: anchorX - worldX * nextK, y: anchorY - worldY * nextK }
+      transformRef.current = next
+      return next
     })
-  }, [])
+  }, [cancelCameraAnimation])
 
   useEffect(() => {
     const container = containerRef.current
@@ -700,17 +758,30 @@ function AtlasMap({ world, events, selectedId, onSelectEvent }: { world: WorldGe
 
   const zoomToMarker = (marker: AtlasMarker) => {
     if (marker.events.length === 1) {
+      cancelCameraAnimation()
       onSelectEvent(marker.events[0].properties.id)
       return
     }
-    setExpandedIds(new Set(marker.events.map((event) => event.properties.id)))
-    const nextK = Math.min(MAX_MAP_ZOOM, Math.max(transform.k * 2.5, 8))
-    setTransform({ k: nextK, x: 500 - marker.x * nextK, y: 275 - marker.y * nextK })
+    const current = transformRef.current
+    const eventIds = new Set(marker.events.map((event) => event.properties.id))
+    const nextK = Math.min(12, Math.max(current.k * 2.35, 7 + Math.log10(marker.events.length)))
+    setExpandedIds(null)
+    setFrozenClusterZoom(current.k)
+    animateCameraTo(
+      { k: nextK, x: 500 - marker.x * nextK, y: 275 - marker.y * nextK },
+      () => {
+        setExpandedIds(eventIds)
+        setFrozenClusterZoom(null)
+      },
+    )
   }
 
   const onPointerDown = (event: ReactPointerEvent<SVGSVGElement>) => {
+    cancelCameraAnimation()
+    setFrozenClusterZoom(null)
     event.currentTarget.setPointerCapture(event.pointerId)
-    dragRef.current = { pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, x: transform.x, y: transform.y }
+    const current = transformRef.current
+    dragRef.current = { pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, x: current.x, y: current.y }
   }
 
   const onPointerMove = (event: ReactPointerEvent<SVGSVGElement>) => {
@@ -719,7 +790,11 @@ function AtlasMap({ world, events, selectedId, onSelectEvent }: { world: WorldGe
     const bounds = event.currentTarget.getBoundingClientRect()
     const scaleX = 1000 / bounds.width
     const scaleY = 550 / bounds.height
-    setTransform((current) => ({ ...current, x: drag.x + (event.clientX - drag.clientX) * scaleX, y: drag.y + (event.clientY - drag.clientY) * scaleY }))
+    setTransform((current) => {
+      const next = { ...current, x: drag.x + (event.clientX - drag.clientX) * scaleX, y: drag.y + (event.clientY - drag.clientY) * scaleY }
+      transformRef.current = next
+      return next
+    })
   }
 
   const onPointerUp = (event: ReactPointerEvent<SVGSVGElement>) => {
@@ -728,7 +803,7 @@ function AtlasMap({ world, events, selectedId, onSelectEvent }: { world: WorldGe
   }
 
   return (
-    <div className="map-container atlas-svg-map" ref={containerRef}>
+    <div className="map-container atlas-svg-map" ref={containerRef} data-camera-animating={isCameraAnimating ? 'true' : 'false'}>
       <svg
         viewBox="0 0 1000 550"
         preserveAspectRatio="xMidYMid meet"
@@ -758,6 +833,7 @@ function AtlasMap({ world, events, selectedId, onSelectEvent }: { world: WorldGe
                   data-count={marker.events.length}
                   data-event-id={isCluster ? undefined : representative.properties.id}
                   data-expanded={marker.expanded ? 'true' : 'false'}
+                  style={marker.expanded ? { animationDelay: `${Math.min((marker.expandedOrder ?? 0) * 7, 160)}ms` } : undefined}
                   transform={`translate(${marker.x} ${marker.y})`}
                   role="button"
                   tabIndex={0}
@@ -784,7 +860,7 @@ function AtlasMap({ world, events, selectedId, onSelectEvent }: { world: WorldGe
       <div className="svg-map-controls" aria-label="Map controls">
         <button onClick={() => zoomAt(1.35)} aria-label="Zoom in">+</button>
         <button onClick={() => zoomAt(0.74)} aria-label="Zoom out">−</button>
-        <button onClick={() => { setExpandedIds(null); setTransform({ x: 0, y: 0, k: 1 }) }} aria-label="Reset world view"><Globe2 size={14} /></button>
+        <button onClick={() => { cancelCameraAnimation(); setExpandedIds(null); setFrozenClusterZoom(null); transformRef.current = { x: 0, y: 0, k: 1 }; setTransform({ x: 0, y: 0, k: 1 }) }} aria-label="Reset world view"><Globe2 size={14} /></button>
       </div>
       <span className="map-attribution">Made with Natural Earth</span>
     </div>

@@ -101,6 +101,10 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
 .atlas-marker:hover circle, .atlas-marker:focus-visible circle { filter: brightness(1.08); }
 .atlas-marker text { fill: #fff; font-weight: 800; text-anchor: middle; pointer-events: none; }
 .atlas-marker .selected-halo { fill: none; stroke: #10251f; filter: none; }
+.atlas-marker.event[data-expanded="true"] { animation: marker-reveal .25s ease-out both; }
+.atlas-marker.event[data-expanded="true"] circle:not(.selected-halo) { transform-box: fill-box; transform-origin: center; animation: marker-pop .34s cubic-bezier(.2,.8,.2,1) both; animation-delay: inherit; }
+@keyframes marker-reveal { from { opacity: 0; } to { opacity: 1; } }
+@keyframes marker-pop { from { transform: scale(.35); } 70% { transform: scale(1.12); } to { transform: scale(1); } }
 .svg-map-controls { position: absolute; z-index: 5; right: 17px; bottom: 57px; overflow: hidden; display: flex; flex-direction: column; border: 1px solid rgba(17,48,39,.14); border-radius: 8px; background: white; box-shadow: 0 3px 10px rgba(17,48,39,.12); }
 .svg-map-controls button { width: 34px; height: 34px; border: 0; border-bottom: 1px solid #dde4df; display: grid; place-items: center; background: white; color: #263b33; font-size: 19px; font-weight: 700; cursor: pointer; }
 .svg-map-controls button:last-child { border-bottom: 0; }
