@@ -121,6 +121,30 @@ test('article links expose political totals, signals and filtering', async ({ pa
   expect(errors).toEqual([])
 })
 
+test('attention toggle and before-after analysis share the selected measure', async ({ page }) => {
+  const errors = collectClientErrors(page)
+  await page.goto('/?event=gdacs%3AWF%3A1023505', { waitUntil: 'networkidle' })
+  await expect(page.locator('.event-drawer')).toBeVisible()
+  await page.locator('.scope-select select').selectOption('global')
+
+  const cards = page.locator('.before-after-card')
+  await expect(cards).toHaveCount(2)
+  await expect(page.locator('.before-after-card[data-test-status="unavailable"]')).toHaveCount(0)
+  await expect(cards.first()).toContainText('URLs/day')
+  await expect(cards.first()).toContainText('One-sided p =')
+  const allArticleResult = await cards.first().textContent()
+
+  await page.getByRole('button', { name: 'Political only' }).click()
+  await expect(page.getByRole('button', { name: 'Political only' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByRole('heading', { name: /Political topic coverage around the event/ })).toBeVisible()
+  await expect.poll(async () => cards.first().textContent()).not.toBe(allArticleResult)
+
+  await page.getByLabel('Comparison window').selectOption('28')
+  await expect(page.locator('.before-after-card[data-test-status="unavailable"]')).toHaveCount(2)
+  await expect(cards.first()).toContainText('Not testable')
+  expect(errors).toEqual([])
+})
+
 test('trackpad-style zoom stays inside the map and clusters reveal individual events', async ({ page }) => {
   const errors = collectClientErrors(page)
   await openExplorer(page)

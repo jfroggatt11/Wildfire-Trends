@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dateWithinRange, formatDate, getPoliticalSignals, hasPoliticalSignal, newestFirst } from './utils'
+import { dateWithinRange, formatDate, getPoliticalSignals, hasPoliticalSignal, newestFirst, permutationIncreaseTest } from './utils'
 
 describe('formatDate', () => {
   it('formats valid UTC dates', () => {
@@ -62,5 +62,24 @@ describe('political article signals', () => {
     }
     expect(hasPoliticalSignal(article)).toBe(false)
     expect(getPoliticalSignals(article)).toEqual([])
+  })
+})
+
+describe('permutationIncreaseTest', () => {
+  it('finds a clear directional increase with an exact short-window test', () => {
+    const result = permutationIncreaseTest([0, 1, 0, 1, 0, 1, 0], [8, 9, 8, 10, 9, 8, 10])
+    expect(result?.method).toBe('exact')
+    expect(result?.difference).toBeGreaterThan(8)
+    expect(result?.pValue).toBeLessThan(0.05)
+  })
+
+  it('does not label unchanged observations as an increase', () => {
+    const result = permutationIncreaseTest([2, 3, 2, 3], [2, 3, 2, 3])
+    expect(result?.difference).toBe(0)
+    expect(result?.pValue).toBeGreaterThanOrEqual(0.5)
+  })
+
+  it('requires at least two observations on each side', () => {
+    expect(permutationIncreaseTest([1], [2, 3])).toBeNull()
   })
 })

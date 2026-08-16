@@ -16,12 +16,7 @@ export type AttentionChartPoint = {
   [topicId: string]: string | number
 }
 
-const TOPICS = [
-  { id: 'climate_change', label: 'Climate change', color: '#286e59' },
-  { id: 'clean_transport', label: 'Clean transport', color: '#d56743' },
-  { id: 'electric_vehicles', label: 'Electric vehicles', color: '#6575b7' },
-  { id: 'clean_energy', label: 'Clean energy', color: '#c59a2b' },
-]
+type TopicDefinition = { id: string; label: string; color: string }
 
 type TooltipEntry = { name: string; value: number; color: string }
 
@@ -54,9 +49,11 @@ function ChartTooltip({
 export default function AttentionChart({
   points,
   eventDuration,
+  topics,
 }: {
   points: AttentionChartPoint[]
   eventDuration: number
+  topics: TopicDefinition[]
 }) {
   return (
     <ResponsiveContainer width="100%" height={260}>
@@ -71,7 +68,7 @@ export default function AttentionChart({
         <Tooltip content={<ChartTooltip />} />
         <Legend iconType="circle" wrapperStyle={{ fontSize: 11, paddingTop: 10 }} />
         <ReferenceArea x1={0} x2={eventDuration} fill="#e9c98a" fillOpacity={0.22} />
-        {TOPICS.map((topic) => (
+        {topics.map((topic) => (
           <Line
             key={topic.id}
             type="monotone"

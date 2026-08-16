@@ -30,7 +30,7 @@ import {
   X,
 } from 'lucide-react'
 import type { AttentionChartPoint } from './AttentionChart'
-import { dateWithinRange, formatDate, getPoliticalSignals, hasPoliticalSignal, newestFirst } from './utils'
+import { dateWithinRange, formatDate, getPoliticalSignals, hasPoliticalSignal, newestFirst, permutationIncreaseTest } from './utils'
 
 const AttentionChart = lazy(() => import('./AttentionChart'))
 
@@ -39,6 +39,7 @@ type AlertLevel = 'Green' | 'Orange' | 'Red'
 type MediaScope = 'affected' | 'eu27' | 'international' | 'global'
 type View = 'explore' | 'lab' | 'data' | 'methods'
 type DetailTab = 'attention' | 'articles'
+type AttentionMode = 'all' | 'political'
 
 type EventProperties = {
   id: string
@@ -891,7 +892,8 @@ function EventDrawer({
   const hazard = HAZARDS[event.hazardType]
   const HazardIcon = hazard.icon
   const displayName = eventDisplayName(event)
-  const chart = useMemo(() => buildEventChart(event, attention, scope), [event, attention, scope])
+  const [attentionMode, setAttentionMode] = useState<AttentionMode>('all')
+  const chart = useMemo(() => buildEventChart(event, attention, scope, attentionMode), [event, attention, scope, attentionMode])
   const candidateArticles = useMemo(
     () =>
       articles
@@ -929,7 +931,7 @@ function EventDrawer({
       </div>
 
       <div className="drawer-content">
-        {tab === 'attention' && <AttentionTab event={event} chart={chart} scope={scope} onScopeChange={onScopeChange} />}
+        {tab === 'attention' && <AttentionTab event={event} chart={chart} scope={scope} onScopeChange={onScopeChange} mode={attentionMode} onModeChange={setAttentionMode} />}
         {tab === 'articles' && <ArticlesTab articles={candidateArticles} scope={scope} geographyLabels={geographyLabels} />}
       </div>
     </aside>
@@ -949,14 +951,16 @@ function ScopeSelect({ scope, onChange }: { scope: MediaScope; onChange: (scope:
 
 type ChartResult = { points: AttentionChartPoint[]; coverageDays: number; preDays: number; postDays: number }
 
-function buildEventChart(event: EventProperties, attention: AttentionRow[], scope: MediaScope): ChartResult {
+function buildEventChart(event: EventProperties, attention: AttentionRow[], scope: MediaScope, mode: AttentionMode): ChartResult {
   const relevant = attention.filter(
     (row) => row.source === 'gdelt_ngrams' && withinWindow(row.date, event) && scopeAllows(row.geography, event, scope),
   )
   const daily = new Map<string, AttentionChartPoint>()
   for (const row of relevant) {
+    const value = mode === 'political' ? row.politicalCount : row.matchedCount
+    if (value == null) continue
     const point = daily.get(row.date) ?? { date: row.date, relativeDay: dayDifference(row.date, event.startAt) }
-    point[row.topicId] = Number(point[row.topicId] ?? 0) + (row.matchedCount ?? 0)
+    point[row.topicId] = Number(point[row.topicId] ?? 0) + value
     daily.set(row.date, point)
   }
   const points = [...daily.values()].sort((a, b) => a.date.localeCompare(b.date))
@@ -968,7 +972,16 @@ function buildEventChart(event: EventProperties, attention: AttentionRow[], scop
   }
 }
 
-function AttentionTab({ event, chart, scope, onScopeChange }: { event: EventProperties; chart: ChartResult; scope: MediaScope; onScopeChange: (scope: MediaScope) => void }) {
+function AttentionModeToggle({ mode, onChange }: { mode: AttentionMode; onChange: (mode: AttentionMode) => void }) {
+  return (
+    <div className="attention-mode-toggle" role="group" aria-label="Attention measure">
+      <button className={mode === 'all' ? 'active' : ''} aria-pressed={mode === 'all'} onClick={() => onChange('all')}>All articles</button>
+      <button className={mode === 'political' ? 'active' : ''} aria-pressed={mode === 'political'} onClick={() => onChange('political')}>Political only</button>
+    </div>
+  )
+}
+
+function AttentionTab({ event, chart, scope, onScopeChange, mode, onModeChange }: { event: EventProperties; chart: ChartResult; scope: MediaScope; onScopeChange: (scope: MediaScope) => void; mode: AttentionMode; onModeChange: (mode: AttentionMode) => void }) {
   const enoughData = chart.preDays >= 7 && chart.postDays >= 7
   return (
     <>
@@ -978,52 +991,115 @@ function AttentionTab({ event, chart, scope, onScopeChange }: { event: EventProp
       </div>
       <section className="drawer-section chart-section">
         <span className="eyebrow">Article attention</span>
-        <h3>Topic coverage around the event</h3>
-        <p className="muted-copy">Distinct matched URLs published by outlets in {SCOPE_COPY[scope].label.toLowerCase()}.</p>
+        <h3>{mode === 'political' ? 'Political topic coverage' : 'Topic coverage'} around the event</h3>
+        <p className="muted-copy">{mode === 'political' ? 'Distinct matched URLs containing a political actor, government action, party-politics or official-source signal' : 'Distinct matched URLs'} published by outlets in {SCOPE_COPY[scope].label.toLowerCase()}.</p>
+        <AttentionModeToggle mode={mode} onChange={onModeChange} />
         <div className="chart-wrap">
           {chart.points.length ? (
             <Suspense fallback={<div className="chart-loading" role="status">Loading chart…</div>}>
               <AttentionChart
                 points={chart.points}
                 eventDuration={Math.max(0, dayDifference(event.endAt, event.startAt))}
+                topics={TOPICS}
               />
             </Suspense>
           ) : (
-            <EmptyChart />
+            <EmptyChart message={mode === 'political' ? 'Political classification was not collected for this window.' : undefined} />
           )}
         </div>
         {!enoughData && (
           <div className="inline-note"><Info size={15} /><span>Only {chart.coverageDays} day{chart.coverageDays === 1 ? '' : 's'} of this window are present. At least seven pre- and post-event days are required for an MVP estimate.</span></div>
         )}
       </section>
-      <section className="drawer-section">
-        <span className="eyebrow">Before / after</span>
-        <h3>Estimated change</h3>
-        <div className="metric-grid">
-          {TOPICS.map((topic) => <div key={topic.id} className="metric-card"><span style={{ background: topic.color }} /><small>{topic.label}</small><strong>Pending</strong><em>Needs continuous coverage</em></div>)}
-        </div>
-      </section>
-      <section className="drawer-section">
-        <span className="eyebrow">Article framing</span>
-        <h3>How the discourse changes</h3>
-        <p className="muted-copy">Signals overlap and will be reported as separate rates among matched articles.</p>
-        <div className="framing-list">
-          {['Political actors', 'Government action', 'Party politics', 'Official sources'].map((label) => (
-            <div key={label}><span>{label}</span><i><b style={{ width: '0%' }} /></i><strong>Pending</strong></div>
-          ))}
-        </div>
-      </section>
+      <BeforeAfterAnalysis event={event} chart={chart} mode={mode} />
     </>
   )
 }
 
-function EmptyChart() {
+const shiftDate = (value: string, days: number) => {
+  const result = new Date(`${value.slice(0, 10)}T00:00:00Z`)
+  result.setUTCDate(result.getUTCDate() + days)
+  return result.toISOString().slice(0, 10)
+}
+
+function BeforeAfterAnalysis({ event, chart, mode }: { event: EventProperties; chart: ChartResult; mode: AttentionMode }) {
+  const [windowDays, setWindowDays] = useState(7)
+  const evaluations = useMemo(() => {
+    const byDate = new Map(chart.points.map((point) => [point.date, point]))
+    const beforeDates = Array.from({ length: windowDays }, (_, index) => shiftDate(event.startAt, index - windowDays))
+    const afterDates = Array.from({ length: windowDays }, (_, index) => shiftDate(event.endAt, index + 1))
+    const collect = (dates: string[], topicId: string) => {
+      const values: number[] = []
+      const missing: string[] = []
+      for (const date of dates) {
+        const value = byDate.get(date)?.[topicId]
+        if (typeof value === 'number') values.push(value)
+        else missing.push(date)
+      }
+      return { values, missing }
+    }
+    return TOPICS.map((topic) => {
+      const before = collect(beforeDates, topic.id)
+      const after = collect(afterDates, topic.id)
+      return {
+        topic,
+        before,
+        after,
+        result: before.missing.length || after.missing.length ? null : permutationIncreaseTest(before.values, after.values),
+      }
+    })
+  }, [chart.points, event.endAt, event.startAt, windowDays])
+
+  return (
+    <section className="drawer-section before-after-analysis" aria-live="polite">
+      <div className="before-after-heading">
+        <div><span className="eyebrow">Before / after</span><h3>Did attention increase?</h3></div>
+        <label><span>Comparison window</span><select value={windowDays} onChange={(event) => setWindowDays(Number(event.target.value))}><option value={7}>7 days</option><option value={14}>14 days</option><option value={28}>28 days</option></select></label>
+      </div>
+      <p className="muted-copy">Mean daily {mode === 'political' ? 'politically flagged ' : ''}matched URLs before and after the event, using complete days only.</p>
+      <div className="before-after-grid">
+        {evaluations.map(({ topic, before, after, result }) => {
+          const significantIncrease = Boolean(result && result.difference > 0 && result.pValue < 0.05)
+          const status = !result ? 'unavailable' : significantIncrease ? 'increase' : 'no-detectable-increase'
+          const verdict = !result
+            ? 'Not testable'
+            : significantIncrease
+              ? 'Evidence of increase'
+              : result.difference > 0
+                ? 'Increase not distinguishable'
+                : 'No increase observed'
+          const pValue = result ? (result.pValue < 0.001 ? '<0.001' : result.pValue.toFixed(3)) : null
+          return (
+            <article key={topic.id} className={significantIncrease ? 'before-after-card significant' : 'before-after-card'} data-topic={topic.id} data-test-status={status}>
+              <header><i style={{ background: topic.color }} /><strong>{topic.label}</strong><span>{verdict}</span></header>
+              {!result ? (
+                <p className="before-after-unavailable"><CircleAlert size={14} /> Missing {before.missing.length} before and {after.missing.length} after day{after.missing.length === 1 ? '' : 's'}.</p>
+              ) : (
+                <>
+                  <div className="before-after-values">
+                    <span><small>Before</small><b>{result.beforeMean.toFixed(1)}</b><em>URLs/day</em></span>
+                    <span><small>After</small><b>{result.afterMean.toFixed(1)}</b><em>URLs/day</em></span>
+                    <span className="change"><small>Change</small><b>{result.difference > 0 ? '+' : ''}{result.difference.toFixed(1)}</b><em>{result.percentChange == null ? 'zero baseline' : `${result.percentChange > 0 ? '+' : ''}${result.percentChange.toFixed(0)}%`}</em></span>
+                  </div>
+                  <p className="before-after-test">One-sided p = {pValue} · {result.method === 'exact' ? 'exact' : `${result.permutations.toLocaleString()}-draw`} permutation test</p>
+                </>
+              )}
+            </article>
+          )
+        })}
+      </div>
+      <div className="inline-note association-note"><Info size={15} /><span>This is an exploratory association test, not a causal estimate. “Not statistically distinguishable” is not evidence of no effect; stronger inference needs control dates or unaffected media markets and correction for multiple testing.</span></div>
+    </section>
+  )
+}
+
+function EmptyChart({ message }: { message?: string }) {
   return (
     <div className="empty-chart">
       <div className="empty-chart-lines"><i /><i /><i /><i /></div>
       <Activity size={23} />
       <strong>No daily observations in this window</strong>
-      <span>The event remains available for geographic exploration.</span>
+      <span>{message || 'The event remains available for geographic exploration.'}</span>
     </div>
   )
 }

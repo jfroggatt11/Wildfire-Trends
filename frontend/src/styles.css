@@ -175,6 +175,10 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
 .tab-toolbar { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
 .tab-toolbar .scope-select { flex: 1; margin-top: 0; grid-template-columns: 1fr; gap: 5px; }
 .window-chip { flex: 0 0 auto; height: 36px; display: flex; align-items: center; padding: 0 10px; border-radius: 7px; color: #57665f; background: #e8ede9; font-size: 9px; font-weight: 750; }
+.attention-mode-toggle { margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 3px; padding: 3px; border-radius: 7px; background: #e7ede9; }
+.attention-mode-toggle button { min-height: 31px; border: 0; border-radius: 5px; color: #64736b; background: transparent; font-size: 9px; font-weight: 750; cursor: pointer; }
+.attention-mode-toggle button:hover { color: #32483e; }
+.attention-mode-toggle button.active { color: #fff; background: var(--green); box-shadow: 0 1px 4px rgba(16,37,31,.16); }
 .chart-section { padding-bottom: 17px; }
 .chart-wrap { margin-top: 13px; min-height: 260px; }
 .recharts-default-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 8px; }
@@ -193,17 +197,32 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
 .empty-chart-lines i { display: block; border-top: 1px dashed #dce2de; }
 .inline-note { margin-top: 9px; display: flex; align-items: flex-start; gap: 7px; color: #7e6a3a; font-size: 8.5px; line-height: 1.4; }
 .inline-note svg { flex: 0 0 auto; }
-.metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
-.metric-card { position: relative; overflow: hidden; min-height: 84px; display: flex; flex-direction: column; padding: 11px; border: 1px solid #dde4df; border-radius: 7px; background: white; }
-.metric-card > span { position: absolute; top: 0; left: 0; bottom: 0; width: 3px; }
-.metric-card small { color: #7d8983; font-size: 8px; }
-.metric-card strong { margin-top: 7px; color: #596660; font-size: 14px; }
-.metric-card em { margin-top: 2px; color: #9aa39e; font-size: 7.5px; font-style: normal; }
-.framing-list { margin-top: 13px; display: flex; flex-direction: column; gap: 10px; }
-.framing-list > div { display: grid; grid-template-columns: 105px 1fr 48px; align-items: center; gap: 9px; color: #66746d; font-size: 8.5px; }
-.framing-list i { height: 5px; overflow: hidden; display: block; border-radius: 5px; background: #e1e7e3; }
-.framing-list b { height: 100%; display: block; border-radius: inherit; background: var(--green); }
-.framing-list strong { color: #9aa49f; font-size: 7.5px; text-align: right; }
+.before-after-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; }
+.before-after-heading h3 { margin-bottom: 0; }
+.before-after-heading label { flex: 0 0 120px; display: flex; flex-direction: column; gap: 4px; }
+.before-after-heading label span { color: #78867f; font-size: 7px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.before-after-heading select { width: 100%; height: 32px; padding: 0 24px 0 8px; border: 1px solid #d4ddd7; border-radius: 6px; color: #34463e; background: white; font-size: 9px; font-weight: 700; }
+.before-after-analysis > .muted-copy { margin-top: 9px; }
+.before-after-grid { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+.before-after-card { overflow: hidden; border: 1px solid #dce4de; border-radius: 8px; background: #fff; }
+.before-after-card.significant { border-color: #9fc5b2; background: #f6fbf8; }
+.before-after-card header { min-height: 37px; display: grid; grid-template-columns: 4px 1fr auto; align-items: center; gap: 8px; padding: 0 10px 0 0; border-bottom: 1px solid #e4e9e6; }
+.before-after-card header i { width: 4px; height: 100%; }
+.before-after-card header strong { color: #34473e; font-size: 9.5px; }
+.before-after-card header span { max-width: 160px; padding: 4px 6px; border-radius: 9px; color: #6f7d76; background: #edf1ee; font-size: 6.5px; font-weight: 850; letter-spacing: .025em; text-align: center; text-transform: uppercase; }
+.before-after-card.significant header span { color: #236047; background: #dcefe4; }
+.before-after-values { display: grid; grid-template-columns: repeat(3, 1fr); padding: 10px; }
+.before-after-values > span { min-width: 0; display: flex; flex-direction: column; padding: 0 9px; border-right: 1px solid #e4e9e6; }
+.before-after-values > span:first-child { padding-left: 0; }
+.before-after-values > span:last-child { padding-right: 0; border-right: 0; }
+.before-after-values small { color: #7d8982; font-size: 6.5px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.before-after-values b { margin-top: 4px; color: #293c33; font-family: Georgia, serif; font-size: 17px; font-weight: 500; }
+.before-after-values em { margin-top: 1px; overflow: hidden; color: #819087; font-size: 7px; font-style: normal; white-space: nowrap; text-overflow: ellipsis; }
+.before-after-values .change b { color: var(--green); }
+.before-after-test { margin: 0; padding: 0 10px 9px; color: #7b8881; font-size: 7.5px; }
+.before-after-unavailable { display: flex; align-items: center; gap: 6px; margin: 0; padding: 11px; color: #806e49; background: #faf7ee; font-size: 8px; }
+.before-after-unavailable svg { flex: 0 0 auto; }
+.association-note { margin-top: 12px; color: #706444; }
 .scope-cards { margin-top: 13px; display: flex; flex-direction: column; gap: 7px; }
 .scope-cards button { display: grid; grid-template-columns: 18px 1fr; gap: 8px; padding: 11px; border: 1px solid #dce3df; border-radius: 8px; background: white; text-align: left; cursor: pointer; }
 .scope-cards button.active { border-color: #73a18f; background: #f0f6f2; box-shadow: inset 0 0 0 1px #73a18f; }
