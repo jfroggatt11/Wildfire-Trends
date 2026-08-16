@@ -36,7 +36,7 @@ const AttentionChart = lazy(() => import('./AttentionChart'))
 type HazardType = 'wildfire' | 'flood' | 'tropical_cyclone'
 type AlertLevel = 'Green' | 'Orange' | 'Red'
 type MediaScope = 'affected' | 'eu27' | 'international' | 'global'
-type View = 'explore' | 'lab' | 'methods'
+type View = 'explore' | 'lab' | 'data' | 'methods'
 type DetailTab = 'briefing' | 'attention' | 'geography' | 'articles' | 'methods'
 
 type EventProperties = {
@@ -93,6 +93,21 @@ type Article = {
   officialSource: boolean
 }
 
+type DataSourceSummary = {
+  id: string
+  name: string
+  provider: string
+  role: string
+  dateMin: string | null
+  dateMax: string | null
+  recordCount: number
+  recordLabel: string
+  geographyCount: number
+  status: 'explorer' | 'supporting' | 'validation'
+  description: string
+  sourceUrl: string
+}
+
 type Manifest = {
   generatedAt: string
   events: { count: number; hazards: Record<string, number>; alerts: Record<string, number> }
@@ -104,6 +119,7 @@ type Manifest = {
     topics: Record<string, number>
   }
   articles: { count: number }
+  dataSources: DataSourceSummary[]
   analysisStatus: string
   notes: string[]
 }
@@ -316,6 +332,9 @@ function App() {
           <button className={view === 'lab' ? 'active' : ''} onClick={() => { setView('lab'); setMobileMenuOpen(false) }}>
             <Microscope size={16} /> Analysis Lab
           </button>
+          <button className={view === 'data' ? 'active' : ''} onClick={() => { setView('data'); setMobileMenuOpen(false) }}>
+            <Database size={16} /> Data
+          </button>
           <button className={view === 'methods' ? 'active' : ''} onClick={() => { setView('methods'); setMobileMenuOpen(false) }}>
             <BookOpen size={16} /> Methods
           </button>
@@ -344,6 +363,8 @@ function App() {
         />
       ) : view === 'lab' ? (
         <AnalysisLab manifest={manifest} />
+      ) : view === 'data' && manifest ? (
+        <DataSummary manifest={manifest} />
       ) : view === 'methods' ? (
         <MethodsView />
       ) : (
@@ -1072,6 +1093,103 @@ function MethodsView() {
         </ol>
       </section>
       <section className="limitations-section"><div><span className="eyebrow">Interpretation boundary</span><h2>What the MVP will not claim</h2></div><ul><li>Temporal change alone does not establish that an event caused media coverage.</li><li>An outlet’s country does not identify an article’s audience or subject location.</li><li>Article counts are not directly comparable across countries without accounting for media-system coverage.</li><li>Event-specific framing requires separate article-to-event linkage and validation.</li></ul></section>
+    </main>
+  )
+}
+
+const SOURCE_STATUS = {
+  explorer: { label: 'Used in explorer', color: '#286e59' },
+  supporting: { label: 'Supporting layer', color: '#b17a25' },
+  validation: { label: 'Validation only', color: '#6575b7' },
+} as const
+
+function DataSummary({ manifest }: { manifest: Manifest }) {
+  const datedSources = manifest.dataSources.filter((source) => source.dateMin && source.dateMax)
+  const coverageStart = datedSources.reduce(
+    (earliest, source) => (!earliest || source.dateMin! < earliest ? source.dateMin! : earliest),
+    '',
+  )
+  const coverageEnd = datedSources.reduce(
+    (latest, source) => (!latest || source.dateMax! > latest ? source.dateMax! : latest),
+    '',
+  )
+  const startTime = new Date(coverageStart).getTime()
+  const totalDuration = Math.max(1, new Date(coverageEnd).getTime() - startTime)
+  const explorerSources = manifest.dataSources.filter((source) => source.status === 'explorer').length
+
+  const rangeStyle = (source: DataSourceSummary) => {
+    const sourceStart = new Date(source.dateMin || coverageStart).getTime()
+    const sourceEnd = new Date(source.dateMax || coverageEnd).getTime()
+    const left = Math.max(0, ((sourceStart - startTime) / totalDuration) * 100)
+    const width = Math.max(1, ((sourceEnd - sourceStart) / totalDuration) * 100)
+    return { left: `${left}%`, width: `${Math.min(width, 100 - left)}%` }
+  }
+
+  return (
+    <main className="data-summary-view">
+      <section className="data-hero">
+        <div>
+          <span className="eyebrow">Data summary</span>
+          <h1>What the Atlas currently covers.</h1>
+          <p>Every date range below is calculated from the stored research data at export time. Sources used in the explorer are separated from supporting and validation-only streams.</p>
+        </div>
+        <div className="data-snapshot">
+          <Database size={18} />
+          <div><strong>Snapshot generated</strong><small>{formatDate(manifest.generatedAt)}</small></div>
+        </div>
+      </section>
+
+      <section className="data-summary-content">
+        <div className="data-overview" aria-label="Data coverage overview">
+          <div><strong>{manifest.dataSources.length}</strong><span>Source streams</span></div>
+          <div><strong>{explorerSources}</strong><span>Used in explorer</span></div>
+          <div><strong>{formatDate(coverageStart)}</strong><span>Earliest observation</span></div>
+          <div><strong>{formatDate(coverageEnd)}</strong><span>Latest observation</span></div>
+        </div>
+
+        <section className="source-coverage-panel" aria-labelledby="coverage-heading">
+          <div className="data-section-heading">
+            <div><span className="eyebrow">Coverage timeline</span><h2 id="coverage-heading">Dates available by source</h2></div>
+            <div className="coverage-legend">
+              {(Object.entries(SOURCE_STATUS) as [keyof typeof SOURCE_STATUS, (typeof SOURCE_STATUS)[keyof typeof SOURCE_STATUS]][]).map(([id, status]) => <span key={id}><i style={{ background: status.color }} />{status.label}</span>)}
+            </div>
+          </div>
+          <div className="source-timeline">
+            <div className="source-timeline-dates"><span>{formatDate(coverageStart)}</span><span>{formatDate(coverageEnd)}</span></div>
+            {manifest.dataSources.map((source) => (
+              <div className="source-timeline-row" key={source.id}>
+                <div><strong>{source.name}</strong><small>{formatDate(source.dateMin)} — {formatDate(source.dateMax)}</small></div>
+                <div className="source-timeline-track"><span style={{ ...rangeStyle(source), background: SOURCE_STATUS[source.status].color }} /></div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="source-catalogue" aria-labelledby="sources-heading">
+          <div className="data-section-heading"><div><span className="eyebrow">Source catalogue</span><h2 id="sources-heading">Inputs and research roles</h2></div></div>
+          <div className="source-card-grid">
+            {manifest.dataSources.map((source) => (
+              <article className="source-card" key={source.id} data-source={source.id}>
+                <div className="source-card-top"><span className="source-role">{source.role}</span><span className={`source-status ${source.status}`}><i />{SOURCE_STATUS[source.status].label}</span></div>
+                <h3>{source.name}</h3>
+                <p className="source-provider">{source.provider}</p>
+                <p>{source.description}</p>
+                <dl>
+                  <div><dt>Coverage</dt><dd>{formatDate(source.dateMin)} — {formatDate(source.dateMax)}</dd></div>
+                  <div><dt>Records</dt><dd>{source.recordCount.toLocaleString()} {source.recordLabel}</dd></div>
+                  <div><dt>Geographies</dt><dd>{source.geographyCount.toLocaleString()}</dd></div>
+                </dl>
+                <a href={source.sourceUrl} target="_blank" rel="noreferrer">Open source documentation <ExternalLink size={13} /></a>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="data-notes">
+          <div><Info size={18} /><span><strong>How to read this page</strong><small>Coverage means dates stored in this snapshot, not the provider’s full historical availability. Record types differ and should not be summed across sources.</small></span></div>
+          <ul>{manifest.notes.map((note) => <li key={note}>{note}</li>)}</ul>
+        </section>
+      </section>
     </main>
   )
 }

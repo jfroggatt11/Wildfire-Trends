@@ -85,6 +85,24 @@ test('article links expose political totals, signals and filtering', async ({ pa
   expect(errors).toEqual([])
 })
 
+test('data summary reports every source and its stored coverage dates', async ({ page }) => {
+  const errors = collectClientErrors(page)
+  await openExplorer(page)
+  await page.getByRole('button', { name: 'Data', exact: true }).click()
+
+  await expect(page.getByRole('heading', { name: 'What the Atlas currently covers.' })).toBeVisible()
+  await expect(page.locator('.source-card')).toHaveCount(6)
+  await expect(page.locator('.source-timeline-row')).toHaveCount(6)
+  await expect(page.locator('[data-source="gdacs"]')).toContainText('17 Nov 2024')
+  await expect(page.locator('[data-source="firms"]')).toContainText('31 Dec 2025')
+  await expect(page.locator('[data-source="gdelt_ngrams"]')).toContainText('31 Jul 2026')
+  expect((await page.locator('.source-card dd').allTextContents()).some((value) => value.includes('Open'))).toBe(false)
+
+  await page.getByRole('button', { name: 'Explore', exact: true }).click()
+  await expect(page.locator('.atlas-svg-map')).toBeVisible()
+  expect(errors).toEqual([])
+})
+
 test('clearing and keyboard-editing date filters never unmounts the explorer', async ({ page }) => {
   const errors = collectClientErrors(page)
   await openExplorer(page)

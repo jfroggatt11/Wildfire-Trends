@@ -19,7 +19,7 @@ series and is being validated before it replaces any canonical API measure.
 
 `frontend/` contains the Netlify-ready Climate Attention Atlas: a React and
 TypeScript map explorer for GDACS events, media-market comparisons, article evidence,
-research hypotheses, and methodology. It deliberately shows an unavailable state
+research hypotheses, a source-level data coverage summary, and methodology. It deliberately shows an unavailable state
 instead of estimating an event effect when the continuous daily panel is incomplete.
 
 Export the current Parquet datasets to compact browser assets, then run the app:
