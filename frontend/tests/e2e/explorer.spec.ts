@@ -119,7 +119,7 @@ test('coverage breakdown replaces article links with aggregate timing, political
   expect(errors).toEqual([])
 })
 
-test('trackpad-style zoom stays inside the map and clusters reveal individual events', async ({ page }) => {
+test('trackpad-style zoom stays inside the map and clusters resolve at source coordinates', async ({ page }) => {
   const errors = collectClientErrors(page)
   await openExplorer(page)
   const map = page.locator('.atlas-svg-map')
@@ -141,13 +141,31 @@ test('trackpad-style zoom stays inside the map and clusters reveal individual ev
   // SVG paints later markers on top; target the topmost visible cluster just as a user would.
   const cluster = page.locator('.atlas-marker.cluster').last()
   const clusterCount = Number(await cluster.getAttribute('data-count'))
+  const clusterPosition = await cluster.getAttribute('transform')
+  const markerCountBefore = await page.locator('.atlas-marker').count()
   expect(clusterCount).toBeGreaterThan(1)
   await cluster.click()
   await expect(map).toHaveAttribute('data-camera-animating', 'true')
-  await expect(page.locator('.atlas-marker.event[data-expanded="true"]')).toHaveCount(0)
   await expect(map).toHaveAttribute('data-camera-animating', 'false')
   await expect.poll(async () => Number(await svg.getAttribute('data-zoom'))).toBeGreaterThanOrEqual(7)
-  await expect(page.locator('.atlas-marker.event[data-expanded="true"]')).toHaveCount(clusterCount)
+  await expect.poll(async () => page.locator('.atlas-marker').count()).toBeGreaterThan(markerCountBefore)
+  await expect(page.locator('.atlas-marker[data-expanded="true"]')).toHaveCount(0)
+  const positionsAfterSplit = await page.locator('.atlas-marker').evaluateAll((markers) => markers.map((marker) => marker.getAttribute('transform')))
+  expect(positionsAfterSplit).toContain(clusterPosition)
+
+  const positionsBeforeZoomOut = await page.locator('.atlas-marker.event').evaluateAll((markers) => Object.fromEntries(markers.map((marker) => [
+    marker.getAttribute('data-event-id'),
+    marker.getAttribute('transform'),
+  ])))
+  const zoomOut = map.getByRole('button', { name: 'Zoom out', exact: true })
+  await zoomOut.evaluate((button: HTMLButtonElement) => button.click())
+  const positionsAfterZoomOut = await page.locator('.atlas-marker.event').evaluateAll((markers) => Object.fromEntries(markers.map((marker) => [
+    marker.getAttribute('data-event-id'),
+    marker.getAttribute('transform'),
+  ])))
+  const persistentIds = Object.keys(positionsBeforeZoomOut).filter((id) => id in positionsAfterZoomOut)
+  expect(persistentIds.length).toBeGreaterThan(0)
+  for (const id of persistentIds) expect(positionsAfterZoomOut[id]).toBe(positionsBeforeZoomOut[id])
   expect(errors).toEqual([])
 })
 

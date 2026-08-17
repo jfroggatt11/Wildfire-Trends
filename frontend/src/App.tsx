@@ -595,13 +595,12 @@ function ExploreView({
 }
 
 type AtlasTransform = { x: number; y: number; k: number }
-type AtlasMarker = { key: string; x: number; y: number; events: EventFeature[]; expanded?: boolean; expandedOrder?: number }
+type AtlasMarker = { key: string; x: number; y: number; events: EventFeature[] }
 
 const MAX_MAP_ZOOM = 18
 
 function AtlasMap({ world, events, selectedId, onSelectEvent }: { world: WorldGeoJSON; events: EventFeature[]; selectedId: string | null; onSelectEvent: (id: string | null) => void }) {
   const [transform, setTransform] = useState<AtlasTransform>({ x: 0, y: 0, k: 1 })
-  const [expandedIds, setExpandedIds] = useState<Set<string> | null>(null)
   const [frozenClusterZoom, setFrozenClusterZoom] = useState<number | null>(null)
   const [isCameraAnimating, setIsCameraAnimating] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -658,7 +657,6 @@ function AtlasMap({ world, events, selectedId, onSelectEvent }: { world: WorldGe
 
   useEffect(() => {
     cancelCameraAnimation()
-    setExpandedIds(null)
     setFrozenClusterZoom(null)
   }, [events, cancelCameraAnimation])
 
@@ -668,11 +666,12 @@ function AtlasMap({ world, events, selectedId, onSelectEvent }: { world: WorldGe
   )
 
   const markers = useMemo(() => {
-    const gridSize = Math.max(7, 34 / (frozenClusterZoom ?? transform.k))
+    // Keep the clustering cell approximately 34 screen pixels wide. The old
+    // seven-unit floor prevented real coordinates from separating at higher
+    // zoom levels and forced us to display displaced "spider" markers.
+    const gridSize = Math.max(0.75, 34 / (frozenClusterZoom ?? transform.k))
     const buckets = new Map<string, AtlasMarker>()
-    const expanded: AtlasMarker[] = []
     const selected: AtlasMarker[] = []
-    let expandedIndex = 0
     for (const event of events) {
       const point = projection(event.geometry.coordinates as [number, number])
       if (!point) continue
@@ -681,41 +680,30 @@ function AtlasMap({ world, events, selectedId, onSelectEvent }: { world: WorldGe
       // always shown at its real coordinate, even while the map is zooming.
       if (event.properties.id === selectedId) {
         selected.push({
-          key: `selected:${event.properties.id}`,
+          key: `event:${event.properties.id}`,
           x: point[0],
           y: point[1],
           events: [event],
         })
         continue
       }
-      if (expandedIds?.has(event.properties.id)) {
-        const angle = expandedIndex * 2.399963
-        const radius = (13 + Math.sqrt(expandedIndex) * 7) / transform.k
-        expanded.push({
-          key: `expanded:${event.properties.id}`,
-          x: point[0] + Math.cos(angle) * radius,
-          y: point[1] + Math.sin(angle) * radius,
-          events: [event],
-          expanded: true,
-          expandedOrder: expandedIndex,
-        })
-        expandedIndex += 1
-        continue
-      }
       const key = `${Math.floor(point[0] / gridSize)}:${Math.floor(point[1] / gridSize)}`
       const bucket = buckets.get(key)
       if (bucket) {
-        const count = bucket.events.length
-        bucket.x = (bucket.x * count + point[0]) / (count + 1)
-        bucket.y = (bucket.y * count + point[1]) / (count + 1)
+        // Keep the first event's real coordinate as the stable cluster anchor.
+        // Recalculating a centroid here makes a numbered bubble drift whenever
+        // its membership changes during zoom.
         bucket.events.push(event)
       } else {
         buckets.set(key, { key, x: point[0], y: point[1], events: [event] })
       }
     }
+    const clustered = [...buckets.values()].map((marker) => marker.events.length === 1
+      ? { ...marker, key: `event:${marker.events[0].properties.id}` }
+      : marker)
     // Selected markers are last so SVG paints them above nearby clusters.
-    return [...buckets.values(), ...expanded, ...selected]
-  }, [events, expandedIds, frozenClusterZoom, projection, selectedId, transform.k])
+    return [...clustered, ...selected]
+  }, [events, frozenClusterZoom, projection, selectedId, transform.k])
 
   const zoomAt = useCallback((factor: number, anchorX = 500, anchorY = 275) => {
     cancelCameraAnimation()
@@ -773,16 +761,11 @@ function AtlasMap({ world, events, selectedId, onSelectEvent }: { world: WorldGe
       return
     }
     const current = transformRef.current
-    const eventIds = new Set(marker.events.map((event) => event.properties.id))
     const nextK = Math.min(12, Math.max(current.k * 2.35, 7 + Math.log10(marker.events.length)))
-    setExpandedIds(null)
     setFrozenClusterZoom(current.k)
     animateCameraTo(
       { k: nextK, x: 500 - marker.x * nextK, y: 275 - marker.y * nextK },
-      () => {
-        setExpandedIds(eventIds)
-        setFrozenClusterZoom(null)
-      },
+      () => setFrozenClusterZoom(null),
     )
   }
 
@@ -842,8 +825,6 @@ function AtlasMap({ world, events, selectedId, onSelectEvent }: { world: WorldGe
                   className={isCluster ? 'atlas-marker cluster' : 'atlas-marker event'}
                   data-count={marker.events.length}
                   data-event-id={isCluster ? undefined : representative.properties.id}
-                  data-expanded={marker.expanded ? 'true' : 'false'}
-                  style={marker.expanded ? { animationDelay: `${Math.min((marker.expandedOrder ?? 0) * 7, 160)}ms` } : undefined}
                   transform={`translate(${marker.x} ${marker.y})`}
                   role="button"
                   tabIndex={0}
@@ -870,7 +851,7 @@ function AtlasMap({ world, events, selectedId, onSelectEvent }: { world: WorldGe
       <div className="svg-map-controls" aria-label="Map controls">
         <button onClick={() => zoomAt(1.35)} aria-label="Zoom in">+</button>
         <button onClick={() => zoomAt(0.74)} aria-label="Zoom out">−</button>
-        <button onClick={() => { cancelCameraAnimation(); setExpandedIds(null); setFrozenClusterZoom(null); transformRef.current = { x: 0, y: 0, k: 1 }; setTransform({ x: 0, y: 0, k: 1 }) }} aria-label="Reset world view"><Globe2 size={14} /></button>
+        <button onClick={() => { cancelCameraAnimation(); setFrozenClusterZoom(null); transformRef.current = { x: 0, y: 0, k: 1 }; setTransform({ x: 0, y: 0, k: 1 }) }} aria-label="Reset world view"><Globe2 size={14} /></button>
       </div>
       <span className="map-attribution">Made with Natural Earth</span>
     </div>
