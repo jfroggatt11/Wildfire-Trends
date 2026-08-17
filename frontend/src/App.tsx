@@ -671,10 +671,23 @@ function AtlasMap({ world, events, selectedId, onSelectEvent }: { world: WorldGe
     const gridSize = Math.max(7, 34 / (frozenClusterZoom ?? transform.k))
     const buckets = new Map<string, AtlasMarker>()
     const expanded: AtlasMarker[] = []
+    const selected: AtlasMarker[] = []
     let expandedIndex = 0
     for (const event of events) {
       const point = projection(event.geometry.coordinates as [number, number])
       if (!point) continue
+      // A cluster is drawn at its members' average projected position. Keep the
+      // active event out of that aggregation so a drawer/sidebar selection is
+      // always shown at its real coordinate, even while the map is zooming.
+      if (event.properties.id === selectedId) {
+        selected.push({
+          key: `selected:${event.properties.id}`,
+          x: point[0],
+          y: point[1],
+          events: [event],
+        })
+        continue
+      }
       if (expandedIds?.has(event.properties.id)) {
         const angle = expandedIndex * 2.399963
         const radius = (13 + Math.sqrt(expandedIndex) * 7) / transform.k
@@ -700,8 +713,9 @@ function AtlasMap({ world, events, selectedId, onSelectEvent }: { world: WorldGe
         buckets.set(key, { key, x: point[0], y: point[1], events: [event] })
       }
     }
-    return [...buckets.values(), ...expanded]
-  }, [events, expandedIds, frozenClusterZoom, projection, transform.k])
+    // Selected markers are last so SVG paints them above nearby clusters.
+    return [...buckets.values(), ...expanded, ...selected]
+  }, [events, expandedIds, frozenClusterZoom, projection, selectedId, transform.k])
 
   const zoomAt = useCallback((factor: number, anchorX = 500, anchorY = 275) => {
     cancelCameraAnimation()

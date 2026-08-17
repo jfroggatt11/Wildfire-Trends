@@ -164,6 +164,28 @@ test('event drawer keeps the corrected map-point label without a geography tab',
   expect(errors).toEqual([])
 })
 
+test('selected Cornwall event stays pinned to its source coordinate while zooming', async ({ page }) => {
+  const errors = collectClientErrors(page)
+  await page.goto('/?event=gdacs%3AFL%3A1103661', { waitUntil: 'networkidle' })
+  await expect(page.locator('.event-drawer')).toBeVisible()
+
+  const map = page.locator('.atlas-svg-map')
+  const marker = page.locator('.atlas-marker.event[data-event-id="gdacs:FL:1103661"]')
+  await expect(marker).toBeVisible()
+  await expect(marker.locator('.selected-halo')).toBeVisible()
+  const sourcePosition = await marker.getAttribute('transform')
+
+  const zoomIn = map.getByRole('button', { name: 'Zoom in', exact: true })
+  // The open analysis drawer intentionally covers the right-side controls at
+  // desktop widths, so invoke the control as a keyboard activation would.
+  await zoomIn.evaluate((button: HTMLButtonElement) => button.click())
+  await zoomIn.evaluate((button: HTMLButtonElement) => button.click())
+  await expect.poll(async () => Number(await map.locator(':scope > svg').getAttribute('data-zoom'))).toBeGreaterThan(1.5)
+  await expect(marker).toHaveAttribute('transform', sourcePosition || '')
+  await expect(marker).toHaveAttribute('data-count', '1')
+  expect(errors).toEqual([])
+})
+
 test('data summary reports only MVP sources and their stored coverage dates', async ({ page }) => {
   const errors = collectClientErrors(page)
   await openExplorer(page)
