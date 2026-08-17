@@ -30,7 +30,12 @@ import {
   X,
 } from 'lucide-react'
 import type { AttentionChartPoint } from './AttentionChart'
-import { dateWithinRange, formatDate, getPoliticalSignals, hasPoliticalSignal, newestFirst, permutationIncreaseTest } from './utils'
+import {
+  fetchAttentionWindow,
+  isSupabaseEnabled,
+} from './supabase'
+import type { WindowQuery } from './supabase'
+import { dateWithinRange, formatDate, permutationIncreaseTest } from './utils'
 
 const AttentionChart = lazy(() => import('./AttentionChart'))
 
@@ -38,7 +43,7 @@ type HazardType = 'wildfire' | 'flood' | 'tropical_cyclone'
 type AlertLevel = 'Green' | 'Orange' | 'Red'
 type MediaScope = 'affected' | 'eu27' | 'international' | 'global'
 type View = 'explore' | 'lab' | 'data' | 'methods'
-type DetailTab = 'attention' | 'articles'
+type DetailTab = 'attention' | 'coverage'
 type AttentionMode = 'all' | 'political'
 
 type EventProperties = {
@@ -53,6 +58,8 @@ type EventProperties = {
   mapCountryId: string | null
   mapCountryIso3: string | null
   mapCountryLabel: string | null
+  mapRegionLabel: string | null
+  mapRegionType: string | null
   alertLevel: AlertLevel
   alertScore: number | null
   severity: number | null
@@ -78,23 +85,6 @@ type AttentionRow = {
   governmentActionCount: number | null
   partyPoliticsCount: number | null
   officialSourceCount: number | null
-}
-
-type Article = {
-  id: string
-  date: string
-  topicId: string
-  geography: string
-  url: string
-  domain: string
-  publishedAt: string | null
-  outletName: string | null
-  title: string | null
-  language: string | null
-  politicalActor: boolean
-  governmentAction: boolean
-  partyPolitics: boolean
-  officialSource: boolean
 }
 
 type DataSourceSummary = {
@@ -203,6 +193,12 @@ const geographyLabel = (id: string, labels: Record<string, string>) => labels[id
 const dayDifference = (date: string, origin: string) =>
   Math.round((new Date(date).getTime() - new Date(origin).getTime()) / 86_400_000)
 
+const formatCoordinates = ([longitude, latitude]: number[]) => {
+  const latitudeLabel = `${Math.abs(latitude).toFixed(2)}°${latitude >= 0 ? 'N' : 'S'}`
+  const longitudeLabel = `${Math.abs(longitude).toFixed(2)}°${longitude >= 0 ? 'E' : 'W'}`
+  return `${latitudeLabel}, ${longitudeLabel}`
+}
+
 function eventWindow(event: EventProperties, days = 28) {
   const start = new Date(event.startAt)
   const end = new Date(event.endAt)
@@ -224,11 +220,23 @@ function scopeAllows(geography: string, event: EventProperties, scope: MediaScop
   return true
 }
 
+function remoteWindowQuery(event: EventProperties, scope: MediaScope) {
+  const { start, end } = eventWindow(event)
+  const query: WindowQuery = {
+    start: start.toISOString().slice(0, 10),
+    end: end.toISOString().slice(0, 10),
+    topics: TOPICS.map((topic) => topic.id),
+  }
+  if (scope === 'affected') query.geographies = event.geographyIds
+  if (scope === 'eu27') query.geographies = [...EU27]
+  if (scope === 'international') query.excludeGeographies = event.geographyIds
+  return query
+}
+
 function useAtlasData() {
   const [events, setEvents] = useState<EventsGeoJSON | null>(null)
   const [world, setWorld] = useState<WorldGeoJSON | null>(null)
   const [attention, setAttention] = useState<AttentionRow[]>([])
-  const [articles, setArticles] = useState<Article[]>([])
   const [manifest, setManifest] = useState<Manifest | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -246,24 +254,13 @@ function useAtlasData() {
         setManifest(manifestData)
       })
       .catch(() => active && setError('The local research datasets could not be loaded.'))
-    Promise.all([
-      fetch('/data/attention.json').then((response) => response.json()),
-      fetch('/data/articles.json').then((response) => response.json()),
-    ]).then(([attentionData, articleData]) => {
-      if (!active) return
-      setAttention(attentionData)
-      setArticles(articleData)
-    }).catch(() => {
-      if (!active) return
-      setAttention([])
-      setArticles([])
-    })
+    if (!isSupabaseEnabled()) setError('Supabase aggregate data access is not configured.')
     return () => {
       active = false
     }
   }, [])
 
-  return { events, world, attention, articles, manifest, error }
+  return { events, world, attention, manifest, error }
 }
 
 class EventDetailBoundary extends Component<{ children: ReactNode; onClose: () => void }, { failed: boolean }> {
@@ -291,7 +288,7 @@ class EventDetailBoundary extends Component<{ children: ReactNode; onClose: () =
 }
 
 function App() {
-  const { events, world, attention, articles, manifest, error } = useAtlasData()
+  const { events, world, attention, manifest, error } = useAtlasData()
   const [view, setView] = useState<View>('explore')
   const [selectedId, setSelectedId] = useState<string | null>(() => {
     const id = new URLSearchParams(window.location.search).get('event')
@@ -372,7 +369,6 @@ function App() {
           scope={scope}
           onScopeChange={setScope}
           attention={attention}
-          articles={articles}
           detailTab={detailTab}
           onDetailTabChange={setDetailTab}
         />
@@ -407,7 +403,6 @@ function ExploreView({
   scope,
   onScopeChange,
   attention,
-  articles,
   detailTab,
   onDetailTabChange,
 }: {
@@ -419,7 +414,6 @@ function ExploreView({
   scope: MediaScope
   onScopeChange: (scope: MediaScope) => void
   attention: AttentionRow[]
-  articles: Article[]
   detailTab: DetailTab
   onDetailTabChange: (tab: DetailTab) => void
 }) {
@@ -439,6 +433,7 @@ function ExploreView({
         !normalizedQuery ||
         event.name.toLowerCase().includes(normalizedQuery) ||
         eventDisplayName(event).toLowerCase().includes(normalizedQuery) ||
+        event.mapRegionLabel?.toLowerCase().includes(normalizedQuery) ||
         event.mapCountryLabel?.toLowerCase().includes(normalizedQuery) ||
         event.geographyIds.some((country) => geographyLabel(country, manifest?.geographyLabels ?? {}).toLowerCase().includes(normalizedQuery))
       return (
@@ -588,7 +583,7 @@ function ExploreView({
             scope={scope}
             onScopeChange={onScopeChange}
             attention={attention}
-            articles={articles}
+            coordinates={selectedEvent.geometry.coordinates}
             geographyLabels={manifest?.geographyLabels ?? {}}
             tab={detailTab}
             onTabChange={onDetailTabChange}
@@ -870,21 +865,21 @@ function AtlasMap({ world, events, selectedId, onSelectEvent }: { world: WorldGe
 
 function EventDrawer({
   event,
+  coordinates,
   onClose,
   scope,
   onScopeChange,
   attention,
-  articles,
   geographyLabels,
   tab,
   onTabChange,
 }: {
   event: EventProperties
+  coordinates: number[]
   onClose: () => void
   scope: MediaScope
   onScopeChange: (scope: MediaScope) => void
   attention: AttentionRow[]
-  articles: Article[]
   geographyLabels: Record<string, string>
   tab: DetailTab
   onTabChange: (tab: DetailTab) => void
@@ -893,20 +888,16 @@ function EventDrawer({
   const HazardIcon = hazard.icon
   const displayName = eventDisplayName(event)
   const [attentionMode, setAttentionMode] = useState<AttentionMode>('all')
-  const chart = useMemo(() => buildEventChart(event, attention, scope, attentionMode), [event, attention, scope, attentionMode])
-  const candidateArticles = useMemo(
-    () =>
-      articles
-        .filter((article) => scopeAllows(article.geography, event, scope) && withinWindow(article.date, event))
-        .sort(newestFirst),
-    [articles, event, scope],
-  )
-
+  const remoteAttention = useRemoteAttention(event, scope)
+  const chartRows = isSupabaseEnabled() ? remoteAttention.rows : attention
+  const chart = useMemo(() => buildEventChart(event, chartRows, scope, attentionMode), [event, chartRows, scope, attentionMode])
+  const coverageRows = useMemo(() => eventAttentionRows(event, chartRows, scope), [event, chartRows, scope])
+  const locationLabel = [event.mapRegionLabel, event.mapCountryLabel].filter(Boolean).join(', ') || 'Offshore or unavailable'
+  const affectedLabels = event.geographyIds.map((id) => geographyLabel(id, geographyLabels))
   const tabs: { id: DetailTab; label: string }[] = [
     { id: 'attention', label: 'Attention' },
-    { id: 'articles', label: 'Articles' },
+    { id: 'coverage', label: 'Coverage breakdown' },
   ]
-
   return (
     <aside className="event-drawer" role="dialog" aria-label={`Analysis for ${displayName}`}>
       <div className="drawer-header">
@@ -915,7 +906,9 @@ function EventDrawer({
         <h2>{displayName}</h2>
         <div className="event-meta">
           <span><CalendarDays size={14} /> {formatDate(event.startAt)} — {formatDate(event.endAt)}</span>
-          <span><MapPin size={14} /> Map point: {event.mapCountryLabel || 'Offshore or unavailable'}</span>
+          <span title={event.mapRegionType || undefined}><MapPin size={14} /> Map point: {locationLabel}</span>
+          <span className="coordinate-label">{formatCoordinates(coordinates)}</span>
+          {affectedLabels.length > 0 && <span><Globe2 size={14} /> Affected: {affectedLabels.join(', ')}</span>}
         </div>
         <div className="status-row">
           <span className={`alert-badge ${event.alertLevel.toLowerCase()}`}>{event.alertLevel} alert</span>
@@ -931,11 +924,40 @@ function EventDrawer({
       </div>
 
       <div className="drawer-content">
-        {tab === 'attention' && <AttentionTab event={event} chart={chart} scope={scope} onScopeChange={onScopeChange} mode={attentionMode} onModeChange={setAttentionMode} />}
-        {tab === 'articles' && <ArticlesTab articles={candidateArticles} scope={scope} geographyLabels={geographyLabels} />}
+        {tab === 'attention' && <AttentionTab event={event} chart={chart} scope={scope} onScopeChange={onScopeChange} mode={attentionMode} onModeChange={setAttentionMode} loading={remoteAttention.loading} error={remoteAttention.error} />}
+        {tab === 'coverage' && <CoverageBreakdown event={event} rows={coverageRows} scope={scope} onScopeChange={onScopeChange} geographyLabels={geographyLabels} loading={remoteAttention.loading} error={remoteAttention.error} />}
       </div>
     </aside>
   )
+}
+
+function useRemoteAttention(event: EventProperties, scope: MediaScope) {
+  const [rows, setRows] = useState<AttentionRow[]>([])
+  const [loading, setLoading] = useState(isSupabaseEnabled())
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!isSupabaseEnabled()) return
+    let active = true
+    setLoading(true)
+    setError(null)
+    fetchAttentionWindow(remoteWindowQuery(event, scope))
+      .then((result) => {
+        if (active) setRows(result)
+      })
+      .catch(() => {
+        if (active) {
+          setRows([])
+          setError('Daily attention could not be loaded from Supabase. Please retry.')
+        }
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+    return () => { active = false }
+  }, [event, scope])
+
+  return { rows, loading, error }
 }
 
 function ScopeSelect({ scope, onChange }: { scope: MediaScope; onChange: (scope: MediaScope) => void }) {
@@ -951,10 +973,14 @@ function ScopeSelect({ scope, onChange }: { scope: MediaScope; onChange: (scope:
 
 type ChartResult = { points: AttentionChartPoint[]; coverageDays: number; preDays: number; postDays: number }
 
-function buildEventChart(event: EventProperties, attention: AttentionRow[], scope: MediaScope, mode: AttentionMode): ChartResult {
-  const relevant = attention.filter(
+function eventAttentionRows(event: EventProperties, attention: AttentionRow[], scope: MediaScope) {
+  return attention.filter(
     (row) => row.source === 'gdelt_ngrams' && withinWindow(row.date, event) && scopeAllows(row.geography, event, scope),
   )
+}
+
+function buildEventChart(event: EventProperties, attention: AttentionRow[], scope: MediaScope, mode: AttentionMode): ChartResult {
+  const relevant = eventAttentionRows(event, attention, scope)
   const daily = new Map<string, AttentionChartPoint>()
   for (const row of relevant) {
     const value = mode === 'political' ? row.politicalCount : row.matchedCount
@@ -981,7 +1007,7 @@ function AttentionModeToggle({ mode, onChange }: { mode: AttentionMode; onChange
   )
 }
 
-function AttentionTab({ event, chart, scope, onScopeChange, mode, onModeChange }: { event: EventProperties; chart: ChartResult; scope: MediaScope; onScopeChange: (scope: MediaScope) => void; mode: AttentionMode; onModeChange: (mode: AttentionMode) => void }) {
+function AttentionTab({ event, chart, scope, onScopeChange, mode, onModeChange, loading, error }: { event: EventProperties; chart: ChartResult; scope: MediaScope; onScopeChange: (scope: MediaScope) => void; mode: AttentionMode; onModeChange: (mode: AttentionMode) => void; loading: boolean; error: string | null }) {
   const enoughData = chart.preDays >= 7 && chart.postDays >= 7
   return (
     <>
@@ -995,11 +1021,15 @@ function AttentionTab({ event, chart, scope, onScopeChange, mode, onModeChange }
         <p className="muted-copy">{mode === 'political' ? 'Distinct matched URLs containing a political actor, government action, party-politics or official-source signal' : 'Distinct matched URLs'} published by outlets in {SCOPE_COPY[scope].label.toLowerCase()}.</p>
         <AttentionModeToggle mode={mode} onChange={onModeChange} />
         <div className="chart-wrap">
-          {chart.points.length ? (
+          {loading ? (
+            <div className="chart-loading" role="status">Loading daily attention…</div>
+          ) : chart.points.length ? (
             <Suspense fallback={<div className="chart-loading" role="status">Loading chart…</div>}>
               <AttentionChart
                 points={chart.points}
                 eventDuration={Math.max(0, dayDifference(event.endAt, event.startAt))}
+                eventStartLabel={formatDate(event.startAt)}
+                eventEndLabel={formatDate(event.endAt)}
                 topics={TOPICS}
               />
             </Suspense>
@@ -1007,6 +1037,7 @@ function AttentionTab({ event, chart, scope, onScopeChange, mode, onModeChange }
             <EmptyChart message={mode === 'political' ? 'Political classification was not collected for this window.' : undefined} />
           )}
         </div>
+        {error && <div className="inline-note"><CircleAlert size={15} /><span>{error}</span></div>}
         {!enoughData && (
           <div className="inline-note"><Info size={15} /><span>Only {chart.coverageDays} day{chart.coverageDays === 1 ? '' : 's'} of this window are present. At least seven pre- and post-event days are required for an MVP estimate.</span></div>
         )}
@@ -1104,114 +1135,135 @@ function EmptyChart({ message }: { message?: string }) {
   )
 }
 
-function ArticlesTab({ articles, scope, geographyLabels }: { articles: Article[]; scope: MediaScope; geographyLabels: Record<string, string> }) {
-  const [politicalOnly, setPoliticalOnly] = useState(false)
-  const [topicFilter, setTopicFilter] = useState('all')
-  const [countryFilter, setCountryFilter] = useState('all')
-  const [articleQuery, setArticleQuery] = useState('')
-  const [visibleCount, setVisibleCount] = useState(20)
-  const politicalTotal = useMemo(() => articles.filter(hasPoliticalSignal).length, [articles])
-  const topicCounts = useMemo(
-    () => [
-      { id: 'all', label: 'All themes', color: '#587068', all: articles.length, political: politicalTotal },
-      ...TOPICS.map((topic) => ({
-        ...topic,
-        all: articles.filter((article) => article.topicId === topic.id).length,
-        political: articles.filter((article) => article.topicId === topic.id && hasPoliticalSignal(article)).length,
-      })),
-    ],
-    [articles, politicalTotal],
-  )
+type CoveragePeriod = 'before' | 'during' | 'after'
+
+function rowPeriod(date: string, event: EventProperties): CoveragePeriod {
+  const day = date.slice(0, 10)
+  if (day < event.startAt.slice(0, 10)) return 'before'
+  if (day > event.endAt.slice(0, 10)) return 'after'
+  return 'during'
+}
+
+function CoverageBreakdown({
+  event,
+  rows,
+  scope,
+  onScopeChange,
+  geographyLabels,
+  loading,
+  error,
+}: {
+  event: EventProperties
+  rows: AttentionRow[]
+  scope: MediaScope
+  onScopeChange: (scope: MediaScope) => void
+  geographyLabels: Record<string, string>
+  loading: boolean
+  error: string | null
+}) {
+  const [country, setCountry] = useState('all')
   const countryOptions = useMemo(
-    () => [...new Set(articles.map((article) => article.geography))]
+    () => [...new Set(rows.map((row) => row.geography))]
       .map((id) => ({ id, label: geographyLabel(id, geographyLabels) }))
       .sort((a, b) => a.label.localeCompare(b.label)),
-    [articles, geographyLabels],
+    [geographyLabels, rows],
   )
-  const filteredArticles = useMemo(() => {
-    const query = articleQuery.trim().toLowerCase()
-    return articles.filter((article) => {
-      if (politicalOnly && !hasPoliticalSignal(article)) return false
-      if (topicFilter !== 'all' && article.topicId !== topicFilter) return false
-      if (countryFilter !== 'all' && article.geography !== countryFilter) return false
-      if (!query) return true
-      return [article.title, article.outletName, article.domain, geographyLabel(article.geography, geographyLabels)]
-        .some((value) => value?.toLowerCase().includes(query))
-    })
-  }, [articles, politicalOnly, topicFilter, countryFilter, articleQuery, geographyLabels])
-  const visibleArticles = filteredArticles.slice(0, visibleCount)
+  const selectedRows = useMemo(
+    () => country === 'all' ? rows : rows.filter((row) => row.geography === country),
+    [country, rows],
+  )
 
-  useEffect(() => setVisibleCount(20), [articles, politicalOnly, topicFilter, countryFilter, articleQuery])
+  useEffect(() => setCountry('all'), [event.id, scope])
 
-  const resetArticleFilters = () => {
-    setPoliticalOnly(false)
-    setTopicFilter('all')
-    setCountryFilter('all')
-    setArticleQuery('')
-  }
+  const totalMatches = selectedRows.reduce((total, row) => total + (row.matchedCount ?? 0), 0)
+  const politicalMatches = selectedRows.reduce((total, row) => total + (row.politicalCount ?? 0), 0)
+  const observedDays = new Set(selectedRows.map((row) => row.date)).size
+  const marketCount = new Set(selectedRows.map((row) => row.geography)).size
+  const politicalShare = totalMatches ? (politicalMatches / totalMatches) * 100 : null
+
+  const phaseStats = TOPICS.map((topic) => ({
+    topic,
+    periods: (['before', 'during', 'after'] as CoveragePeriod[]).map((period) => {
+      const periodRows = selectedRows.filter((row) => rowPeriod(row.date, event) === period)
+      const allDaily = new Map<string, number>()
+      const politicalDaily = new Map<string, number>()
+      for (const row of periodRows) {
+        if (row.topicId !== topic.id) continue
+        if (row.matchedCount != null) allDaily.set(row.date, (allDaily.get(row.date) ?? 0) + row.matchedCount)
+        if (row.politicalCount != null) politicalDaily.set(row.date, (politicalDaily.get(row.date) ?? 0) + row.politicalCount)
+      }
+      const mean = (values: number[]) => values.length ? values.reduce((total, value) => total + value, 0) / values.length : null
+      return {
+        period,
+        all: mean([...allDaily.values()]),
+        political: mean([...politicalDaily.values()]),
+        days: allDaily.size,
+      }
+    }),
+  }))
+
+  const signals = [
+    { label: 'Political actor', key: 'politicalActorCount' as const },
+    { label: 'Government action', key: 'governmentActionCount' as const },
+    { label: 'Party politics', key: 'partyPoliticsCount' as const },
+    { label: 'Official source', key: 'officialSourceCount' as const },
+  ].map((signal) => ({ ...signal, value: selectedRows.reduce((total, row) => total + (row[signal.key] ?? 0), 0) }))
+
+  const marketTotals = [...selectedRows.reduce((totals, row) => {
+    totals.set(row.geography, (totals.get(row.geography) ?? 0) + (row.matchedCount ?? 0))
+    return totals
+  }, new Map<string, number>())]
+    .map(([id, value]) => ({ id, label: geographyLabel(id, geographyLabels), value }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 8)
+  const largestMarket = marketTotals[0]?.value ?? 0
 
   return (
     <>
-      <div className="notice-card info">
-        <ShieldCheck size={17} />
-        <div><strong>Candidate evidence—not event-linked</strong><p>These articles match a configured climate or transport theme and fall within the event window. Place and hazard matching comes in the next data phase.</p></div>
+      <div className="tab-toolbar coverage-toolbar">
+        <ScopeSelect scope={scope} onChange={onScopeChange} />
+        <label><span>Publishing market</span><select value={country} onChange={(input) => setCountry(input.target.value)}><option value="all">All in scope</option>{countryOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></label>
       </div>
-      <section className="drawer-section">
-        <div className="section-title-row"><div><span className="eyebrow">{SCOPE_COPY[scope].label}</span><h3>{articles.length ? 'Articles in the window' : 'No stored articles in the window'}</h3></div></div>
-        <div className="article-totals" aria-label="Article totals">
-          <div><strong>{articles.length.toLocaleString()}</strong><span>All articles</span></div>
-          <div className="political"><strong>{politicalTotal.toLocaleString()}</strong><span>Political</span></div>
-        </div>
-        <div className="theme-count-grid" aria-label="Article counts by theme">
-          {topicCounts.map((topic) => (
-            <button key={topic.id} className={topicFilter === topic.id ? 'active' : ''} data-topic={topic.id} aria-pressed={topicFilter === topic.id} onClick={() => setTopicFilter(topic.id)}>
-              <i style={{ background: topic.color }} />
-              <strong>{topic.label}</strong>
-              <span><b>{topic.all.toLocaleString()}</b> all</span>
-              <span><b>{topic.political.toLocaleString()}</b> political</span>
-            </button>
-          ))}
-        </div>
-        <div className="article-filters" role="group" aria-label="Filter articles">
-          <button className={!politicalOnly ? 'active' : ''} aria-pressed={!politicalOnly} onClick={() => setPoliticalOnly(false)}>All <span>{articles.length}</span></button>
-          <button className={politicalOnly ? 'active' : ''} aria-pressed={politicalOnly} onClick={() => setPoliticalOnly(true)}>Political <span>{politicalTotal}</span></button>
-        </div>
-        <p className="article-filter-definition">Political includes articles flagged for political actors, government action, party politics or official sources.</p>
-        <div className="article-browser-controls">
-          <label className="article-search-field">
-            <span>Search articles</span>
-            <div><Search size={14} /><input type="search" value={articleQuery} onChange={(event) => setArticleQuery(event.target.value)} placeholder="Title, outlet or keyword" /></div>
-          </label>
-          <label>
-            <span>Outlet country</span>
-            <select value={countryFilter} onChange={(event) => setCountryFilter(event.target.value)}>
-              <option value="all">All countries</option>
-              {countryOptions.map((country) => <option key={country.id} value={country.id}>{country.label}</option>)}
-            </select>
-          </label>
-        </div>
-        <div className="article-results-row">
-          <span>{filteredArticles.length.toLocaleString()} result{filteredArticles.length === 1 ? '' : 's'}</span>
-          {(politicalOnly || topicFilter !== 'all' || countryFilter !== 'all' || articleQuery) && <button onClick={resetArticleFilters}>Reset filters</button>}
-        </div>
-        <div className="article-list">
-          {visibleArticles.map((article) => {
-            const politicalSignals = getPoliticalSignals(article)
-            return (
-              <a key={article.id} href={article.url} target="_blank" rel="noreferrer" data-political={politicalSignals.length > 0 ? 'true' : 'false'} data-topic={article.topicId} data-country={article.geography}>
-                <div className="article-meta">
-                  <span>{article.outletName || article.domain}</span>
-                  {politicalSignals.length > 0 && <span className="political-indicator">Political</span>}
-                  <span>{formatDate(article.publishedAt || article.date)}</span>
+      <section className="drawer-section coverage-breakdown">
+        <span className="eyebrow">Aggregate coverage</span>
+        <h3>What changed, and where?</h3>
+        <p className="muted-copy">Daily topic-match counts from the same ±28-day window as the graph. This replaces article browsing with a view of timing, political content and publishing-market composition.</p>
+        {country !== 'all' && <span className="coverage-market-context">Publishing market · {geographyLabel(country, geographyLabels)}</span>}
+        {loading ? <div className="coverage-loading" role="status">Loading coverage breakdown…</div> : (
+          <>
+            <div className="coverage-summary" aria-label="Coverage summary">
+              <div><strong>{totalMatches.toLocaleString()}</strong><span>Topic matches</span></div>
+              <div><strong>{politicalMatches.toLocaleString()}</strong><span>Political matches</span></div>
+              <div><strong>{politicalShare == null ? '—' : `${politicalShare.toFixed(1)}%`}</strong><span>Political share</span></div>
+              <div><strong>{country === 'all' ? marketCount.toLocaleString() : observedDays.toLocaleString()}</strong><span>{country === 'all' ? 'Publishing markets' : 'Observed days'}</span></div>
+            </div>
+
+            <div className="coverage-section-heading"><div><span className="eyebrow">Timing</span><h4>Average daily URLs by phase</h4></div><small>Event duration shown separately</small></div>
+            <div className="phase-table" role="table" aria-label="Average daily coverage before, during and after the event">
+              <div role="row"><span role="columnheader">Theme</span><span role="columnheader">Before</span><span role="columnheader">During</span><span role="columnheader">After</span></div>
+              {phaseStats.map(({ topic, periods }) => (
+                <div role="row" key={topic.id} data-topic={topic.id}>
+                  <strong role="cell"><i style={{ background: topic.color }} />{topic.label}</strong>
+                  {periods.map((period) => <span role="cell" key={period.period}><b>{period.all == null ? '—' : period.all.toFixed(1)}</b><small>{period.political == null ? '—' : period.political.toFixed(1)} political · {period.days}d</small></span>)}
                 </div>
-                <strong>{article.title || 'Untitled article'}</strong>
-                <div className="article-tags"><span>{titleCase(article.topicId)}</span><span>{geographyLabel(article.geography, geographyLabels)}</span>{politicalSignals.map((signal) => <span className="political-tag" key={signal}>{signal}</span>)}</div>
-              </a>
-            )
-          })}
-        </div>
-        {!filteredArticles.length && articles.length > 0 && <p className="article-empty">No articles match the current theme, political, country and search filters.</p>}
-        {filteredArticles.length > visibleArticles.length && <button className="load-more-button" onClick={() => setVisibleCount((current) => current + 20)}>Show 20 more <span>{visibleArticles.length.toLocaleString()} of {filteredArticles.length.toLocaleString()}</span></button>}
+              ))}
+            </div>
+
+            <div className="coverage-section-heading"><div><span className="eyebrow">Political composition</span><h4>Signals within topic matches</h4></div><small>Signals overlap</small></div>
+            <div className="political-signal-summary">
+              {signals.map((signal) => <div key={signal.key}><strong>{signal.value.toLocaleString()}</strong><span>{signal.label}</span></div>)}
+            </div>
+
+            {country === 'all' && <>
+              <div className="coverage-section-heading"><div><span className="eyebrow">Geography</span><h4>Largest publishing markets</h4></div><small>Top {marketTotals.length}</small></div>
+              <div className="market-ranking">
+                {marketTotals.map((market) => <button key={market.id} onClick={() => setCountry(market.id)}><span>{market.label}</span><i><b style={{ width: `${largestMarket ? (market.value / largestMarket) * 100 : 0}%` }} /></i><strong>{market.value.toLocaleString()}</strong></button>)}
+              </div>
+            </>}
+          </>
+        )}
+        {error && <div className="inline-note"><CircleAlert size={15} /><span>{error}</span></div>}
+        <div className="inline-note"><Info size={15} /><span>Averages use the observed days shown; missing dates are not treated as zero. Counts are topic–URL observations. A URL matching both themes contributes once to each theme, and overlapping political components should not be added together.</span></div>
       </section>
     </>
   )
@@ -1367,6 +1419,13 @@ function MethodsView({ manifest }: { manifest: Manifest | null }) {
       note: 'Exact and randomised independent-sample permutation-test mechanics.',
       href: 'https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.permutation_test.html',
     },
+    {
+      number: '08',
+      title: 'Natural Earth Admin-1 states and provinces',
+      organisation: 'Natural Earth, version 5.1.1',
+      note: 'First-order administrative polygons used to label the region containing each event point.',
+      href: 'https://www.naturalearthdata.com/downloads/10m-cultural-vectors/10m-admin-1-states-provinces/',
+    },
   ]
 
   return (
@@ -1401,7 +1460,7 @@ function MethodsView({ manifest }: { manifest: Manifest | null }) {
             <a href="#geography"><span>06</span> Geography &amp; scope</a>
             <a href="#measurement"><span>07</span> Attention measures</a>
             <a href="#before-after"><span>08</span> Before / after test</a>
-            <a href="#articles"><span>09</span> Article evidence</a>
+            <a href="#coverage-breakdown-method"><span>09</span> Coverage breakdown</a>
             <a href="#decisions"><span>10</span> Decision register</a>
             <a href="#limitations"><span>11</span> Limits &amp; validation</a>
             <a href="#references"><span>12</span> References</a>
@@ -1517,7 +1576,7 @@ function MethodsView({ manifest }: { manifest: Manifest | null }) {
             <div className="geography-diagram" aria-label="Relationship between provider-affected countries, event map point and publishing outlet country">
               <article><span className="geo-symbol event"><MapPin size={17} /></span><small>Provider geography</small><strong>Affected countries</strong><p>Used for affected-country and international media scopes.</p></article>
               <ArrowRight size={17} />
-              <article><span className="geo-symbol map"><MapIcon size={17} /></span><small>Display geography</small><strong>Event map point</strong><p>Checked against Natural Earth country polygons for the map label.</p></article>
+              <article><span className="geo-symbol map"><MapIcon size={17} /></span><small>Display geography</small><strong>Event map point</strong><p>Checked against Natural Earth country and first-order region polygons.</p></article>
               <span className="geo-divider">≠</span>
               <article><span className="geo-symbol outlet"><Globe2 size={17} /></span><small>Media geography</small><strong>Outlet source country</strong><p>Assigned from the article domain; not its subject or audience.</p></article>
             </div>
@@ -1565,12 +1624,12 @@ function MethodsView({ manifest }: { manifest: Manifest | null }) {
             <div className="method-callout caution"><CircleAlert size={17} /><p><strong>Interpretation.</strong> This is an unadjusted temporal association, not a causal estimate. News cycles are autocorrelated; many events and outcomes create multiple-testing risk; seasonality, weekday patterns and concurrent stories can confound the comparison. A confirmatory release should pre-register outcomes and add matched dates or interrupted time-series controls.</p></div>
           </section>
 
-          <section className="protocol-section" id="articles">
-            <header><span>09</span><div><small>Supporting evidence</small><h2>What the article list contains</h2></div></header>
-            <p className="protocol-lede">The Articles tab is an audit trail for the quantitative series: topic-matched URLs in the selected media scope and a ±28-day envelope around the event.</p>
+          <section className="protocol-section" id="coverage-breakdown-method">
+            <header><span>09</span><div><small>Descriptive evidence</small><h2>What the coverage breakdown contains</h2></div></header>
+            <p className="protocol-lede">The Coverage breakdown tab summarizes the same topic-country-day observations as the attention graph instead of presenting individual article links.</p>
             <div className="method-definition-grid two">
-              <article><small>Included</small><strong>Metadata and classification</strong><p>URL, domain, outlet name, title, publication time where available, language, outlet country, topic and political signal flags.</p></article>
-              <article><small>Not established</small><strong>Event-specific relevance</strong><p>Inclusion does not prove that an article discusses, attributes or responds to the selected event. That requires a separately validated article-to-event linkage step.</p></article>
+              <article><small>Included</small><strong>Timing, themes and markets</strong><p>Mean daily URL counts before, during and after the event; political signal totals; and the largest publishing-outlet countries in the selected scope.</p></article>
+              <article><small>Counting boundary</small><strong>Topic–URL observations</strong><p>A URL matching both themes contributes once to each theme. Political component signals overlap, so neither set should be summed into a deduplicated article corpus.</p></article>
             </div>
           </section>
 

@@ -33,7 +33,7 @@ test('all media scopes preserve events and open their detail panel', async ({ pa
   expect(errors).toEqual([])
 })
 
-test('January plus Global opens articles with nullable publication timestamps', async ({ page }) => {
+test('January plus Global opens aggregate attention across every media scope', async ({ page }) => {
   const errors = collectClientErrors(page)
   await openExplorer(page)
   await page.locator('input[type="date"]').nth(1).fill('2025-01-31')
@@ -58,66 +58,12 @@ test('January plus Global opens articles with nullable publication timestamps', 
 
   await expect(page.getByRole('tab')).toHaveCount(2)
   await expect(page.getByRole('tab', { name: 'Attention' })).toHaveAttribute('aria-selected', 'true')
-  for (const removedTab of ['Briefing', 'Geography', 'Methods']) {
+  await expect(page.getByRole('tab', { name: 'Coverage breakdown' })).toHaveCount(1)
+  for (const removedTab of ['Articles', 'Briefing', 'Geography', 'Methods']) {
     await expect(page.getByRole('tab', { name: removedTab })).toHaveCount(0)
   }
+  await expect(page.getByRole('heading', { name: /Topic coverage around the event/ })).toBeVisible()
 
-  for (const tab of ['Articles', 'Attention']) {
-    await page.getByRole('tab', { name: tab }).click()
-    await expect(page.locator('.event-error')).toHaveCount(0)
-  }
-
-  expect(errors).toEqual([])
-})
-
-test('article links expose political totals, signals and filtering', async ({ page }) => {
-  const errors = collectClientErrors(page)
-  await openExplorer(page)
-  await page.locator('input[type="date"]').nth(1).fill('2025-01-31')
-  await page.locator('.scope-section select').selectOption('global')
-  await page.locator('.watchlist > button').first().click()
-  await page.getByRole('tab', { name: 'Articles' }).click()
-
-  const allTotal = Number((await page.locator('.article-totals > div').first().locator('strong').textContent())?.replaceAll(',', ''))
-  const politicalTotal = Number((await page.locator('.article-totals .political strong').textContent())?.replaceAll(',', ''))
-  expect(allTotal).toBeGreaterThan(0)
-  expect(politicalTotal).toBeGreaterThan(0)
-  expect(politicalTotal).toBeLessThanOrEqual(allTotal)
-
-  const configuredTopicCount = await page.evaluate(async () => {
-    const manifest = await fetch('/data/manifest.json').then((response) => response.json())
-    return Object.keys(manifest.attention.topics).length
-  })
-  await expect(page.locator('.theme-count-grid > button')).toHaveCount(configuredTopicCount + 1)
-  await expect(page.locator('.theme-count-grid > button[data-topic="climate_change"]')).toContainText('all')
-  await expect(page.locator('.theme-count-grid > button[data-topic="climate_change"]')).toContainText('political')
-
-  await page.getByRole('button', { name: /^Political/ }).click()
-  await expect(page.locator('.article-list > a').first()).toHaveAttribute('data-political', 'true')
-  await expect(page.locator('.article-list .political-indicator').first()).toHaveText('Political')
-  await expect(page.locator('.article-list > a[data-political="false"]')).toHaveCount(0)
-
-  await page.locator('.theme-count-grid > button[data-topic="climate_change"]').click()
-  await expect(page.locator('.article-list > a').first()).toHaveAttribute('data-topic', 'climate_change')
-  await expect(page.locator('.article-list > a:not([data-topic="climate_change"])')).toHaveCount(0)
-
-  await page.getByRole('button', { name: 'Reset filters' }).click()
-  const countrySelect = page.locator('.article-browser-controls select')
-  const countryValue = await countrySelect.locator('option').nth(1).getAttribute('value')
-  expect(countryValue).toBeTruthy()
-  await countrySelect.selectOption(countryValue!)
-  await expect(page.locator('.article-list > a').first()).toHaveAttribute('data-country', countryValue!)
-  await expect(page.locator(`.article-list > a:not([data-country="${countryValue}"])`)).toHaveCount(0)
-
-  await page.getByRole('button', { name: 'Reset filters' }).click()
-  await expect(page.locator('.article-list > a')).toHaveCount(20)
-  await page.getByRole('button', { name: /Show 20 more/ }).click()
-  await expect(page.locator('.article-list > a')).toHaveCount(40)
-
-  const firstTitle = (await page.locator('.article-list > a > strong').first().textContent()) || ''
-  const searchTerm = firstTitle.split(/\s+/).find((word) => word.length >= 5) || firstTitle
-  await page.getByLabel('Search articles').fill(searchTerm)
-  await expect(page.locator('.article-list > a').first()).toContainText(new RegExp(searchTerm, 'i'))
   expect(errors).toEqual([])
 })
 
@@ -132,6 +78,10 @@ test('attention toggle and before-after analysis share the selected measure', as
   await expect(page.locator('.before-after-card[data-test-status="unavailable"]')).toHaveCount(0)
   await expect(cards.first()).toContainText('URLs/day')
   await expect(cards.first()).toContainText('One-sided p =')
+  await expect(page.locator('.recharts-reference-line')).toHaveCount(2)
+  await expect(page.locator('.chart-wrap')).toContainText('Starts ·')
+  await expect(page.locator('.chart-wrap')).toContainText('Ends ·')
+  await expect(page.locator('.chart-wrap')).toContainText('Event duration')
   const allArticleResult = await cards.first().textContent()
 
   await page.getByRole('button', { name: 'Political only' }).click()
@@ -140,8 +90,32 @@ test('attention toggle and before-after analysis share the selected measure', as
   await expect.poll(async () => cards.first().textContent()).not.toBe(allArticleResult)
 
   await page.getByLabel('Comparison window').selectOption('28')
-  await expect(page.locator('.before-after-card[data-test-status="unavailable"]')).toHaveCount(2)
-  await expect(cards.first()).toContainText('Not testable')
+  await expect(page.locator('.before-after-card[data-test-status="unavailable"]')).toHaveCount(0)
+  await expect(cards.first()).toContainText('URLs/day')
+  expect(errors).toEqual([])
+})
+
+test('coverage breakdown replaces article links with aggregate timing, political and market views', async ({ page }) => {
+  const errors = collectClientErrors(page)
+  await page.goto('/?event=gdacs%3AWF%3A1023505', { waitUntil: 'networkidle' })
+  await expect(page.locator('.event-drawer')).toBeVisible()
+  await page.locator('.scope-select select').selectOption('global')
+  await page.getByRole('tab', { name: 'Coverage breakdown' }).click()
+
+  await expect(page.getByRole('heading', { name: 'What changed, and where?' })).toBeVisible()
+  await expect(page.locator('.coverage-summary strong').first()).not.toHaveText('0')
+  await expect(page.getByRole('table', { name: 'Average daily coverage before, during and after the event' })).toBeVisible()
+  await expect(page.locator('.phase-table > div[data-topic]')).toHaveCount(2)
+  await expect(page.locator('.political-signal-summary > div')).toHaveCount(4)
+  await expect(page.locator('.market-ranking button').first()).toBeVisible()
+  await expect(page.locator('.article-list')).toHaveCount(0)
+  await expect(page.locator('.drawer-content a[href^="http"]')).toHaveCount(0)
+
+  const market = page.locator('.market-ranking button').first()
+  const marketName = (await market.locator('span').textContent()) || ''
+  await market.click()
+  await expect(page.locator('.coverage-toolbar select').nth(1)).not.toHaveValue('all')
+  await expect(page.locator('.coverage-breakdown')).toContainText(marketName)
   expect(errors).toEqual([])
 })
 
@@ -182,7 +156,9 @@ test('event drawer keeps the corrected map-point label without a geography tab',
   await page.goto('/?event=gdacs%3AFL%3A1103661', { waitUntil: 'networkidle' })
   await expect(page.locator('.event-drawer')).toBeVisible()
   await expect(page.locator('.drawer-header h2')).toHaveText('Flood in United Kingdom')
-  await expect(page.locator('.event-meta')).toContainText('Map point: United Kingdom')
+  await expect(page.locator('.event-meta')).toContainText('Map point: Cornwall, United Kingdom')
+  await expect(page.locator('.event-meta')).toContainText('50.42°N, 4.75°W')
+  await expect(page.locator('.event-meta')).toContainText('Affected: Ireland, United Kingdom')
   await expect(page.getByRole('tab')).toHaveCount(2)
   await expect(page.getByRole('tab', { name: 'Geography' })).toHaveCount(0)
   expect(errors).toEqual([])
@@ -194,14 +170,14 @@ test('data summary reports only MVP sources and their stored coverage dates', as
   await page.getByRole('button', { name: 'Data', exact: true }).click()
 
   await expect(page.getByRole('heading', { name: 'What the Atlas currently covers.' })).toBeVisible()
-  await expect(page.locator('.source-card')).toHaveCount(3)
-  await expect(page.locator('.source-timeline-row')).toHaveCount(3)
+  await expect(page.locator('.source-card')).toHaveCount(2)
+  await expect(page.locator('.source-timeline-row')).toHaveCount(2)
   await expect(page.locator('.source-card[data-source="gdacs"]')).toContainText('1 Jan 2025 — 31 Dec 2025')
   await expect(page.locator('.source-card[data-source="gdelt_ngrams"]')).toContainText('31 Jul 2026')
   await expect(page.locator('.source-card[data-source="gdelt_ngrams"]')).toContainText('stored observation dates')
-  await expect(page.locator('.source-card[data-source="gdelt_ngrams"] .source-coverage-ranges span')).toHaveCount(3)
-  await expect(page.locator('.source-card[data-source="gdelt_articles"] .source-coverage-ranges span')).toHaveCount(2)
-  await expect(page.locator('.source-timeline-row[data-source="gdelt_ngrams"] .source-timeline-track span')).toHaveCount(3)
+  await expect(page.locator('.source-card[data-source="gdelt_ngrams"] .source-coverage-ranges span')).toHaveCount(2)
+  await expect(page.locator('.source-card[data-source="gdelt_articles"]')).toHaveCount(0)
+  await expect(page.locator('.source-timeline-row[data-source="gdelt_ngrams"] .source-timeline-track span')).toHaveCount(2)
   await expect(page.getByText('Google Trends comparison series')).toHaveCount(0)
   await expect(page.getByText('NASA FIRMS wildfire detections')).toHaveCount(0)
   await expect(page.getByText('GDELT DOC 2.0 topic timelines')).toHaveCount(0)
@@ -237,7 +213,7 @@ test('methods page documents the current research protocol and definitions', asy
   await expect(page.locator('.window-diagram')).toContainText('Event duration')
   await expect(page.locator('.window-diagram')).toContainText('Excluded')
   await expect(page.locator('.decision-table .status-chip.planned')).toHaveText('Planned')
-  await expect(page.locator('.reference-list > a')).toHaveCount(7)
+  await expect(page.locator('.reference-list > a')).toHaveCount(8)
   await expect(page.locator('.reference-list > a').first()).toHaveAttribute('href', /gdeltproject\.org/)
   await expect(page.locator('.reference-list > a').first()).toHaveAttribute('target', '_blank')
 

@@ -28,13 +28,13 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   reporter: 'list',
   use: {
-    baseURL: 'http://127.0.0.1:5173',
+    baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:5173',
     headless: true,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     launchOptions: executablePath ? { executablePath } : {},
   },
-  webServer: {
+  webServer: process.env.PLAYWRIGHT_BASE_URL ? undefined : {
     command: 'npm run dev -- --host 127.0.0.1',
     url: 'http://127.0.0.1:5173',
     reuseExistingServer: !process.env.CI,

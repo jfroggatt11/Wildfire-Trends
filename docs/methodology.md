@@ -114,6 +114,10 @@ named wildfire event. Agricultural and prescribed burning may remain.
 GDACS records are used at event level. The canonical identity combines provider,
 hazard code, and event id; affected-country arrays support multi-country events.
 Start/end dates and severity can be revised, so `source_updated_at` controls upserts.
+For display, the GDACS point is independently intersected with pinned Natural Earth
+Admin-0 and Admin-1 polygons to derive a map country and first-order region label.
+These point labels do not overwrite GDACS's affected-country array, and offshore or
+unmatched points remain explicitly unlabeled.
 GDACS alert scores are oriented toward potential humanitarian consequences rather
 than a uniform physical magnitude. Analyses should preserve both event type and
 source-specific severity semantics instead of pooling them naively.

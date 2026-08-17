@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gzip
 import json
 from dataclasses import dataclass
 from pathlib import Path
@@ -81,6 +82,45 @@ class CountryBoundaryIndex:
         return None
 
 
+@dataclass(frozen=True)
+class RegionBoundary:
+    """A first-order administrative area used only to describe an event point."""
+
+    label: str
+    region_type: str | None
+    country_iso3: str
+    bbox: tuple[float, float, float, float]
+    geometry: dict[str, Any]
+
+
+class RegionBoundaryIndex:
+    """Grid-indexed Natural Earth Admin-1 boundaries for point labelling."""
+
+    def __init__(self, boundaries: Iterable[RegionBoundary], cell_size: int = 2):
+        self.boundaries = tuple(boundaries)
+        self.cell_size = cell_size
+        cells: dict[tuple[int, int], list[int]] = {}
+        for index, boundary in enumerate(self.boundaries):
+            west, south, east, north = boundary.bbox
+            for lon_cell in range(_cell(west, cell_size), _cell(east, cell_size) + 1):
+                for lat_cell in range(_cell(south, cell_size), _cell(north, cell_size) + 1):
+                    cells.setdefault((lon_cell, lat_cell), []).append(index)
+        self._cells = cells
+
+    def assign(self, longitude: float, latitude: float) -> RegionBoundary | None:
+        candidates = self._cells.get(
+            (_cell(longitude, self.cell_size), _cell(latitude, self.cell_size)), []
+        )
+        for index in candidates:
+            boundary = self.boundaries[index]
+            west, south, east, north = boundary.bbox
+            if not (west <= longitude <= east and south <= latitude <= north):
+                continue
+            if _geometry_contains(boundary.geometry, longitude, latitude):
+                return boundary
+        return None
+
+
 def load_country_boundaries(
     path: str | Path, countries: Iterable[Country]
 ) -> CountryBoundaryIndex:
@@ -118,6 +158,48 @@ def load_country_boundaries(
     if not boundaries:
         raise ValueError("country boundary file does not match any configured countries")
     return CountryBoundaryIndex(boundaries)
+
+
+def load_region_boundaries(path: str | Path) -> RegionBoundaryIndex:
+    """Load Natural Earth first-order administrative polygons from GeoJSON or gzip."""
+    path = Path(path)
+    try:
+        if path.suffix == ".gz":
+            with gzip.open(path, "rt", encoding="utf-8") as handle:
+                document = json.load(handle)
+        else:
+            document = json.loads(path.read_text(encoding="utf-8"))
+    except OSError as exc:
+        raise ValueError(f"cannot read region boundaries {path}: {exc}") from exc
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"invalid region boundary GeoJSON {path}: {exc}") from exc
+    if document.get("type") != "FeatureCollection":
+        raise ValueError("region boundaries must be a GeoJSON FeatureCollection")
+
+    boundaries: list[RegionBoundary] = []
+    for feature in document.get("features", []):
+        properties = feature.get("properties") or {}
+        geometry = feature.get("geometry")
+        label = properties.get("name_en") or properties.get("name")
+        iso3 = properties.get("adm0_a3") or properties.get("ADM0_A3")
+        if not geometry or not isinstance(label, str) or not isinstance(iso3, str):
+            continue
+        bbox = feature.get("bbox") or _geometry_bbox(geometry)
+        if len(bbox) != 4:
+            continue
+        region_type = properties.get("type_en") or properties.get("type")
+        boundaries.append(
+            RegionBoundary(
+                label=label,
+                region_type=region_type if isinstance(region_type, str) else None,
+                country_iso3=iso3.upper(),
+                bbox=tuple(float(item) for item in bbox),
+                geometry=geometry,
+            )
+        )
+    if not boundaries:
+        raise ValueError("region boundary file contains no usable Admin-1 polygons")
+    return RegionBoundaryIndex(boundaries)
 
 
 def _feature_iso3(properties: dict[str, Any]) -> str | None:

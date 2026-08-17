@@ -136,6 +136,7 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
 .drawer-header h2 { margin: 7px 38px 10px 0; color: var(--ink); font-family: Georgia, serif; font-size: 27px; font-weight: 500; line-height: 1.08; letter-spacing: -.025em; }
 .event-meta { display: flex; flex-wrap: wrap; gap: 7px 15px; color: #65736c; font-size: 10px; }
 .event-meta span { display: flex; align-items: center; gap: 5px; }
+.event-meta .coordinate-label { padding-left: 19px; color: #87938d; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 8px; }
 .status-row { margin-top: 13px; display: flex; flex-wrap: wrap; gap: 6px; }
 .alert-badge, .severity-badge, .analysis-badge { height: 23px; display: inline-flex; align-items: center; gap: 5px; padding: 0 8px; border-radius: 20px; font-size: 8.5px; font-weight: 750; text-transform: uppercase; letter-spacing: .04em; }
 .alert-badge.green { color: #2d7350; background: #e1f1e7; }
@@ -223,6 +224,38 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
 .before-after-unavailable { display: flex; align-items: center; gap: 6px; margin: 0; padding: 11px; color: #806e49; background: #faf7ee; font-size: 8px; }
 .before-after-unavailable svg { flex: 0 0 auto; }
 .association-note { margin-top: 12px; color: #706444; }
+.coverage-toolbar > label { flex: 1; display: flex; flex-direction: column; gap: 5px; color: #47564f; font-size: 10px; font-weight: 750; }
+.coverage-toolbar select { width: 100%; height: 36px; padding: 0 28px 0 9px; border: 1px solid #d4ddd7; border-radius: 7px; color: #34463e; background: white; font-size: 9px; }
+.coverage-market-context { display: inline-flex; margin-top: 9px; padding: 5px 7px; border-radius: 5px; color: #3f5d4f; background: #e7efe9; font-size: 7px; font-weight: 800; letter-spacing: .035em; text-transform: uppercase; }
+.coverage-summary { margin-top: 13px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.coverage-summary > div { min-width: 0; min-height: 59px; display: flex; flex-direction: column; justify-content: center; padding: 9px; border: 1px solid #dce4de; border-radius: 7px; background: #f9fbf9; }
+.coverage-summary strong { overflow: hidden; color: #2d4137; font-family: Georgia, serif; font-size: 17px; font-weight: 500; text-overflow: ellipsis; }
+.coverage-summary span { margin-top: 3px; color: #7b8881; font-size: 6.5px; font-weight: 800; letter-spacing: .04em; line-height: 1.25; text-transform: uppercase; }
+.coverage-loading { height: 180px; display: grid; place-items: center; color: #7e8a84; font-size: 10px; }
+.coverage-section-heading { margin: 20px 0 8px; display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.coverage-section-heading h4 { margin: 3px 0 0; color: #30443a; font-family: Georgia, serif; font-size: 15px; font-weight: 500; }
+.coverage-section-heading > small { color: #89958f; font-size: 7px; }
+.phase-table { overflow: hidden; border: 1px solid #dce4de; border-radius: 8px; }
+.phase-table > div { display: grid; grid-template-columns: 1.15fr repeat(3, 1fr); align-items: center; }
+.phase-table > div + div { border-top: 1px solid #e3e8e5; }
+.phase-table > div:first-child { color: #748179; background: #eaf0eb; font-size: 6.5px; font-weight: 850; letter-spacing: .05em; text-transform: uppercase; }
+.phase-table > div > span, .phase-table > div > strong { min-width: 0; padding: 9px; }
+.phase-table > div > strong { display: flex; align-items: center; gap: 6px; color: #3e5248; font-size: 8px; }
+.phase-table > div > strong i { width: 6px; height: 6px; flex: 0 0 auto; border-radius: 50%; }
+.phase-table > div:not(:first-child) > span { display: flex; flex-direction: column; border-left: 1px solid #edf0ee; }
+.phase-table b { color: #30443a; font-family: Georgia, serif; font-size: 13px; font-weight: 500; }
+.phase-table small { margin-top: 2px; overflow: hidden; color: #86928c; font-size: 6px; white-space: nowrap; text-overflow: ellipsis; }
+.political-signal-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.political-signal-summary div { min-width: 0; padding: 10px; border-radius: 7px; color: #6e5825; background: #f4eddb; }
+.political-signal-summary strong { display: block; font-family: Georgia, serif; font-size: 15px; font-weight: 500; }
+.political-signal-summary span { display: block; margin-top: 3px; font-size: 6.5px; font-weight: 750; line-height: 1.25; }
+.market-ranking { display: flex; flex-direction: column; gap: 6px; }
+.market-ranking button { display: grid; grid-template-columns: 115px minmax(0, 1fr) 48px; align-items: center; gap: 8px; padding: 7px 9px; border: 1px solid #e0e6e2; border-radius: 6px; color: #52635a; background: #fafbfa; font-size: 8px; text-align: left; cursor: pointer; }
+.market-ranking button:hover { border-color: #8ca698; background: #f1f6f2; }
+.market-ranking button > span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.market-ranking button > i { height: 5px; overflow: hidden; border-radius: 4px; background: #e1e7e3; }
+.market-ranking button > i > b { display: block; height: 100%; border-radius: inherit; background: var(--green); }
+.market-ranking button > strong { color: #354a40; font-size: 8px; text-align: right; }
 .scope-cards { margin-top: 13px; display: flex; flex-direction: column; gap: 7px; }
 .scope-cards button { display: grid; grid-template-columns: 18px 1fr; gap: 8px; padding: 11px; border: 1px solid #dce3df; border-radius: 8px; background: white; text-align: left; cursor: pointer; }
 .scope-cards button.active { border-color: #73a18f; background: #f0f6f2; box-shadow: inset 0 0 0 1px #73a18f; }
@@ -588,6 +621,9 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
   .drawer-header { padding: 18px 20px 14px; }
   .drawer-header h2 { font-size: 24px; }
   .drawer-content { padding: 17px 20px 30px; }
+  .coverage-summary, .political-signal-summary { grid-template-columns: 1fr 1fr; }
+  .phase-table { overflow-x: auto; }
+  .phase-table > div { min-width: 520px; }
   .lab-view, .methods-view, .data-summary-view { min-height: 0; }
   .lab-hero, .methods-hero { align-items: flex-start; flex-direction: column; padding: 28px 20px; }
   .lab-status { width: 100%; }

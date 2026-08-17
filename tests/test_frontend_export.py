@@ -6,7 +6,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from climate_attention.config import load_country_config
-from climate_attention.geography import load_country_boundaries
+from climate_attention.geography import load_country_boundaries, load_region_boundaries
 from scripts.export_frontend_data import FRONTEND_TOPIC_IDS, contiguous_date_ranges
 
 
@@ -48,3 +48,15 @@ def test_cornwall_event_point_resolves_to_united_kingdom() -> None:
     assert match is not None
     assert match.country_id == "unitedkingdom"
     assert match.iso3 == "GBR"
+
+
+def test_cornwall_event_point_resolves_to_first_order_region() -> None:
+    boundaries = load_region_boundaries(
+        ROOT / "data/reference/ne_10m_admin_1_states_provinces.geojson.gz"
+    )
+
+    match = boundaries.assign(-4.75, 50.4167)
+
+    assert match is not None
+    assert match.label == "Cornwall"
+    assert match.country_iso3 == "GBR"

@@ -58,7 +58,11 @@ from .sources.firms import (
 from .sources.gdacs import GDACSProvider
 from .geography import load_country_boundaries
 from .storage import LocalParquetStorage
-from .supabase_sync import MVP_TOPICS, dotenv_value, sync_articles
+from .supabase_sync import (
+    MVP_TOPICS,
+    dotenv_value,
+    sync_daily_attention,
+)
 
 
 LOGGER = logging.getLogger(__name__)
@@ -378,7 +382,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     sync_supabase = subparsers.add_parser(
         "sync-supabase",
-        help="upsert the matched-article Parquet panel into Supabase Postgres",
+        help="upsert daily-attention Parquet counts into Supabase",
     )
     sync_supabase.add_argument("--data-dir", type=Path, default=Path("data"))
     sync_supabase.add_argument("--start", type=_iso_date)
@@ -393,12 +397,13 @@ def build_parser() -> argparse.ArgumentParser:
     sync_supabase.add_argument(
         "--apply-migration",
         action="store_true",
-        help="apply the bundled idempotent article schema before syncing",
+        help="apply the bundled daily-attention schema before syncing",
     )
     sync_supabase.add_argument(
-        "--migration",
+        "--attention-migration",
         type=Path,
-        default=Path("supabase/migrations/20260816193000_create_articles.sql"),
+        default=Path("supabase/migrations/20260817130000_create_daily_attention.sql"),
+        help="daily attention table migration",
     )
 
     aggregate = subparsers.add_parser(
@@ -1490,17 +1495,17 @@ def _sync_supabase(args: argparse.Namespace) -> int:
         raise ValueError(
             "missing SUPABASE_DB_URL; add it to .env or pass --database-url"
         )
-    copied, files = sync_articles(
+    copied, files = sync_daily_attention(
         database_url=database_url,
         data_dir=args.data_dir,
-        migration_path=args.migration,
+        migration_path=args.attention_migration,
         topics=set(args.topics),
         start=args.start,
         end=args.end,
         apply_migration=args.apply_migration,
     )
     print(
-        f"Supabase article sync complete: {copied:,} row(s) upserted "
+        f"Supabase attention sync complete: {copied:,} row(s) upserted "
         f"from {files:,} Parquet partition(s)."
     )
     return 0

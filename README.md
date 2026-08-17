@@ -4,9 +4,9 @@
 events affect media and search attention around climate change and clean transport.
 This version collects canonical daily GDELT media-attention trends, optional
 article-level samples, and an explicitly unofficial Google Trends search-interest
-index. It now also collects an independent global event layer from NASA FIRMS and
-GDACS. It does not yet include event-study analysis, a frontend, or a database
-service.
+index. It also collects an independent global event layer from NASA FIRMS and
+GDACS, and includes a research frontend with an optional Supabase serving layer.
+Causal event-study estimation remains future work.
 
 GDELT `TimelineSourceCountry` aggregates are the canonical comparable trend input;
 optional `TimelineVolRaw` requests add exact counts for selected validation panels.
@@ -18,8 +18,9 @@ series and is being validated before it replaces any canonical API measure.
 ## Frontend MVP
 
 `frontend/` contains the Netlify-ready Climate Attention Atlas: a React and
-TypeScript map explorer for GDACS events, media-market comparisons, article evidence,
-research hypotheses, a source-level data coverage summary, and methodology. It deliberately shows an unavailable state
+TypeScript map explorer for GDACS events, media-market comparisons, aggregate topic
+and political-attention counts, research hypotheses, a source-level data coverage
+summary, and methodology. It deliberately shows an unavailable state
 instead of estimating an event effect when the continuous daily panel is incomplete.
 
 Export the current Parquet datasets to compact browser assets, then run the app:
@@ -31,9 +32,37 @@ npm install
 npm run dev
 ```
 
-The root `netlify.toml` builds and publishes the Vite app. The exported article
-geography is the publishing outlet's country; the MVP does not present articles as
-precise event-location pins or claim that candidate articles are event-linked.
+Event-point countries use the pinned Natural Earth 1:50m Admin-0 file in
+`data/reference/`. Regional labels use the Natural Earth 1:10m Admin-1 states and
+provinces GeoJSON (version 5.1.1), stored locally as
+`data/reference/ne_10m_admin_1_states_provinces.geojson.gz`. These labels describe
+the point supplied by GDACS; they do not replace GDACS's affected-country list.
+
+The root `netlify.toml` builds and publishes the Vite app. Article-level Parquet is
+retained locally for validation, but the public interface is not an article finder
+and does not publish URLs or detailed article records.
+
+Load the two MVP topics' daily aggregate counts into Supabase:
+
+```bash
+python -m pip install -e '.[supabase]'
+climate-attention sync-supabase \
+  --data-dir data \
+  --start 2025-01-01 \
+  --end 2025-03-31 \
+  --apply-migration
+```
+
+The command idempotently upserts daily country-topic counts, including the distinct
+political union and component counts. Complete GAL metadata, URLs, descriptions and
+phrase-level match evidence remain in canonical local Parquet for validation.
+`SUPABASE_DB_URL` is server-side only. The frontend uses only
+`VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`, protected by read-only row
+level security. Set `VITE_USE_SUPABASE=true` after the daily table is populated.
+The frontend export script also writes these browser-safe values to
+`frontend/src/supabase-config.json`, allowing Netlify Git builds to work when the
+project role cannot manage hosted environment variables. Never place
+`SUPABASE_DB_URL` in that file.
 
 Run the frontend unit and browser regression suites with:
 
@@ -574,6 +603,7 @@ data/
 ├── raw_events/firms/<product>/<start>_<end>.csv
 ├── raw_events/gdacs/<start>_<end>_pageNNNN.geojson
 ├── reference/ne_50m_admin_0_countries.geojson
+├── reference/ne_10m_admin_1_states_provinces.geojson.gz
 ├── raw/source=gdelt/date=YYYY-MM-DD/topic_id=.../query_id=.../records.parquet
 ├── processed/daily_attention.parquet
 ├── api_responses/gdelt/<run-id>.jsonl

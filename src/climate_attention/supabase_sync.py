@@ -1,8 +1,7 @@
-"""Bulk-load the canonical matched-article panel into Supabase Postgres."""
+"""Bulk-load canonical daily attention counts into Supabase Postgres."""
 
 from __future__ import annotations
 
-import json
 import os
 from collections.abc import Iterable
 from datetime import date
@@ -13,33 +12,25 @@ import pyarrow.parquet as pq
 
 
 MVP_TOPICS = {"climate_change", "electric_vehicles"}
-ARTICLE_COLUMNS = (
+ATTENTION_COLUMNS = (
     "record_id",
-    "article_date",
+    "observation_date",
     "source",
     "topic_id",
+    "query_id",
     "geography",
-    "url",
-    "domain",
-    "published_at",
-    "outlet_name",
-    "outlet_logo",
-    "outlet_twitter",
-    "title",
-    "image_url",
-    "description",
     "language",
-    "author",
-    "political_actor",
-    "government_action",
-    "party_politics",
-    "official_source",
-    "match_evidence",
-    "match_evidence_total",
-    "match_evidence_truncated",
+    "matched_count",
+    "country_attention_share",
+    "attention_index",
+    "political_count",
+    "political_actor_count",
+    "government_action_count",
+    "party_politics_count",
+    "official_source_count",
     "collected_at",
-    "metadata",
 )
+ATTENTION_SYNC_BATCH_SIZE = 50_000
 
 
 def dotenv_value(name: str, path: Path = Path(".env")) -> str | None:
@@ -59,16 +50,16 @@ def dotenv_value(name: str, path: Path = Path(".env")) -> str | None:
     return None
 
 
-def article_files(data_dir: Path, topics: set[str]) -> list[Path]:
-    root = data_dir / "articles" / "source=gdelt_ngrams"
+def attention_files(data_dir: Path, topics: set[str]) -> list[Path]:
+    root = data_dir / "trends" / "source=gdelt_ngrams"
     return sorted(
         path
         for topic in sorted(topics)
-        for path in (root / f"topic_id={topic}").rglob("articles.parquet")
+        for path in (root / f"topic_id={topic}").rglob("daily.parquet")
     )
 
 
-def article_rows(
+def attention_rows(
     path: Path, *, start: date | None = None, end: date | None = None
 ) -> Iterable[dict[str, Any]]:
     for row in pq.ParquetFile(path).read().to_pylist():
@@ -77,34 +68,25 @@ def article_rows(
             continue
         yield {
             "record_id": row["record_id"],
-            "article_date": day,
+            "observation_date": day,
             "source": row["source"],
             "topic_id": row["topic_id"],
+            "query_id": row["query_id"],
             "geography": row["geography"],
-            "url": row["url"],
-            "domain": row["domain"],
-            "published_at": row["published_at"],
-            "outlet_name": row["outlet_name"],
-            "outlet_logo": row["outlet_logo"],
-            "outlet_twitter": row["outlet_twitter"],
-            "title": row["title"],
-            "image_url": row["image_url"],
-            "description": row["description"],
             "language": row["language"],
-            "author": row["author"],
-            "political_actor": row["political_actor"],
-            "government_action": row["government_action"],
-            "party_politics": row["party_politics"],
-            "official_source": row["official_source"],
-            "match_evidence": json.loads(row.get("match_evidence_json") or "[]"),
-            "match_evidence_total": row.get("match_evidence_total") or 0,
-            "match_evidence_truncated": bool(row.get("match_evidence_truncated")),
+            "matched_count": row["matched_count"],
+            "country_attention_share": row["country_attention_share"],
+            "attention_index": row["attention_index"],
+            "political_count": row["political_count"],
+            "political_actor_count": row["political_actor_count"],
+            "government_action_count": row["government_action_count"],
+            "party_politics_count": row["party_politics_count"],
+            "official_source_count": row["official_source_count"],
             "collected_at": row["collected_at"],
-            "metadata": json.loads(row.get("metadata_json") or "{}"),
         }
 
 
-def sync_articles(
+def sync_daily_attention(
     *,
     database_url: str,
     data_dir: Path,
@@ -114,10 +96,9 @@ def sync_articles(
     end: date | None = None,
     apply_migration: bool = False,
 ) -> tuple[int, int]:
-    """Idempotently upsert selected Parquet article partitions via COPY."""
+    """Idempotently upsert selected daily trend partitions via COPY."""
     try:
         import psycopg
-        from psycopg.types.json import Jsonb
     except ImportError as exc:
         raise RuntimeError(
             "Supabase sync requires: python -m pip install -e '.[supabase]'"
@@ -127,14 +108,14 @@ def sync_articles(
     unsupported = selected_topics - MVP_TOPICS
     if unsupported:
         raise ValueError("unsupported Supabase topic(s): " + ", ".join(sorted(unsupported)))
-    files = article_files(data_dir, selected_topics)
+    files = attention_files(data_dir, selected_topics)
     if not files:
-        raise ValueError(f"no matched article Parquet files found under {data_dir}")
+        raise ValueError(f"no daily trend Parquet files found under {data_dir}")
 
-    column_sql = ", ".join(ARTICLE_COLUMNS)
+    column_sql = ", ".join(ATTENTION_COLUMNS)
     update_sql = ", ".join(
         f"{column} = excluded.{column}"
-        for column in ARTICLE_COLUMNS
+        for column in ATTENTION_COLUMNS
         if column != "record_id"
     )
     copied = 0
@@ -143,30 +124,36 @@ def sync_articles(
         if apply_migration:
             connection.execute(migration_path.read_text(encoding="utf-8"))
             connection.commit()
-        for path in files:
-            rows = list(article_rows(path, start=start, end=end))
-            if not rows:
-                continue
+
+        def upsert_batch(rows: list[dict[str, Any]]) -> None:
             with connection.transaction():
                 connection.execute(
-                    "create temp table article_sync_stage "
-                    "(like public.articles including defaults) on commit drop"
+                    "create temp table daily_attention_sync_stage "
+                    "(like public.daily_attention including defaults) on commit drop"
                 )
                 with connection.cursor().copy(
-                    f"copy article_sync_stage ({column_sql}) from stdin"
+                    f"copy daily_attention_sync_stage ({column_sql}) from stdin"
                 ) as copy:
                     for row in rows:
-                        values = [row[column] for column in ARTICLE_COLUMNS]
-                        values[ARTICLE_COLUMNS.index("match_evidence")] = Jsonb(
-                            row["match_evidence"]
-                        )
-                        values[ARTICLE_COLUMNS.index("metadata")] = Jsonb(row["metadata"])
+                        values = [row[column] for column in ATTENTION_COLUMNS]
                         copy.write_row(values)
                 connection.execute(
-                    f"insert into public.articles ({column_sql}) "
-                    f"select {column_sql} from article_sync_stage "
+                    f"insert into public.daily_attention ({column_sql}) "
+                    f"select {column_sql} from daily_attention_sync_stage "
                     f"on conflict (record_id) do update set {update_sql}"
                 )
-            copied += len(rows)
-            populated_files += 1
+
+        batch: list[dict[str, Any]] = []
+        for path in files:
+            file_rows = list(attention_rows(path, start=start, end=end))
+            if file_rows:
+                populated_files += 1
+            for row in file_rows:
+                batch.append(row)
+                copied += 1
+                if len(batch) >= ATTENTION_SYNC_BATCH_SIZE:
+                    upsert_batch(batch)
+                    batch = []
+        if batch:
+            upsert_batch(batch)
     return copied, populated_files
