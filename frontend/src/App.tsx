@@ -381,7 +381,7 @@ function App() {
       ) : view === 'data' && manifest ? (
         <DataSummary manifest={manifest} />
       ) : view === 'methods' ? (
-        <MethodsView />
+        <MethodsView manifest={manifest} />
       ) : (
         <LoadingView />
       )}
@@ -1277,29 +1277,341 @@ function AnalysisLab({ manifest }: { manifest: Manifest | null }) {
   )
 }
 
-function MethodsView() {
+function MethodsView({ manifest }: { manifest: Manifest | null }) {
+  const topicTranslations = [
+    {
+      id: 'climate_change',
+      label: 'Climate change',
+      definition: 'General public and media language about anthropogenic climate change.',
+      rationale: 'The broad outcome: whether an event changes attention to climate change itself.',
+      phrases: [
+        ['English · validated', 'climate change · global warming · climate crisis'],
+        ['Spanish · draft', 'cambio climático · calentamiento global · crisis climática'],
+        ['Portuguese · draft', 'mudanças climáticas · alteração climática · aquecimento global · crise climática'],
+        ['French · draft', 'changement climatique · réchauffement climatique · crise climatique'],
+        ['German · draft', 'Klimawandel · globale Erwärmung · Klimakrise'],
+        ['Italian · draft', 'cambiamento climatico · riscaldamento globale · crisi climatica'],
+        ['Russian · draft', 'изменение климата · глобальное потепление · климатический кризис'],
+        ['Arabic · draft', 'تغير المناخ · الاحتباس الحراري · أزمة المناخ'],
+        ['Chinese · draft', '气候变化 · 全球变暖 · 气候危机'],
+        ['Japanese · draft', '気候変動 · 地球温暖化 · 気候危機'],
+      ],
+    },
+    {
+      id: 'electric_vehicles',
+      label: 'Electric vehicles',
+      definition: 'Explicit references to electric vehicles or electric cars.',
+      rationale: 'A transport-specific outcome relevant to T&E, narrow enough to audit across languages.',
+      phrases: [
+        ['English · validated', 'electric vehicle · electric vehicles · electric car · electric cars'],
+        ['Spanish · draft', 'vehículo eléctrico · vehículos eléctricos · coche eléctrico · coches eléctricos'],
+        ['Portuguese · draft', 'veículo elétrico · veículos elétricos · carro elétrico · carros elétricos'],
+        ['French · draft', 'véhicule électrique · véhicules électriques · voiture électrique · voitures électriques'],
+        ['German · draft', 'Elektrofahrzeug · Elektrofahrzeuge · Elektroauto · Elektroautos'],
+        ['Italian · draft', 'veicolo elettrico · veicoli elettrici · auto elettrica · auto elettriche'],
+        ['Russian · draft', 'электромобиль · электромобили · электрический автомобиль'],
+        ['Arabic · draft', 'سيارة كهربائية · سيارات كهربائية · مركبة كهربائية · مركبات كهربائية'],
+        ['Chinese · draft', '电动汽车 · 电动车'],
+        ['Japanese · draft', '電気自動車'],
+      ],
+    },
+  ]
+
+  const references = [
+    {
+      number: '01',
+      title: 'GDELT Web News NGrams 3.0',
+      organisation: 'The GDELT Project, 2021',
+      note: 'Dataset structure, language segmentation, article URLs and contextual phrase reconstruction.',
+      href: 'https://blog.gdeltproject.org/announcing-the-new-web-news-ngrams-3-0-dataset/',
+    },
+    {
+      number: '02',
+      title: 'Custom media catalogues with Web NGrams',
+      organisation: 'The GDELT Project, 2022',
+      note: 'Method for joining matching URLs to external domain catalogues.',
+      href: 'https://blog.gdeltproject.org/using-web-ngrams-3-0-custom-media-catalogs-to-segment-by-country-state-ownership-partisanship-or-other-attributes/',
+    },
+    {
+      number: '03',
+      title: 'GDACS API',
+      organisation: 'Global Disaster Alert and Coordination System',
+      note: 'Event, episode, alert-level and archive endpoints used for the event catalogue.',
+      href: 'https://www.gdacs.org/gdacsapi/swagger/index.html',
+    },
+    {
+      number: '04',
+      title: 'GDACS tropical-cyclone methodology',
+      organisation: 'European Commission Joint Research Centre',
+      note: 'Hazard, exposure and vulnerability components behind cyclone alert levels.',
+      href: 'https://www.gdacs.org/Knowledge/models_tc.aspx',
+    },
+    {
+      number: '05',
+      title: 'GDACS flood methodology',
+      organisation: 'European Commission Joint Research Centre',
+      note: 'Impact-oriented flood alerts and hazard-specific severity context.',
+      href: 'https://www.gdacs.org/Knowledge/models_fl.aspx',
+    },
+    {
+      number: '06',
+      title: 'Natural Earth 1:50m cultural vectors',
+      organisation: 'Natural Earth',
+      note: 'Administrative country polygons used to check the country containing each event point.',
+      href: 'https://www.naturalearthdata.com/downloads/50m-cultural-vectors/',
+    },
+    {
+      number: '07',
+      title: 'Permutation test reference',
+      organisation: 'SciPy documentation',
+      note: 'Exact and randomised independent-sample permutation-test mechanics.',
+      href: 'https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.permutation_test.html',
+    },
+  ]
+
   return (
     <main className="methods-view">
-      <section className="methods-hero"><span className="eyebrow">Methods &amp; definitions</span><h1>Built to make uncertainty visible.</h1><p>The Atlas keeps physical events, publishing geography and media outcomes separate so exploratory findings remain interpretable.</p></section>
-      <section className="methods-grid">
-        <article><span className="method-icon"><Layers3 size={20} /></span><small>01 · Treatment</small><h2>Independent event layer</h2><p>GDACS supplies named wildfires, floods and tropical cyclones. NASA FIRMS provides a separate physical wildfire-intensity layer. News coverage never defines the primary event treatment.</p></article>
-        <article><span className="method-icon"><Globe2 size={20} /></span><small>02 · Geography</small><h2>Two places, two meanings</h2><p>Event geography describes where a disaster occurred. Media geography identifies the publishing outlet’s source country—not the event location or audience.</p></article>
-        <article><span className="method-icon"><BarChart3 size={20} /></span><small>03 · Outcome</small><h2>Topic attention</h2><p>Daily counts represent distinct URLs matching configured multilingual topic phrases. Topics overlap and are displayed separately rather than summed into a whole.</p></article>
-        <article><span className="method-icon"><ShieldCheck size={20} /></span><small>04 · Eligibility</small><h2>No invented zeroes</h2><p>An estimate requires a complete window, supported country mapping and enough observed variation. Failed checks produce an explicit unavailable state.</p></article>
+      <section className="methods-hero">
+        <div>
+          <span className="eyebrow">Research protocol · MVP v0.1</span>
+          <h1>How the Atlas turns events into evidence.</h1>
+          <p>This protocol defines what is counted, how places and political content are classified, and what the before-and-after comparison can support. Definitions describe the current exported MVP—not the full historical availability of its providers.</p>
+        </div>
+        <div className="methods-hero-meta">
+          <span><ShieldCheck size={16} /> Transparent by design</span>
+          <small>Last data export {manifest ? formatDate(manifest.generatedAt) : 'not available'}</small>
+        </div>
       </section>
-      <section className="method-flow">
-        <div><span className="eyebrow">Planned analytical path</span><h2>From event to evidence</h2></div>
-        <ol>
-          <li><span>1</span><strong>Select event</strong><small>Independent GDACS record</small></li>
-          <li><ArrowRight size={17} /></li>
-          <li><span>2</span><strong>Define market</strong><small>Local, EU or global outlets</small></li>
-          <li><ArrowRight size={17} /></li>
-          <li><span>3</span><strong>Check coverage</strong><small>Complete daily window</small></li>
-          <li><ArrowRight size={17} /></li>
-          <li><span>4</span><strong>Estimate change</strong><small>Effect and uncertainty</small></li>
-        </ol>
+
+      <section className="method-principles" aria-label="Methodological principles">
+        <article><span><Layers3 size={18} /></span><div><small>Independent treatment</small><strong>Weather events are defined outside the news data.</strong></div></article>
+        <article><span><Globe2 size={18} /></span><div><small>Separate geographies</small><strong>Event location and outlet country are not interchangeable.</strong></div></article>
+        <article><span><ShieldCheck size={18} /></span><div><small>Explicit missingness</small><strong>Missing dates are unavailable, never invented zeroes.</strong></div></article>
       </section>
-      <section className="limitations-section"><div><span className="eyebrow">Interpretation boundary</span><h2>What the MVP will not claim</h2></div><ul><li>Temporal change alone does not establish that an event caused media coverage.</li><li>An outlet’s country does not identify an article’s audience or subject location.</li><li>Article counts are not directly comparable across countries without accounting for media-system coverage.</li><li>Event-specific framing requires separate article-to-event linkage and validation.</li></ul></section>
+
+      <section className="methods-shell">
+        <aside className="methods-toc" aria-label="Methods contents">
+          <span className="eyebrow">On this page</span>
+          <nav>
+            <a href="#research-design"><span>01</span> Research design</a>
+            <a href="#topics"><span>02</span> Topic taxonomy</a>
+            <a href="#political"><span>03</span> Political classification</a>
+            <a href="#collection"><span>04</span> News collection</a>
+            <a href="#events"><span>05</span> Weather events</a>
+            <a href="#geography"><span>06</span> Geography &amp; scope</a>
+            <a href="#measurement"><span>07</span> Attention measures</a>
+            <a href="#before-after"><span>08</span> Before / after test</a>
+            <a href="#articles"><span>09</span> Article evidence</a>
+            <a href="#decisions"><span>10</span> Decision register</a>
+            <a href="#limitations"><span>11</span> Limits &amp; validation</a>
+            <a href="#references"><span>12</span> References</a>
+          </nav>
+        </aside>
+
+        <div className="methods-protocol">
+          <section className="protocol-section" id="research-design">
+            <header><span>01</span><div><small>Foundation</small><h2>Research design</h2></div></header>
+            <p className="protocol-lede">The Atlas asks whether attention to climate and transport topics changes around a major weather event, and whether that response differs by publishing market or political content.</p>
+            <div className="method-definition-grid three">
+              <article><small>Event unit</small><strong>One GDACS event</strong><p>A stable provider ID, hazard type, start and end time, affected countries, point geometry and provider alert fields.</p></article>
+              <article><small>Attention unit</small><strong>Topic × outlet country × UTC day</strong><p>A daily count of distinct matching article URLs. Original source language is retained where available.</p></article>
+              <article><small>Comparison unit</small><strong>One eligible event window</strong><p>Complete daily observations before and after the event, evaluated separately for each topic, media scope and attention mode.</p></article>
+            </div>
+            <div className="methods-pipeline" aria-label="Data flow from independent weather events and news articles to an event-window comparison">
+              <div className="pipeline-source"><MapPin size={18} /><small>Event stream</small><strong>GDACS records</strong><span>Where and when</span></div>
+              <ArrowRight size={17} />
+              <div className="pipeline-source"><Search size={18} /><small>News stream</small><strong>GDELT URLs</strong><span>Topic and outlet</span></div>
+              <ArrowRight size={17} />
+              <div className="pipeline-join"><Layers3 size={18} /><small>Defined join</small><strong>Scope + date window</strong><span>No event inference from news</span></div>
+              <ArrowRight size={17} />
+              <div className="pipeline-result"><BarChart3 size={18} /><small>Output</small><strong>Change in URLs/day</strong><span>With an uncertainty test</span></div>
+            </div>
+            <p className="method-caption"><strong>Why independent streams?</strong> Defining events from the same coverage being explained would favour events that already received more news attention.</p>
+          </section>
+
+          <section className="protocol-section" id="topics">
+            <header><span>02</span><div><small>Outcome definitions</small><h2>Topic taxonomy</h2></div></header>
+            <p className="protocol-lede">The current MVP measures two deliberately distinct concepts. Exact phrases inside a topic are alternatives; a URL matching several phrases is still counted once for that topic. A URL may count once in each topic.</p>
+            <div className="topic-method-grid">
+              {topicTranslations.map((topic) => (
+                <article className="topic-method-card" key={topic.id} data-topic={topic.id}>
+                  <div className="topic-method-heading"><span className="status-chip active">Active</span><small>{topic.id}</small></div>
+                  <h3>{topic.label}</h3>
+                  <p><strong>Definition.</strong> {topic.definition}</p>
+                  <p><strong>Why included.</strong> {topic.rationale}</p>
+                  <details>
+                    <summary>View exact multilingual phrases <ChevronRight size={14} /></summary>
+                    <div className="translation-table">
+                      {topic.phrases.map(([language, phrases]) => <div key={language}><strong>{language}</strong><span>{phrases}</span></div>)}
+                    </div>
+                  </details>
+                </article>
+              ))}
+            </div>
+            <div className="candidate-topics">
+              <div><span className="status-chip held">Held back</span><strong>Clean energy</strong><p>Renewable and low-carbon energy technologies and deployment.</p></div>
+              <div><span className="status-chip held">Held back</span><strong>Clean transport</strong><p>Low-carbon mobility, transport decarbonisation, electrification, zero-emission movement and modal shift.</p></div>
+              <p>These dictionaries remain in project configuration for later validation, but are excluded from the two-topic MVP so exploratory results do not outrun taxonomy review.</p>
+            </div>
+            <div className="method-callout"><Info size={17} /><p><strong>Translation status.</strong> English seeds are reviewed and marked validated. Spanish, Portuguese, French, German, Italian, Russian, Arabic, Chinese and Japanese terms remain draft until native-speaker review for local usage, inflection and conceptual equivalence. Chinese and Japanese are matched as character sequences.</p></div>
+          </section>
+
+          <section className="protocol-section" id="political">
+            <header><span>03</span><div><small>Derived classification</small><h2>What “political” means</h2></div></header>
+            <p className="protocol-lede">“Political” is a broad discourse-relevance flag, not a claim about tone, ideology, support, opposition or causation.</p>
+            <div className="signal-grid">
+              <article><small>01</small><strong>Political actor</strong><p>References to elected institutions, office-holders or parties—for example government, minister, parliament or president.</p></article>
+              <article><small>02</small><strong>Government action</strong><p>References to policy, law, regulation, public spending, targets, bans or official decisions.</p></article>
+              <article><small>03</small><strong>Party politics</strong><p>Electoral competition, governing or opposition parties, and configured major-party names.</p></article>
+              <article><small>04</small><strong>Official source</strong><p>The article hostname matches a versioned registry of government, parliamentary or political-party domains.</p></article>
+            </div>
+            <div className="method-equation"><span>political URL</span><strong>= actor <em>OR</em> action <em>OR</em> party <em>OR</em> official source</strong></div>
+            <ul className="method-rules">
+              <li>The measure is the distinct-URL union. Component signals overlap and must not be added together.</li>
+              <li>Phrase signals may appear anywhere in indexed article text; they do not prove the political actor discussed the weather event.</li>
+              <li>The explicit official-domain registry is strongest for the United Kingdom, France, Spain, Germany and Italy. Generic translated phrase signals are global, but non-English translations remain draft.</li>
+            </ul>
+          </section>
+
+          <section className="protocol-section" id="collection">
+            <header><span>04</span><div><small>News data</small><h2>How coverage is queried and sources are selected</h2></div></header>
+            <p className="protocol-lede">The collector uses parameterised BigQuery SQL to match configured literal phrases in GDELT Web News NGrams 3.0 original-language text. This is deterministic phrase matching, not an AI-model query.</p>
+            <ol className="collection-steps">
+              <li><span>1</span><div><strong>Scan configured anchors</strong><p>All active topics are evaluated in one date-window scan. Lower- and title-case anchors reduce query cost.</p></div></li>
+              <li><span>2</span><div><strong>Reconstruct the phrase</strong><p>The <code>pre</code>, <code>ngram</code> and <code>post</code> context fields are recombined, with character joining for Chinese and Japanese.</p></div></li>
+              <li><span>3</span><div><strong>Deduplicate URLs</strong><p>Synonyms, translations and repeat NGram rows collapse to one URL per topic and UTC day.</p></div></li>
+              <li><span>4</span><div><strong>Assign outlet country</strong><p>The article domain is joined to GDELT’s multilingual April 2015 domain-country catalogue. The longest unambiguous suffix wins.</p></div></li>
+              <li><span>5</span><div><strong>Aggregate and audit</strong><p>Daily topic and political counts are exported with article metadata, query metadata and coverage checks.</p></div></li>
+            </ol>
+            <div className="source-selection-note">
+              <Database size={18} />
+              <div><strong>There is no manually curated global outlet list.</strong><p>Eligible sources are outlets indexed by GDELT whose domains map unambiguously to a publishing country. Ambiguous or unmapped domains are excluded. Official-domain overrides are transparent in the political configuration. The 2015 country catalogue is old and incomplete, so country coverage is a measurement limitation rather than a complete census of national media.</p></div>
+            </div>
+            <details className="technical-details">
+              <summary>Technical query safeguards <ChevronRight size={14} /></summary>
+              <ul><li>Every job receives a dry run, explicit billing project and per-window byte cap.</li><li>Job estimates, completed byte statistics, batched topic IDs and phrase metadata are retained.</li><li>The affordable anchor strategy can miss uppercase and punctuation-adjacent forms; this requires sensitivity testing.</li><li>No article bodies are downloaded by the frontend export.</li></ul>
+            </details>
+          </section>
+
+          <section className="protocol-section" id="events">
+            <header><span>05</span><div><small>Independent treatment</small><h2>Weather-event definitions</h2></div></header>
+            <p className="protocol-lede">The event catalogue comes from GDACS, a UN–European Commission cooperation framework for major sudden-onset disasters. The MVP includes event-level wildfires, floods and tropical cyclones.</p>
+            <div className="hazard-method-grid">
+              <article><Flame size={18} /><strong>Wildfire</strong><p>A named GDACS wildfire event. It is not an individual satellite hotspot and does not imply a burned-area estimate.</p></article>
+              <article><CloudRain size={18} /><strong>Flood</strong><p>A GDACS flood event assembled from authoritative institutions, media and scientific sources under provider impact rules.</p></article>
+              <article><Wind size={18} /><strong>Tropical cyclone</strong><p>A GDACS cyclone record based on global advisories, with hazard, exposed population and vulnerability informing alerting.</p></article>
+            </div>
+            <dl className="definition-list">
+              <div><dt>Event identity</dt><dd>Provider + hazard code + event ID. This remains stable when an upstream record is revised.</dd></div>
+              <div><dt>Event dates</dt><dd>Provider start and end timestamps in UTC. Later provider modification dates replace the stored version.</dd></div>
+              <div><dt>Affected countries</dt><dd>The provider’s country array. Multi-country events stay multi-country and are not reduced to the map point.</dd></div>
+              <div><dt>Alert level</dt><dd>GDACS Green, Orange or Red assessment of likely humanitarian consequences. Its logic is hazard-specific and incorporates factors such as hazard, exposure and vulnerability; it is not a pure physical-intensity scale.</dd></div>
+              <div><dt>Alert score</dt><dd>The provider’s numeric alert field retained alongside the colour. It supports ordering within the GDACS record but is not treated as a universal hazard magnitude.</dd></div>
+              <div><dt>Severity</dt><dd>The hazard-specific value and unit supplied by GDACS. Cyclone wind, flood severity and wildfire metrics do not share a common unit, so the MVP displays them but never pools them as equivalent.</dd></div>
+            </dl>
+          </section>
+
+          <section className="protocol-section" id="geography">
+            <header><span>06</span><div><small>Location rules</small><h2>Three geographies, four media scopes</h2></div></header>
+            <p className="protocol-lede">The most important geographic distinction is between where an event happened and where a publishing outlet is based.</p>
+            <div className="geography-diagram" aria-label="Relationship between provider-affected countries, event map point and publishing outlet country">
+              <article><span className="geo-symbol event"><MapPin size={17} /></span><small>Provider geography</small><strong>Affected countries</strong><p>Used for affected-country and international media scopes.</p></article>
+              <ArrowRight size={17} />
+              <article><span className="geo-symbol map"><MapIcon size={17} /></span><small>Display geography</small><strong>Event map point</strong><p>Checked against Natural Earth country polygons for the map label.</p></article>
+              <span className="geo-divider">≠</span>
+              <article><span className="geo-symbol outlet"><Globe2 size={17} /></span><small>Media geography</small><strong>Outlet source country</strong><p>Assigned from the article domain; not its subject or audience.</p></article>
+            </div>
+            <div className="scope-table" role="table" aria-label="Media scope definitions">
+              <div role="row"><span role="columnheader">Scope</span><span role="columnheader">Included publishing outlets</span><span role="columnheader">Interpretation</span></div>
+              <div role="row"><strong role="cell">Affected countries</strong><span role="cell">Outlet country is in the event’s affected-country array.</span><span role="cell">Domestic or affected-market response.</span></div>
+              <div role="row"><strong role="cell">EU27</strong><span role="cell">Outlet country is one of the fixed 27 EU member states.</span><span role="cell">Aggregate European publishing response.</span></div>
+              <div role="row"><strong role="cell">International</strong><span role="cell">Outlet country is not in the affected-country array.</span><span role="cell">External response, including EU outlets where applicable.</span></div>
+              <div role="row"><strong role="cell">Global</strong><span role="cell">Every available mapped publishing market.</span><span role="cell">Total indexed response in the exported data.</span></div>
+            </div>
+            <p className="method-caption"><strong>Boundary note.</strong> Natural Earth provides a display and validation layer, not the event definition. Its default Admin-0 countries reflect de facto cartographic boundaries, which may differ from legal or political claims.</p>
+          </section>
+
+          <section className="protocol-section" id="measurement">
+            <header><span>07</span><div><small>Daily outcomes</small><h2>Attention and political-attention measures</h2></div></header>
+            <div className="measure-grid">
+              <article><small>All coverage</small><strong>Distinct topic URLs per day</strong><div className="mini-formula">matched_count = unique matching URLs</div><p>One URL can count in both active topics, but only once within each topic and day.</p></article>
+              <article><small>Political only</small><strong>Distinct political topic URLs per day</strong><div className="mini-formula">political_count = unique matched URLs with ≥1 signal</div><p>The graph toggle and before/after cards use the same selected measure.</p></article>
+            </div>
+            <ul className="method-rules">
+              <li>The current frontend export reports URL counts. Denominator-based shares are unavailable in this data snapshot and are not silently inferred.</li>
+              <li>Counts measure indexed publishing output, not readership, public opinion, article prominence or sentiment.</li>
+              <li>Raw levels are not directly comparable between countries because outlet mapping and GDELT coverage differ.</li>
+              <li>A successful observed zero is valid; an absent date fails completeness and is not replaced with zero.</li>
+            </ul>
+          </section>
+
+          <section className="protocol-section" id="before-after">
+            <header><span>08</span><div><small>Exploratory inference</small><h2>What the before / after test estimates</h2></div></header>
+            <p className="protocol-lede">For a selected event, topic, media scope and measure, the panel compares mean matching URLs per complete day before and after the event.</p>
+            <div className="window-diagram" aria-label="Before and after event window">
+              <div className="window-before"><span>7, 14 or 28 days</span><strong>Before mean</strong><small>Days ending immediately before the start</small></div>
+              <div className="window-event"><span>Event duration</span><strong>Excluded</strong><small>Start through end date</small></div>
+              <div className="window-after"><span>7, 14 or 28 days</span><strong>After mean</strong><small>Days beginning immediately after the end</small></div>
+            </div>
+            <div className="test-output-grid">
+              <article><small>Effect</small><strong>After mean − before mean</strong><p>Shown in URLs per day and as a percentage when the before mean is above zero.</p></article>
+              <article><small>Null hypothesis</small><strong>No increase after the event</strong><p>A one-sided independent-sample permutation test asks how often shuffled labels produce an increase at least this large.</p></article>
+              <article><small>Decision label</small><strong>Evidence of an increase</strong><p>Used only when the observed difference is positive and p &lt; 0.05. Otherwise the result is “no clear increase”.</p></article>
+            </div>
+            <details className="technical-details">
+              <summary>Exact test, simulation and eligibility <ChevronRight size={14} /></summary>
+              <ul><li>Every day in both windows must be present. The event-duration dates are excluded.</li><li>All distinct label allocations are evaluated when there are no more than 50,000 combinations.</li><li>Larger tests use a deterministic 10,000-shuffle Monte Carlo approximation so the same input reproduces the same output.</li><li>Windows with no complete observations or no usable variation return “Not testable”.</li></ul>
+            </details>
+            <div className="method-callout caution"><CircleAlert size={17} /><p><strong>Interpretation.</strong> This is an unadjusted temporal association, not a causal estimate. News cycles are autocorrelated; many events and outcomes create multiple-testing risk; seasonality, weekday patterns and concurrent stories can confound the comparison. A confirmatory release should pre-register outcomes and add matched dates or interrupted time-series controls.</p></div>
+          </section>
+
+          <section className="protocol-section" id="articles">
+            <header><span>09</span><div><small>Supporting evidence</small><h2>What the article list contains</h2></div></header>
+            <p className="protocol-lede">The Articles tab is an audit trail for the quantitative series: topic-matched URLs in the selected media scope and a ±28-day envelope around the event.</p>
+            <div className="method-definition-grid two">
+              <article><small>Included</small><strong>Metadata and classification</strong><p>URL, domain, outlet name, title, publication time where available, language, outlet country, topic and political signal flags.</p></article>
+              <article><small>Not established</small><strong>Event-specific relevance</strong><p>Inclusion does not prove that an article discusses, attributes or responds to the selected event. That requires a separately validated article-to-event linkage step.</p></article>
+            </div>
+          </section>
+
+          <section className="protocol-section" id="decisions">
+            <header><span>10</span><div><small>Audit trail</small><h2>Current decision register</h2></div></header>
+            <div className="decision-table">
+              <div><span>Decision</span><span>Reason</span><span>Status</span></div>
+              <div><strong>Use GDACS as the event treatment</strong><p>Keeps event selection independent of news attention.</p><span className="status-chip active">In use</span></div>
+              <div><strong>Limit the MVP to two topics</strong><p>Prioritises interpretable, auditable concepts before taxonomy expansion.</p><span className="status-chip active">In use</span></div>
+              <div><strong>Count distinct URLs</strong><p>Prevents repeated phrases and duplicate NGram rows from inflating attention.</p><span className="status-chip active">In use</span></div>
+              <div><strong>Treat political as a union</strong><p>Avoids double counting overlapping actor, action, party and official-source signals.</p><span className="status-chip active">In use</span></div>
+              <div><strong>Use outlet country for media scope</strong><p>It is observable and reproducible; article audience geography is not.</p><span className="status-chip active">In use</span></div>
+              <div><strong>Exclude the event duration from tests</strong><p>Creates clean pre- and post-period definitions across events of different lengths.</p><span className="status-chip active">In use</span></div>
+              <div><strong>Do not impute missing days</strong><p>Prevents provider gaps from becoming false evidence of low attention.</p><span className="status-chip active">In use</span></div>
+              <div><strong>Add normalized country shares</strong><p>Needed for stronger cross-market comparison when denominator coverage is validated.</p><span className="status-chip planned">Planned</span></div>
+            </div>
+          </section>
+
+          <section className="protocol-section" id="limitations">
+            <header><span>11</span><div><small>Research boundaries</small><h2>Limitations and validation priorities</h2></div></header>
+            <div className="limits-grid">
+              <div><strong>The MVP does not claim</strong><ul><li>that an event caused a change in coverage;</li><li>that URL count equals audience attention;</li><li>that outlet country equals article subject or audience;</li><li>that political classification captures stance or ideology;</li><li>that provider alert levels are comparable physical intensities;</li><li>that every listed article is about the selected event.</li></ul></div>
+              <div><strong>Validation before external research use</strong><ol><li>Native-speaker review and precision/recall samples for every language.</li><li>Manual audit of political false positives and false negatives.</li><li>Refresh and quantify domain-to-country mapping coverage.</li><li>Validate event points and multi-country records against provider pages.</li><li>Pre-register hypotheses and correct for multiple comparisons.</li><li>Add denominators, matched controls and robustness specifications.</li></ol></div>
+            </div>
+            <div className="reproducibility-strip"><Database size={17} /><p><strong>Reproducibility record.</strong> Each research export should retain the retrieval date, package version, frozen topic, political and country configurations, run manifest, query metadata and underlying provider citations. Do not combine date ranges collected under different phrase dictionaries without checking their metadata.</p></div>
+          </section>
+
+          <section className="protocol-section" id="references">
+            <header><span>12</span><div><small>Source documentation</small><h2>References and technical documentation</h2></div></header>
+            <div className="reference-list">
+              {references.map((reference) => (
+                <a href={reference.href} target="_blank" rel="noreferrer" key={reference.number}>
+                  <span>{reference.number}</span>
+                  <div><strong>{reference.title}</strong><small>{reference.organisation}</small><p>{reference.note}</p></div>
+                  <ExternalLink size={15} />
+                </a>
+              ))}
+            </div>
+          </section>
+        </div>
+      </section>
     </main>
   )
 }

@@ -212,6 +212,40 @@ test('data summary reports only MVP sources and their stored coverage dates', as
   expect(errors).toEqual([])
 })
 
+test('methods page documents the current research protocol and definitions', async ({ page }) => {
+  const errors = collectClientErrors(page)
+  await openExplorer(page)
+  await page.getByRole('button', { name: 'Methods', exact: true }).click()
+
+  await expect(page.getByRole('heading', { name: 'How the Atlas turns events into evidence.' })).toBeVisible()
+  await expect(page.locator('.protocol-section')).toHaveCount(12)
+  await expect(page.locator('.topic-method-card')).toHaveCount(2)
+  await expect(page.locator('.topic-method-card[data-topic="climate_change"]')).toContainText('Climate change')
+  await expect(page.locator('.candidate-topics')).toContainText('Clean energy')
+  await expect(page.locator('.candidate-topics')).toContainText('Held back')
+
+  const climateDictionary = page.locator('.topic-method-card[data-topic="climate_change"] details')
+  await climateDictionary.locator('summary').click()
+  await expect(climateDictionary).toHaveAttribute('open', '')
+  await expect(climateDictionary).toContainText('cambio climático')
+  await expect(climateDictionary).toContainText('Japanese · draft')
+
+  await expect(page.locator('.method-equation')).toContainText('actor OR action OR party OR official source')
+  await expect(page.locator('#collection')).toContainText('deterministic phrase matching, not an AI-model query')
+  await expect(page.getByRole('table', { name: 'Media scope definitions' })).toContainText('Affected countries')
+  await expect(page.getByRole('table', { name: 'Media scope definitions' })).toContainText('Global')
+  await expect(page.locator('.window-diagram')).toContainText('Event duration')
+  await expect(page.locator('.window-diagram')).toContainText('Excluded')
+  await expect(page.locator('.decision-table .status-chip.planned')).toHaveText('Planned')
+  await expect(page.locator('.reference-list > a')).toHaveCount(7)
+  await expect(page.locator('.reference-list > a').first()).toHaveAttribute('href', /gdeltproject\.org/)
+  await expect(page.locator('.reference-list > a').first()).toHaveAttribute('target', '_blank')
+
+  await page.locator('.methods-toc a[href="#geography"]').click()
+  await expect(page.locator('#geography')).toBeInViewport()
+  expect(errors).toEqual([])
+})
+
 test('clearing and keyboard-editing date filters never unmounts the explorer', async ({ page }) => {
   const errors = collectClientErrors(page)
   await openExplorer(page)
