@@ -265,6 +265,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="hard per-window BigQuery byte cap",
     )
     ngrams.add_argument(
+        "--maximum-total-gb-billed",
+        type=_positive_float,
+        help=(
+            "whole-run BigQuery preflight ceiling; performs one free combined-window "
+            "dry run before creating or executing the workload"
+        ),
+    )
+    ngrams.add_argument(
         "--plan-only", action="store_true", help="save the workload without BigQuery calls"
     )
     ngrams.add_argument("--data-dir", type=Path, default=Path("data"))
@@ -786,10 +794,45 @@ def _collect_ngrams(args: argparse.Namespace) -> int:
     request = CollectionRequest(start=args.start, end=args.end, topics=topics)
     windows, phrases = plan_ngram_windows(request, window_days=args.window_days)
     maximum_bytes = int(args.maximum_gb_billed * 1_000_000_000)
+    maximum_total_bytes = (
+        int(args.maximum_total_gb_billed * 1_000_000_000)
+        if args.maximum_total_gb_billed is not None
+        else None
+    )
+    preflight_estimated_bytes: int | None = None
+    if maximum_total_bytes is not None and not args.plan_only:
+        total_days = (request.end - request.start).days + 1
+        combined_windows, _ = plan_ngram_windows(request, window_days=total_days)
+        executor = GoogleBigQueryExecutor(
+            project=args.billing_project, location=args.location
+        )
+        estimates = estimate_ngram_windows(
+            combined_windows,
+            executor=executor,
+            country_labels={
+                country.id: country.ngram_label for country in countries
+            },
+            phrases_by_topic=phrases,
+            include_denominator=args.include_denominator,
+            political_signals=political.phrase_mapping() if political else None,
+            official_domains=political.official_domains if political else None,
+            article_sample_size=article_output_size,
+        )
+        preflight_estimated_bytes = sum(
+            item["estimated_bytes_processed"] for item in estimates
+        )
+        if preflight_estimated_bytes > maximum_total_bytes:
+            raise ValueError(
+                "BigQuery combined dry run estimated "
+                f"{preflight_estimated_bytes} bytes, above the whole-run cap of "
+                f"{maximum_total_bytes} bytes"
+            )
     options = {
         "billing_project": args.billing_project,
         "location": args.location,
         "maximum_bytes_billed": maximum_bytes,
+        "maximum_total_bytes_billed": maximum_total_bytes,
+        "preflight_estimated_bytes": preflight_estimated_bytes,
         "country_labels": {
             country.id: country.ngram_label for country in countries
         },
@@ -846,6 +889,12 @@ def _collect_ngrams(args: argparse.Namespace) -> int:
         "Each job is dry-run first and cannot exceed the configured per-job "
         f"cap of {maximum_bytes / 1_000_000_000:.3f} GB."
     )
+    if preflight_estimated_bytes is not None:
+        print(
+            "Whole-run preflight estimate: "
+            f"{preflight_estimated_bytes / 1_000_000_000:.3f} GB; cap: "
+            f"{maximum_total_bytes / 1_000_000_000:.3f} GB."
+        )
     denominator = "with GAL denominators" if args.include_denominator else "counts only"
     attribution = (
         "GDELT's April 2015 domain map plus the configured official-domain overrides"

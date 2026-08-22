@@ -333,6 +333,8 @@ def test_collect_ngrams_plan_only_freezes_billing_cap_and_queries(tmp_path, caps
             "research-project",
             "--maximum-gb-billed",
             "2.5",
+            "--maximum-total-gb-billed",
+            "75",
             "--plan-only",
             "--data-dir",
             str(data_dir),
@@ -345,6 +347,8 @@ def test_collect_ngrams_plan_only_freezes_billing_cap_and_queries(tmp_path, caps
     assert state.source == "gdelt_ngrams"
     assert state.provider_options["billing_project"] == "research-project"
     assert state.provider_options["maximum_bytes_billed"] == 2_500_000_000
+    assert state.provider_options["maximum_total_bytes_billed"] == 75_000_000_000
+    assert state.provider_options["preflight_estimated_bytes"] is None
     assert state.provider_options["topic_phrases"]["climate"][0] == {
         "text": "climate change",
         "language": None,
