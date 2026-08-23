@@ -228,6 +228,36 @@ test('data summary reports only MVP sources and their stored coverage dates', as
   expect(errors).toEqual([])
 })
 
+test('analysis lab runs the major-event study for climate and electric vehicles', async ({ page }) => {
+  const errors = collectClientErrors(page)
+  await openExplorer(page)
+  await page.getByRole('button', { name: 'Analysis Lab', exact: true }).click()
+
+  await expect(page.getByRole('heading', { name: 'Compare attention across major events.' })).toBeVisible()
+  await expect(page.locator('.cohort-flow')).toContainText('40')
+  await expect(page.locator('.cohort-flow')).toContainText('37')
+  await expect(page.locator('.cohort-flow')).toContainText('24')
+  await expect(page.locator('.topic-result-grid > article')).toHaveCount(2)
+  await expect(page.locator('.topic-result-grid [data-topic="electric_vehicles"]')).toContainText('Electric vehicles')
+  await expect(page.locator('.study-timeline')).toBeVisible()
+  await expect(page.locator('.ranked-event-table > button').first()).toBeVisible()
+
+  await page.getByRole('button', { name: /H2 EV spillover/ }).click()
+  await expect(page.locator('.pooled-result')).toContainText('Electric vehicles · Article attention')
+
+  await page.getByLabel('Chart measure').selectOption('political_share')
+  await expect(page.locator('.pooled-result')).toContainText('Politicisation')
+  await expect(page.locator('.headline-result-grid article').first()).toContainText('pp')
+
+  await page.getByLabel('Exclude same-country overlapping events').uncheck()
+  await expect(page.locator('.cohort-flow')).toContainText('37')
+
+  await page.locator('.ranked-event-table > button').first().click()
+  await expect(page.locator('.event-drawer')).toBeVisible()
+  await expect(page.locator('.event-error')).toHaveCount(0)
+  expect(errors).toEqual([])
+})
+
 test('methods page documents the current research protocol and definitions', async ({ page }) => {
   const errors = collectClientErrors(page)
   await openExplorer(page)

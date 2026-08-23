@@ -8,7 +8,6 @@ import {
   BarChart3,
   BookOpen,
   CalendarDays,
-  Check,
   ChevronRight,
   CircleAlert,
   CloudRain,
@@ -25,10 +24,10 @@ import {
   Microscope,
   Search,
   ShieldCheck,
-  Sparkles,
   X,
 } from 'lucide-react'
 import type { AttentionChartPoint } from './AttentionChart'
+import type { EventStudyData } from './AnalysisLab'
 import {
   fetchAttentionWindow,
   isSupabaseEnabled,
@@ -37,6 +36,7 @@ import type { WindowQuery } from './supabase'
 import { dateWithinRange, formatDate, permutationIncreaseTest } from './utils'
 
 const AttentionChart = lazy(() => import('./AttentionChart'))
+const AnalysisLab = lazy(() => import('./AnalysisLab'))
 
 type HazardType = 'wildfire' | 'flood'
 type AlertLevel = 'Green' | 'Orange' | 'Red'
@@ -236,6 +236,7 @@ function useAtlasData() {
   const [world, setWorld] = useState<WorldGeoJSON | null>(null)
   const [attention, setAttention] = useState<AttentionRow[]>([])
   const [manifest, setManifest] = useState<Manifest | null>(null)
+  const [eventStudy, setEventStudy] = useState<EventStudyData | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -244,12 +245,14 @@ function useAtlasData() {
       fetch('/data/events.geojson').then((response) => response.json()),
       fetch('/data/world.geojson').then((response) => response.json()),
       fetch('/data/manifest.json').then((response) => response.json()),
+      fetch('/data/event-study.json').then((response) => response.json()),
     ])
-      .then(([eventsData, worldData, manifestData]) => {
+      .then(([eventsData, worldData, manifestData, eventStudyData]) => {
         if (!active) return
         setEvents(eventsData)
         setWorld(worldData)
         setManifest(manifestData)
+        setEventStudy(eventStudyData)
       })
       .catch(() => active && setError('The local research datasets could not be loaded.'))
     if (!isSupabaseEnabled()) setError('Supabase aggregate data access is not configured.')
@@ -258,7 +261,7 @@ function useAtlasData() {
     }
   }, [])
 
-  return { events, world, attention, manifest, error }
+  return { events, world, attention, manifest, eventStudy, error }
 }
 
 class EventDetailBoundary extends Component<{ children: ReactNode; onClose: () => void }, { failed: boolean }> {
@@ -286,7 +289,7 @@ class EventDetailBoundary extends Component<{ children: ReactNode; onClose: () =
 }
 
 function App() {
-  const { events, world, attention, manifest, error } = useAtlasData()
+  const { events, world, attention, manifest, eventStudy, error } = useAtlasData()
   const [view, setView] = useState<View>('explore')
   const [selectedId, setSelectedId] = useState<string | null>(() => {
     const id = new URLSearchParams(window.location.search).get('event')
@@ -371,7 +374,13 @@ function App() {
           onDetailTabChange={setDetailTab}
         />
       ) : view === 'lab' ? (
-        <AnalysisLab manifest={manifest} />
+        <Suspense fallback={<LoadingView />}>
+          <AnalysisLab
+            study={eventStudy}
+            geographyLabels={manifest?.geographyLabels ?? {}}
+            onOpenEvent={(id) => { selectEvent(id); setView('explore') }}
+          />
+        </Suspense>
       ) : view === 'data' && manifest ? (
         <DataSummary manifest={manifest} />
       ) : view === 'methods' ? (
@@ -1262,66 +1271,6 @@ function CoverageBreakdown({
   )
 }
 
-function AnalysisLab({ manifest }: { manifest: Manifest | null }) {
-  const [hypothesis, setHypothesis] = useState('attention')
-  const [scope, setScope] = useState<MediaScope>('eu27')
-  const [window, setWindow] = useState('28')
-  const hypotheses = [
-    { id: 'attention', number: 'H1', title: 'Attention response', copy: 'Extreme-weather events increase climate-related media attention.' },
-    { id: 'spillover', number: 'H2', title: 'Transport spillover', copy: 'Events shift discourse toward clean transport and electric vehicles.' },
-    { id: 'geography', number: 'H3', title: 'Geographic diffusion', copy: 'Affected-country, EU and international responses differ.' },
-    { id: 'severity', number: 'H4', title: 'Severity gradient', copy: 'More severe events produce larger or more persistent responses.' },
-  ]
-  return (
-    <main className="lab-view">
-      <section className="lab-hero">
-        <div><span className="eyebrow">Analysis Lab</span><h1>Turn events into testable questions.</h1><p>Define the media market, window and outcome before comparing responses across the global event catalogue.</p></div>
-        <div className="lab-status"><span className="live-dot" /><div><strong>Research pipeline connected</strong><small>Inference waits for continuous windows</small></div></div>
-      </section>
-
-      <section className="lab-grid">
-        <div className="hypothesis-panel">
-          <div className="lab-section-heading"><span>1</span><div><small>Research question</small><h2>Select a hypothesis</h2></div></div>
-          <div className="hypothesis-list">
-            {hypotheses.map((item) => (
-              <button key={item.id} onClick={() => setHypothesis(item.id)} className={hypothesis === item.id ? 'active' : ''}>
-                <span>{item.number}</span><div><strong>{item.title}</strong><p>{item.copy}</p></div>{hypothesis === item.id && <Check size={17} />}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="configuration-panel">
-          <div className="lab-section-heading"><span>2</span><div><small>Study design</small><h2>Configure comparison</h2></div></div>
-          <div className="lab-form">
-            <label><span>Event types</span><select defaultValue="all"><option value="all">All available hazards</option><option>Wildfires</option><option>Floods</option></select></label>
-            <label><span>Media market</span><select value={scope} onChange={(event) => setScope(event.target.value as MediaScope)}>{(Object.entries(SCOPE_COPY) as [MediaScope, (typeof SCOPE_COPY)[MediaScope]][]).map(([id, item]) => <option key={id} value={id}>{item.label}</option>)}</select></label>
-            <label><span>Pre / post window</span><select value={window} onChange={(event) => setWindow(event.target.value)}><option value="7">7 days</option><option value="14">14 days</option><option value="28">28 days</option><option value="56">56 days</option></select></label>
-            <label><span>Primary outcome</span><select defaultValue="climate_change">{TOPICS.map((topic) => <option key={topic.id} value={topic.id}>{topic.label}</option>)}</select></label>
-          </div>
-          <button className="run-button" disabled><Sparkles size={16} /> Run comparison <span>Waiting for panel</span></button>
-        </div>
-
-        <div className="results-panel">
-          <div className="lab-section-heading"><span>3</span><div><small>Eligibility</small><h2>Evidence available today</h2></div></div>
-          <div className="coverage-metrics">
-            <div><strong>{manifest?.events.count.toLocaleString() ?? '—'}</strong><span>Mapped events</span><em>Ready</em></div>
-            <div><strong>197</strong><span>Media markets</span><em>Mapped</em></div>
-            <div><strong>{manifest?.attention.rowCount.toLocaleString() ?? '—'}</strong><span>Attention rows</span><em>Partial</em></div>
-            <div><strong>0</strong><span>Complete event windows</span><em className="waiting">Waiting</em></div>
-          </div>
-          <div className="coverage-calendar">
-            <div className="calendar-heading"><span>Daily panel coverage</span><small>Jan 2025 — Jul 2026</small></div>
-            <div className="calendar-track"><span className="coverage-point january" title="1 January 2025" /><span className="coverage-block july" title="July 2026" /></div>
-            <div className="calendar-labels"><span>Jan ’25</span><span>Jul ’25</span><span>Jan ’26</span><span>Jul ’26</span></div>
-          </div>
-          <div className="notice-card warning compact"><CircleAlert size={17} /><div><strong>Continuous collection is the next dependency</strong><p>The analytical UI is wired for a ±{window}-day {SCOPE_COPY[scope].label.toLowerCase()} comparison. Results remain disabled until eligible event windows exist.</p></div></div>
-        </div>
-      </section>
-    </main>
-  )
-}
-
 function MethodsView({ manifest }: { manifest: Manifest | null }) {
   const topicTranslations = [
     {
@@ -1572,6 +1521,7 @@ function MethodsView({ manifest }: { manifest: Manifest | null }) {
               <div role="row"><strong role="cell">International</strong><span role="cell">Outlet country is not in the affected-country array.</span><span role="cell">External response, including EU outlets where applicable.</span></div>
               <div role="row"><strong role="cell">Global</strong><span role="cell">Every available mapped publishing market.</span><span role="cell">Total indexed response in the exported data.</span></div>
             </div>
+            <p className="method-caption"><strong>Analysis Lab comparison groups.</strong> To prevent overlap between pooled geographic estimates, the Lab separates affected countries, other EU27 countries and the rest of the world. Global remains an all-market summary. Explore retains the broader EU27 and international scopes above for single-event inspection.</p>
             <p className="method-caption"><strong>Boundary note.</strong> Natural Earth provides a display and validation layer, not the event definition. Its default Admin-0 countries reflect de facto cartographic boundaries, which may differ from legal or political claims.</p>
           </section>
 
@@ -1582,7 +1532,7 @@ function MethodsView({ manifest }: { manifest: Manifest | null }) {
               <article><small>Political only</small><strong>Distinct political topic URLs per day</strong><div className="mini-formula">political_count = unique matched URLs with ≥1 signal</div><p>The graph toggle and before/after cards use the same selected measure.</p></article>
             </div>
             <ul className="method-rules">
-              <li>The current frontend export reports URL counts. Denominator-based shares are unavailable in this data snapshot and are not silently inferred.</li>
+              <li>The current frontend export reports URL counts. Overall country-news denominators are unavailable, but political share is calculated transparently as political URLs divided by matched topic URLs.</li>
               <li>Counts measure indexed publishing output, not readership, public opinion, article prominence or sentiment.</li>
               <li>Raw levels are not directly comparable between countries because outlet mapping and GDELT coverage differ.</li>
               <li>A successful observed zero is valid; an absent date fails completeness and is not replaced with zero.</li>
@@ -1590,23 +1540,24 @@ function MethodsView({ manifest }: { manifest: Manifest | null }) {
           </section>
 
           <section className="protocol-section" id="before-after">
-            <header><span>08</span><div><small>Exploratory inference</small><h2>What the before / after test estimates</h2></div></header>
-            <p className="protocol-lede">For a selected event, topic, media scope and measure, the panel compares mean matching URLs per complete day before and after the event.</p>
+            <header><span>08</span><div><small>Exploratory inference</small><h2>What the single- and multi-event studies estimate</h2></div></header>
+            <p className="protocol-lede">Explore compares one selected event with its own pre-event period. Analysis Lab applies the same complete-day principle to every major 2025 event, then summarises event-level changes without allowing large media markets to dominate the result.</p>
             <div className="window-diagram" aria-label="Before and after event window">
               <div className="window-before"><span>7, 14 or 28 days</span><strong>Before mean</strong><small>Days ending immediately before the start</small></div>
               <div className="window-event"><span>Event duration</span><strong>Excluded</strong><small>Start through end date</small></div>
               <div className="window-after"><span>7, 14 or 28 days</span><strong>After mean</strong><small>Days beginning immediately after the end</small></div>
             </div>
+            <p className="method-caption"><strong>Two Lab timings.</strong> Onset response begins on the event start date and captures the immediate reaction. Persistence begins after the event end date and asks whether attention remains elevated. Both use the selected 7-, 14- or 28-day pre-event baseline.</p>
             <div className="test-output-grid">
-              <article><small>Effect</small><strong>After mean − before mean</strong><p>Shown in URLs per day and as a percentage when the before mean is above zero.</p></article>
-              <article><small>Null hypothesis</small><strong>No increase after the event</strong><p>A one-sided independent-sample permutation test asks how often shuffled labels produce an increase at least this large.</p></article>
-              <article><small>Decision label</small><strong>Evidence of an increase</strong><p>Used only when the observed difference is positive and p &lt; 0.05. Otherwise the result is “no clear increase”.</p></article>
+              <article><small>Event effect</small><strong>Post mean relative to its own baseline</strong><p>All and political volume use percentage change. Political share uses percentage-point change.</p></article>
+              <article><small>Lab aggregation</small><strong>Median event response</strong><p>The middle event is the headline result; the interquartile range shows the middle half of event estimates.</p></article>
+              <article><small>Single-event test</small><strong>One-sided permutation result</strong><p>Explore retains its complete-window permutation calculation as a drill-down, not as the pooled Lab estimator.</p></article>
             </div>
             <details className="technical-details">
               <summary>Exact test, simulation and eligibility <ChevronRight size={14} /></summary>
-              <ul><li>Every day in both windows must be present. The event-duration dates are excluded.</li><li>All distinct label allocations are evaluated when there are no more than 50,000 combinations.</li><li>Larger tests use a deterministic 10,000-shuffle Monte Carlo approximation so the same input reproduces the same output.</li><li>Windows with no complete observations or no usable variation return “Not testable”.</li></ul>
+              <ul><li>Every day in both periods must be present; absent dates are never converted to zero.</li><li>The primary Lab cohort contains GDACS Orange and Red floods and wildfires beginning in 2025.</li><li>The default Lab result excludes another major event affecting the same country during the analysis window; users may include overlaps as a sensitivity check.</li><li>Explore evaluates every label allocation when there are no more than 50,000 combinations and otherwise uses a deterministic 10,000-shuffle approximation.</li></ul>
             </details>
-            <div className="method-callout caution"><CircleAlert size={17} /><p><strong>Interpretation.</strong> This is an unadjusted temporal association, not a causal estimate. News cycles are autocorrelated; many events and outcomes create multiple-testing risk; seasonality, weekday patterns and concurrent stories can confound the comparison. A confirmatory release should pre-register outcomes and add matched dates or interrupted time-series controls.</p></div>
+            <div className="method-callout caution"><CircleAlert size={17} /><p><strong>Interpretation.</strong> These are unadjusted temporal associations, not causal estimates or confidence intervals. News cycles are autocorrelated; seasonality, weekday patterns and concurrent stories can confound comparisons. A confirmatory release should pre-register outcomes and add matched dates, untreated markets or interrupted time-series controls.</p></div>
           </section>
 
           <section className="protocol-section" id="coverage-breakdown-method">
@@ -1627,7 +1578,9 @@ function MethodsView({ manifest }: { manifest: Manifest | null }) {
               <div><strong>Count distinct URLs</strong><p>Prevents repeated phrases and duplicate NGram rows from inflating attention.</p><span className="status-chip active">In use</span></div>
               <div><strong>Treat political as a union</strong><p>Avoids double counting overlapping actor, action, party and official-source signals.</p><span className="status-chip active">In use</span></div>
               <div><strong>Use outlet country for media scope</strong><p>It is observable and reproducible; article audience geography is not.</p><span className="status-chip active">In use</span></div>
-              <div><strong>Exclude the event duration from tests</strong><p>Creates clean pre- and post-period definitions across events of different lengths.</p><span className="status-chip active">In use</span></div>
+              <div><strong>Separate onset from persistence</strong><p>Distinguishes the immediate response from attention remaining after an event ends.</p><span className="status-chip active">In use</span></div>
+              <div><strong>Use Orange and Red events as the primary cohort</strong><p>Prevents thousands of low-salience Green alerts from dominating pooled estimates.</p><span className="status-chip active">In use</span></div>
+              <div><strong>Exclude same-country overlaps by default</strong><p>Reduces attribution of one event’s news response to another concurrent major event.</p><span className="status-chip active">In use</span></div>
               <div><strong>Do not impute missing days</strong><p>Prevents provider gaps from becoming false evidence of low attention.</p><span className="status-chip active">In use</span></div>
               <div><strong>Add normalized country shares</strong><p>Needed for stronger cross-market comparison when denominator coverage is validated.</p><span className="status-chip planned">Planned</span></div>
             </div>

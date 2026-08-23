@@ -7,11 +7,19 @@ sys.path.insert(0, str(ROOT))
 
 from climate_attention.config import load_country_config
 from climate_attention.geography import load_country_boundaries, load_region_boundaries
-from scripts.export_frontend_data import FRONTEND_TOPIC_IDS, contiguous_date_ranges
+from scripts.export_frontend_data import (
+    FRONTEND_HAZARD_TYPES,
+    FRONTEND_TOPIC_IDS,
+    contiguous_date_ranges,
+)
 
 
 def test_frontend_topic_scope_is_the_two_topic_mvp():
     assert FRONTEND_TOPIC_IDS == {"climate_change", "electric_vehicles"}
+
+
+def test_frontend_hazard_scope_excludes_cyclones():
+    assert FRONTEND_HAZARD_TYPES == {"wildfire", "flood"}
 
 
 def test_contiguous_date_ranges_preserves_gaps() -> None:

@@ -11,6 +11,7 @@ from typing import Any
 import pyarrow.parquet as pq
 
 from climate_attention.config import load_country_config
+from climate_attention.event_study import build_event_study_files
 from climate_attention.geography import load_country_boundaries, load_region_boundaries
 from climate_attention.supabase_sync import dotenv_value
 
@@ -310,6 +311,11 @@ def main() -> None:
     export_supabase_config()
     export_world_map()
     events = export_events()
+    event_study = build_event_study_files(
+        data_dir=ROOT / "data",
+        json_path=OUT / "event-study.json",
+        study_year=2025,
+    )
     attention_summary = summarize_attention()
     article_summary = summarize_articles()
     country_config = load_country_config(ROOT / "config/countries.world.yaml")
@@ -326,10 +332,10 @@ def main() -> None:
             "articles": {"count": article_summary["count"]},
             "geographyLabels": geography_labels,
             "dataSources": data_sources,
-            "analysisStatus": "continuous_event windows_pending",
+            "analysisStatus": "2025_major_event_study_ready",
             "notes": [
                 "Media geography is publishing-outlet country, not event location.",
-                "Event effects require continuous daily attention coverage around each event.",
+                "The Analysis Lab uses GDACS Orange and Red events with complete daily attention windows.",
                 "Coverage intervals use actual stored dates; gaps are never rendered as continuous coverage.",
             ],
         },
@@ -337,7 +343,8 @@ def main() -> None:
     print(
         f"Exported {len(events)} events and a manifest covering "
         f"{attention_summary['rowCount']} attention rows and "
-        f"{article_summary['count']} articles to {OUT}. "
+        f"{article_summary['count']} articles and "
+        f"{len(event_study['events'])} major-event study candidates to {OUT}. "
         "Aggregate attention is served by Supabase; article rows remain an offline validation archive."
     )
 

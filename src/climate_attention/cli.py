@@ -20,6 +20,7 @@ from .config import (
     load_political_config,
 )
 from .comparison import compare_trends, write_comparisons
+from .event_study import build_event_study_files
 from .manifest import build_run_manifest, package_version
 from .models import (
     CollectionRequest,
@@ -414,6 +415,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="daily attention table migration",
     )
 
+    event_study = subparsers.add_parser(
+        "build-event-study",
+        help="build canonical and browser-ready multi-event analysis datasets",
+    )
+    event_study.add_argument("--data-dir", type=Path, default=Path("data"))
+    event_study.add_argument("--year", type=int, default=2025)
+    event_study.add_argument(
+        "--frontend-output",
+        type=Path,
+        default=Path("frontend/public/data/event-study.json"),
+    )
+
     aggregate = subparsers.add_parser(
         "aggregate", aliases=["rebuild-aggregates"], help="rebuild daily Parquet"
     )
@@ -473,6 +486,8 @@ def main(argv: list[str] | None = None) -> int:
             return _export_articles(args)
         if args.command == "sync-supabase":
             return _sync_supabase(args)
+        if args.command == "build-event-study":
+            return _build_event_study(args)
         if args.command in {"aggregate", "rebuild-aggregates"}:
             return _aggregate(args.data_dir)
         if args.command == "runs":
@@ -1556,6 +1571,22 @@ def _sync_supabase(args: argparse.Namespace) -> int:
     print(
         f"Supabase attention sync complete: {copied:,} row(s) upserted "
         f"from {files:,} Parquet partition(s)."
+    )
+    return 0
+
+
+def _build_event_study(args: argparse.Namespace) -> int:
+    payload = build_event_study_files(
+        data_dir=args.data_dir,
+        json_path=args.frontend_output,
+        study_year=args.year,
+    )
+    complete = sum(row["complete"] for row in payload["effects"])
+    print(
+        f"Event study complete: {len(payload['events']):,} major event(s), "
+        f"{complete:,} complete event-topic-scope specification(s). "
+        f"Canonical effects: {args.data_dir / 'analysis' / 'event_effects.parquet'}. "
+        f"Frontend dataset: {args.frontend_output}."
     )
     return 0
 

@@ -19,9 +19,9 @@ series and is being validated before it replaces any canonical API measure.
 
 `frontend/` contains the Netlify-ready Climate Attention Atlas: a React and
 TypeScript map explorer for GDACS events, media-market comparisons, aggregate topic
-and political-attention counts, research hypotheses, a source-level data coverage
-summary, and methodology. It deliberately shows an unavailable state
-instead of estimating an event effect when the continuous daily panel is incomplete.
+and political-attention counts, and a multi-event Analysis Lab. The Lab compares
+Orange and Red wildfire and flood events across climate-change and electric-vehicle
+attention, retains only complete daily windows, and flags same-country overlaps.
 
 Export the current Parquet datasets to compact browser assets, then run the app:
 
@@ -41,6 +41,21 @@ the point supplied by GDACS; they do not replace GDACS's affected-country list.
 The root `netlify.toml` builds and publishes the Vite app. Article-level Parquet is
 retained locally for validation, but the public interface is not an article finder
 and does not publish URLs or detailed article records.
+
+The frontend export also rebuilds `data/analysis/event_effects.parquet` and the
+compact `frontend/public/data/event-study.json` serving asset. Rebuild the analysis
+without the other frontend assets with:
+
+```bash
+climate-attention build-event-study \
+  --data-dir data \
+  --year 2025 \
+  --frontend-output frontend/public/data/event-study.json
+```
+
+The canonical flat effect table contains event, topic, mutually exclusive media
+group, window, timing, completeness, overlap and pre/post measures. It can be moved
+to Supabase later without changing the estimator or frontend result semantics.
 
 Load the two MVP topics' daily aggregate counts into Supabase:
 
