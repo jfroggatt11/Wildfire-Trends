@@ -26,7 +26,6 @@ import {
   Search,
   ShieldCheck,
   Sparkles,
-  Wind,
   X,
 } from 'lucide-react'
 import type { AttentionChartPoint } from './AttentionChart'
@@ -39,7 +38,7 @@ import { dateWithinRange, formatDate, permutationIncreaseTest } from './utils'
 
 const AttentionChart = lazy(() => import('./AttentionChart'))
 
-type HazardType = 'wildfire' | 'flood' | 'tropical_cyclone'
+type HazardType = 'wildfire' | 'flood'
 type AlertLevel = 'Green' | 'Orange' | 'Red'
 type MediaScope = 'affected' | 'eu27' | 'international' | 'global'
 type View = 'explore' | 'lab' | 'data' | 'methods'
@@ -128,7 +127,6 @@ const HAZARDS: Record<
 > = {
   wildfire: { label: 'Wildfire', shortLabel: 'Fire', color: '#ef704b', icon: Flame },
   flood: { label: 'Flood', shortLabel: 'Flood', color: '#2b7fa3', icon: CloudRain },
-  tropical_cyclone: { label: 'Tropical cyclone', shortLabel: 'Cyclone', color: '#826ab4', icon: Wind },
 }
 
 const TOPICS = [
@@ -182,7 +180,7 @@ const titleCase = (value: string) =>
     .replace(/\b\w/g, (character) => character.toUpperCase())
 
 const eventDisplayName = (event: EventProperties) => {
-  if (!event.mapCountryLabel || event.hazardType === 'tropical_cyclone') return event.name
+  if (!event.mapCountryLabel) return event.name
   if (event.hazardType === 'flood' && /^flood in /i.test(event.name)) return `Flood in ${event.mapCountryLabel}`
   if (event.hazardType === 'wildfire' && /^(forest fires?|wildfires?) in /i.test(event.name)) return `Wildfire in ${event.mapCountryLabel}`
   return event.name
@@ -543,7 +541,7 @@ function ExploreView({
           {priorityEvents.map((event) => (
             <button key={event.properties.id} onClick={() => { onSelectEvent(event.properties.id); setFiltersOpen(false) }}>
               <span className="watch-icon" style={{ color: HAZARDS[event.properties.hazardType].color }}>
-                {event.properties.hazardType === 'wildfire' ? <Flame size={16} /> : event.properties.hazardType === 'flood' ? <CloudRain size={16} /> : <Wind size={16} />}
+                {event.properties.hazardType === 'wildfire' ? <Flame size={16} /> : <CloudRain size={16} />}
               </span>
               <span><strong>{eventDisplayName(event.properties)}</strong><small>{formatDate(event.properties.startAt)} · {event.properties.alertLevel}</small></span>
               <ChevronRight size={15} />
@@ -1296,7 +1294,7 @@ function AnalysisLab({ manifest }: { manifest: Manifest | null }) {
         <div className="configuration-panel">
           <div className="lab-section-heading"><span>2</span><div><small>Study design</small><h2>Configure comparison</h2></div></div>
           <div className="lab-form">
-            <label><span>Event types</span><select defaultValue="all"><option value="all">All available hazards</option><option>Wildfires</option><option>Floods</option><option>Tropical cyclones</option></select></label>
+            <label><span>Event types</span><select defaultValue="all"><option value="all">All available hazards</option><option>Wildfires</option><option>Floods</option></select></label>
             <label><span>Media market</span><select value={scope} onChange={(event) => setScope(event.target.value as MediaScope)}>{(Object.entries(SCOPE_COPY) as [MediaScope, (typeof SCOPE_COPY)[MediaScope]][]).map(([id, item]) => <option key={id} value={id}>{item.label}</option>)}</select></label>
             <label><span>Pre / post window</span><select value={window} onChange={(event) => setWindow(event.target.value)}><option value="7">7 days</option><option value="14">14 days</option><option value="28">28 days</option><option value="56">56 days</option></select></label>
             <label><span>Primary outcome</span><select defaultValue="climate_change">{TOPICS.map((topic) => <option key={topic.id} value={topic.id}>{topic.label}</option>)}</select></label>
@@ -1388,34 +1386,27 @@ function MethodsView({ manifest }: { manifest: Manifest | null }) {
     },
     {
       number: '04',
-      title: 'GDACS tropical-cyclone methodology',
-      organisation: 'European Commission Joint Research Centre',
-      note: 'Hazard, exposure and vulnerability components behind cyclone alert levels.',
-      href: 'https://www.gdacs.org/Knowledge/models_tc.aspx',
-    },
-    {
-      number: '05',
       title: 'GDACS flood methodology',
       organisation: 'European Commission Joint Research Centre',
       note: 'Impact-oriented flood alerts and hazard-specific severity context.',
       href: 'https://www.gdacs.org/Knowledge/models_fl.aspx',
     },
     {
-      number: '06',
+      number: '05',
       title: 'Natural Earth 1:50m cultural vectors',
       organisation: 'Natural Earth',
       note: 'Administrative country polygons used to check the country containing each event point.',
       href: 'https://www.naturalearthdata.com/downloads/50m-cultural-vectors/',
     },
     {
-      number: '07',
+      number: '06',
       title: 'Permutation test reference',
       organisation: 'SciPy documentation',
       note: 'Exact and randomised independent-sample permutation-test mechanics.',
       href: 'https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.permutation_test.html',
     },
     {
-      number: '08',
+      number: '07',
       title: 'Natural Earth Admin-1 states and provinces',
       organisation: 'Natural Earth, version 5.1.1',
       note: 'First-order administrative polygons used to label the region containing each event point.',
@@ -1549,11 +1540,10 @@ function MethodsView({ manifest }: { manifest: Manifest | null }) {
 
           <section className="protocol-section" id="events">
             <header><span>05</span><div><small>Independent treatment</small><h2>Weather-event definitions</h2></div></header>
-            <p className="protocol-lede">The event catalogue comes from GDACS, a UN–European Commission cooperation framework for major sudden-onset disasters. The MVP includes event-level wildfires, floods and tropical cyclones.</p>
+            <p className="protocol-lede">The event catalogue comes from GDACS, a UN–European Commission cooperation framework for major sudden-onset disasters. The MVP includes event-level wildfires and floods.</p>
             <div className="hazard-method-grid">
               <article><Flame size={18} /><strong>Wildfire</strong><p>A named GDACS wildfire event. It is not an individual satellite hotspot and does not imply a burned-area estimate.</p></article>
               <article><CloudRain size={18} /><strong>Flood</strong><p>A GDACS flood event assembled from authoritative institutions, media and scientific sources under provider impact rules.</p></article>
-              <article><Wind size={18} /><strong>Tropical cyclone</strong><p>A GDACS cyclone record based on global advisories, with hazard, exposed population and vulnerability informing alerting.</p></article>
             </div>
             <dl className="definition-list">
               <div><dt>Event identity</dt><dd>Provider + hazard code + event ID. This remains stable when an upstream record is revised.</dd></div>
@@ -1561,7 +1551,7 @@ function MethodsView({ manifest }: { manifest: Manifest | null }) {
               <div><dt>Affected countries</dt><dd>The provider’s country array. Multi-country events stay multi-country and are not reduced to the map point.</dd></div>
               <div><dt>Alert level</dt><dd>GDACS Green, Orange or Red assessment of likely humanitarian consequences. Its logic is hazard-specific and incorporates factors such as hazard, exposure and vulnerability; it is not a pure physical-intensity scale.</dd></div>
               <div><dt>Alert score</dt><dd>The provider’s numeric alert field retained alongside the colour. It supports ordering within the GDACS record but is not treated as a universal hazard magnitude.</dd></div>
-              <div><dt>Severity</dt><dd>The hazard-specific value and unit supplied by GDACS. Cyclone wind, flood severity and wildfire metrics do not share a common unit, so the MVP displays them but never pools them as equivalent.</dd></div>
+              <div><dt>Severity</dt><dd>The hazard-specific value and unit supplied by GDACS. Flood severity and wildfire metrics do not share a common unit, so the MVP displays them but never pools them as equivalent.</dd></div>
             </dl>
           </section>
 

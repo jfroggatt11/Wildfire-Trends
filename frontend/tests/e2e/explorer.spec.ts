@@ -19,11 +19,11 @@ test('all media scopes preserve events and open their detail panel', async ({ pa
   const errors = collectClientErrors(page)
   await openExplorer(page)
   const visibleCount = page.locator('.map-stat strong')
-  await expect(visibleCount).toHaveText('4,159')
+  await expect(visibleCount).toHaveText('4,050')
 
   for (const scope of ['affected', 'eu27', 'international', 'global']) {
     await page.locator('.scope-section select').selectOption(scope)
-    await expect(visibleCount).toHaveText('4,159')
+    await expect(visibleCount).toHaveText('4,050')
     await page.locator('.watchlist > button').first().click()
     await expect(page.locator('.event-drawer')).toBeVisible()
     await expect(page.locator('.event-error')).toHaveCount(0)
@@ -37,7 +37,7 @@ test('January plus Global opens aggregate attention across every media scope', a
   const errors = collectClientErrors(page)
   await openExplorer(page)
   await page.locator('input[type="date"]').nth(1).fill('2025-01-31')
-  await expect(page.locator('.map-stat strong')).toHaveText('304')
+  await expect(page.locator('.map-stat strong')).toHaveText('299')
   await expect(page.locator('.watchlist > button').first()).toContainText('Wildfire in United States')
 
   for (const scope of ['affected', 'eu27', 'international', 'global']) {
@@ -79,9 +79,9 @@ test('attention toggle and before-after analysis share the selected measure', as
   await expect(cards.first()).toContainText('URLs/day')
   await expect(cards.first()).toContainText('One-sided p =')
   await expect(page.locator('.recharts-reference-line')).toHaveCount(2)
-  await expect(page.locator('.chart-wrap')).toContainText('Starts ·')
-  await expect(page.locator('.chart-wrap')).toContainText('Ends ·')
-  await expect(page.locator('.chart-wrap')).toContainText('Event duration')
+  await expect(page.locator('.chart-wrap')).toContainText('Starts')
+  await expect(page.locator('.chart-wrap')).toContainText('Ends')
+  await expect(page.locator('.chart-wrap')).not.toContainText('Event duration')
   const allArticleResult = await cards.first().textContent()
 
   await page.getByRole('button', { name: 'Political only' }).click()
@@ -253,7 +253,7 @@ test('methods page documents the current research protocol and definitions', asy
   await expect(page.locator('.window-diagram')).toContainText('Event duration')
   await expect(page.locator('.window-diagram')).toContainText('Excluded')
   await expect(page.locator('.decision-table .status-chip.planned')).toHaveText('Planned')
-  await expect(page.locator('.reference-list > a')).toHaveCount(8)
+  await expect(page.locator('.reference-list > a')).toHaveCount(7)
   await expect(page.locator('.reference-list > a').first()).toHaveAttribute('href', /gdeltproject\.org/)
   await expect(page.locator('.reference-list > a').first()).toHaveAttribute('target', '_blank')
 
@@ -277,14 +277,14 @@ test('clearing and keyboard-editing date filters never unmounts the explorer', a
   await expect(page.locator('.map-stat small')).toContainText('Open')
 
   await endDate.fill('2025-01-31')
-  await expect(page.locator('.map-stat strong')).toHaveText('304')
+  await expect(page.locator('.map-stat strong')).toHaveText('299')
 
   const startDate = page.locator('input[type="date"]').first()
   await startDate.fill('2025-02-01')
   await expect(page.locator('.map-stat strong')).toHaveText('0')
   await expect(page.locator('.atlas-svg-map')).toBeVisible()
   await startDate.fill('2025-01-01')
-  await expect(page.locator('.map-stat strong')).toHaveText('304')
+  await expect(page.locator('.map-stat strong')).toHaveText('299')
   expect(errors).toEqual([])
 })
 
@@ -293,11 +293,11 @@ test('hazard and alert filters update map and sidebar together', async ({ page }
   await openExplorer(page)
   const visibleCount = page.locator('.map-stat strong')
   await page.getByRole('button', { name: 'Fire', exact: true }).click()
-  await expect(visibleCount).toHaveText('718')
-  await expect(page.locator('.section-label small').first()).toHaveText('718 events')
+  await expect(visibleCount).toHaveText('609')
+  await expect(page.locator('.section-label small').first()).toHaveText('609 events')
 
   await page.getByRole('button', { name: 'Green', exact: true }).click()
-  await expect(visibleCount).not.toHaveText('718')
+  await expect(visibleCount).not.toHaveText('609')
   await expect(page.locator('.event-error')).toHaveCount(0)
   expect(errors).toEqual([])
 })
@@ -310,7 +310,7 @@ test('event selection survives an embedded preview that blocks URL history', asy
       throw new DOMException('History blocked by embedded preview', 'SecurityError')
     }
   })
-  await page.locator('.atlas-marker.event').first().click()
+  await page.locator('.watchlist > button').first().click()
   await expect(page.locator('.event-drawer')).toBeVisible()
   await expect(page.locator('.event-error')).toHaveCount(0)
   expect(errors).toEqual([])
@@ -330,6 +330,6 @@ test('search supports empty results and recovers to the full event set', async (
   await expect(page.locator('.atlas-marker').first()).toBeVisible()
 
   await page.locator('.search-field button').click()
-  await expect(page.locator('.map-stat strong')).toHaveText('4,159')
+  await expect(page.locator('.map-stat strong')).toHaveText('4,050')
   expect(errors).toEqual([])
 })

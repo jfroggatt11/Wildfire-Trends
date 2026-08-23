@@ -20,6 +20,7 @@ OUT = ROOT / "frontend" / "public" / "data"
 SUPABASE_CONFIG = ROOT / "frontend" / "src" / "supabase-config.json"
 FRONTEND_ATTENTION_SOURCES = {"gdelt_ngrams"}
 FRONTEND_TOPIC_IDS = {"climate_change", "electric_vehicles"}
+FRONTEND_HAZARD_TYPES = {"wildfire", "flood"}
 
 
 def clean(value: Any) -> Any:
@@ -111,6 +112,8 @@ def export_events() -> list[dict[str, Any]]:
     )
     features: list[dict[str, Any]] = []
     for row in rows:
+        if row["hazard_type"] not in FRONTEND_HAZARD_TYPES:
+            continue
         try:
             geometry = json.loads(row["geometry_json"])
         except (TypeError, json.JSONDecodeError):
@@ -266,7 +269,7 @@ def source_summaries(
             "recordLabel": "events",
             "geographyCount": len(event_countries),
             "status": "explorer",
-            "description": "Named floods, wildfires and tropical cyclones with alert level, severity and affected countries.",
+            "description": "Named floods and wildfires with alert level, severity and affected countries.",
             "sourceUrl": "https://www.gdacs.org/",
         }
     ]

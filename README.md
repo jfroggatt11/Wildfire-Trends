@@ -432,7 +432,8 @@ saved plan later with `climate-attention runs retry <run-id>`.
 
 The event layer deliberately does not infer physical extreme-weather events from the
 same news coverage used as the outcome. NASA FIRMS supplies daily physical wildfire
-activity; GDACS supplies named major wildfires, floods, and tropical cyclones.
+activity; GDACS supplies named major wildfires, floods, and tropical cyclones to the
+canonical archive. The public MVP exports only GDACS wildfires and floods.
 
 Request a free NASA FIRMS `MAP_KEY`, copy the environment template, and place the
 key in the ignored project-root `.env` file:
