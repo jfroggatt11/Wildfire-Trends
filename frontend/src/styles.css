@@ -368,7 +368,10 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
 .calendar-labels { color: #9aa49f; font-size: 6.5px; }
 
 .lab-loading { min-height: 50vh; display: flex; align-items: center; justify-content: center; gap: 9px; color: #66756e; font-size: 11px; }
-.lab-hypothesis-strip { position: relative; z-index: 2; max-width: 1240px; margin: -15px auto 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 0 24px; }
+.lab-mode-switch { position: relative; z-index: 3; width: max-content; margin: -17px auto 18px; display: flex; gap: 3px; padding: 4px; border: 1px solid #d2ddd6; border-radius: 9px; background: #f9fbf9; box-shadow: 0 7px 20px rgba(18,49,40,.08); }
+.lab-mode-switch button { min-width: 130px; height: 34px; border: 0; border-radius: 6px; color: #6a7871; background: transparent; font-size: 9px; font-weight: 800; cursor: pointer; }
+.lab-mode-switch button.active { color: white; background: var(--green); }
+.lab-hypothesis-strip { position: relative; z-index: 2; max-width: 1240px; margin: 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 0 24px; }
 .lab-hypothesis-strip button { min-height: 74px; display: grid; grid-template-columns: 32px 1fr auto; align-items: center; gap: 9px; padding: 12px; border: 1px solid #d8e0db; border-radius: 9px; color: #34463e; background: var(--paper); box-shadow: 0 7px 20px rgba(18,49,40,.06); text-align: left; cursor: pointer; }
 .lab-hypothesis-strip button:hover { border-color: #9eb4a8; }
 .lab-hypothesis-strip button.active { border-color: #6f9c89; background: #eff6f1; box-shadow: inset 0 0 0 1px #6f9c89, 0 7px 20px rgba(18,49,40,.06); }
@@ -388,6 +391,12 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
 .analysis-definition { display: grid; grid-template-columns: 17px 1fr; gap: 8px; margin-top: 15px; padding: 11px; border-radius: 8px; color: #596961; background: #edf1ee; }
 .analysis-definition svg { color: var(--green); }
 .analysis-definition p { margin: 0; font-size: 7.5px; line-height: 1.55; }
+.analysis-loading { display: flex; align-items: center; gap: 7px; padding: 10px 13px; border: 1px solid #d7e2db; border-radius: 8px; color: #4f685c; background: #edf5ef; font-size: 8px; }
+.analysis-loading.error { color: #8c5f31; border-color: #ead7bd; background: #fbf4e8; }
+.all-alert-chart-note { display: grid; grid-template-columns: 19px 1fr; gap: 9px; margin-top: 15px; padding: 13px; border-top: 1px solid #e2e7e4; color: #596961; background: #f1f5f2; }
+.all-alert-chart-note svg { color: var(--green); }
+.all-alert-chart-note strong { color: #3d5047; font-size: 9px; }
+.all-alert-chart-note p { margin: 3px 0 0; font-size: 7.5px; line-height: 1.5; }
 .lab-results-panel { min-width: 0; display: flex; flex-direction: column; gap: 12px; }
 .cohort-flow { display: flex; align-items: center; gap: 10px; padding: 13px 16px; border: 1px solid #dbe3de; border-radius: 9px; background: var(--paper); }
 .cohort-flow > div { min-width: 104px; display: flex; flex-direction: column; }
@@ -453,6 +462,24 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
 .ranked-event-table > button small { color: #8b9690; font-size: 6.5px; }
 .ranked-event-table > button > span:last-child { display: flex; align-items: center; justify-content: flex-end; gap: 5px; color: var(--green); }
 .ranked-event-table b { font-family: Georgia, serif; font-size: 12px; font-weight: 500; }
+
+.activity-workspace { max-width: 1240px; margin: 0 auto; display: grid; grid-template-columns: 270px minmax(0, 1fr); align-items: start; gap: 15px; padding: 0 24px 55px; }
+.activity-controls { position: sticky; top: 18px; padding: 19px; border: 1px solid #dce3de; border-radius: 10px; background: var(--paper); box-shadow: 0 4px 16px rgba(18,49,40,.035); }
+.activity-results { min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+.activity-state { min-height: 320px; display: flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid #dbe3de; border-radius: 10px; color: #627169; background: var(--paper); font-size: 9px; }
+.activity-state.error { flex-direction: column; text-align: center; }
+.activity-state.error strong { color: #6c4d2e; font-size: 11px; }
+.activity-state.error p { margin: 0; color: #8b7258; }
+.activity-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.activity-kpis article { min-height: 88px; display: flex; flex-direction: column; padding: 12px; border: 1px solid #dbe3de; border-radius: 9px; background: var(--paper); }
+.activity-kpis small { color: #7f8c85; font-size: 7px; }
+.activity-kpis strong { margin: 5px 0 2px; color: var(--green); font-family: Georgia, serif; font-size: 22px; font-weight: 500; }
+.activity-kpis span { margin-top: auto; color: #8b9690; font-size: 6.5px; }
+.activity-chart-card, .lag-chart-card { padding: 18px; border: 1px solid #dbe3de; border-radius: 10px; background: var(--paper); box-shadow: 0 4px 16px rgba(18,49,40,.025); }
+.activity-chart { height: 350px; margin-top: 12px; }
+.lag-chart { height: 235px; margin-top: 12px; }
+.activity-chart .recharts-default-tooltip, .lag-chart .recharts-default-tooltip { border: 1px solid #d8e0db !important; border-radius: 7px; box-shadow: 0 8px 20px rgba(18,49,40,.1); font-size: 8px; }
+.lag-chart-card > .analysis-definition { margin-top: 12px; }
 
 .methods-hero { align-items: center; padding-bottom: 53px; }
 .methods-hero > div:first-child { max-width: 770px; }
@@ -676,6 +703,8 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
   .results-panel { grid-column: 1 / -1; }
   .lab-hypothesis-strip { grid-template-columns: 1fr 1fr; }
   .lab-workspace { grid-template-columns: 235px minmax(0, 1fr); }
+  .activity-workspace { grid-template-columns: 235px minmax(0, 1fr); }
+  .activity-kpis { grid-template-columns: 1fr 1fr; }
   .headline-result-grid { grid-template-columns: 1fr; }
   .comparison-grid { grid-template-columns: 1fr; }
   .methods-shell { grid-template-columns: 180px minmax(0, 1fr); }
@@ -723,7 +752,14 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
   .lab-hypothesis-strip { grid-template-columns: 1fr; margin-top: 14px; padding: 0 14px; }
   .lab-hypothesis-strip button { min-height: 66px; }
   .lab-workspace { display: block; padding: 14px 14px 40px; }
+  .lab-mode-switch { width: calc(100% - 28px); margin-top: 14px; }
+  .lab-mode-switch button { min-width: 0; flex: 1; }
+  .activity-workspace { display: block; padding: 0 14px 40px; }
   .study-config-panel { position: static; margin-bottom: 12px; }
+  .activity-controls { position: static; margin-bottom: 12px; }
+  .activity-kpis { grid-template-columns: 1fr 1fr; }
+  .activity-chart { height: 280px; }
+  .lag-chart { height: 220px; }
   .cohort-flow { overflow-x: auto; }
   .cohort-flow > div { min-width: 90px; }
   .cohort-flow .included { margin-left: 0; }

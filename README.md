@@ -20,8 +20,10 @@ series and is being validated before it replaces any canonical API measure.
 `frontend/` contains the Netlify-ready Climate Attention Atlas: a React and
 TypeScript map explorer for GDACS events, media-market comparisons, aggregate topic
 and political-attention counts, and a multi-event Analysis Lab. The Lab compares
-Orange and Red wildfire and flood events across climate-change and electric-vehicle
-attention, retains only complete daily windows, and flags same-country overlaps.
+wildfire and flood events across climate-change and electric-vehicle attention,
+retains only complete daily windows, and flags same-country overlaps. Orange and
+Red alerts remain the primary cohort; Green alerts and the complete catalogue are
+available as sensitivity filters.
 
 Export the current Parquet datasets to compact browser assets, then run the app:
 
@@ -54,8 +56,31 @@ climate-attention build-event-study \
 ```
 
 The canonical flat effect table contains event, topic, mutually exclusive media
-group, window, timing, completeness, overlap and pre/post measures. It can be moved
-to Supabase later without changing the estimator or frontend result semantics.
+group, window, timing, completeness, overlap and pre/post measures. The compact
+static file contains the primary major-event cohort and acts as a deployment
+fallback.
+
+Build the all-alert Analysis Lab warehouse and load its three derived tables into
+Supabase:
+
+```bash
+climate-attention sync-analysis-supabase \
+  --data-dir data \
+  --year 2025 \
+  --apply-migration
+```
+
+This materialises event-level effects, sparse country-day event activity, and daily
+global/EU27 attention. The browser requests only the selected specification and
+country, rather than downloading raw articles or millions of event-day rows. The
+Event activity view offers Green/major/all-alert filters, 7- or 28-day rolling event
+starts, both MVP attention topics, and exploratory lead/lag correlations. Positive
+lag means attention follows event activity. These correlations are descriptive and
+do not adjust for autocorrelation, seasonality or common news shocks.
+
+At the current 2025 scale the derived warehouse is small enough for Supabase and a
+static frontend. A separate Render service is not required; it would become useful
+only for scheduled multi-year recomputation or heavier statistical models.
 
 Load the two MVP topics' daily aggregate counts into Supabase:
 

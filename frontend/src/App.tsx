@@ -378,6 +378,7 @@ function App() {
           <AnalysisLab
             study={eventStudy}
             geographyLabels={manifest?.geographyLabels ?? {}}
+            eventGeographies={[...new Set(events?.features.flatMap((event) => event.properties.geographyIds) ?? [])]}
             onOpenEvent={(id) => { selectEvent(id); setView('explore') }}
           />
         </Suspense>
@@ -1405,7 +1406,7 @@ function MethodsView({ manifest }: { manifest: Manifest | null }) {
         <div className="methods-protocol">
           <section className="protocol-section" id="research-design">
             <header><span>01</span><div><small>Foundation</small><h2>Research design</h2></div></header>
-            <p className="protocol-lede">The Atlas asks whether attention to climate and transport topics changes around a major weather event, and whether that response differs by publishing market or political content.</p>
+            <p className="protocol-lede">The Atlas asks whether attention to climate and transport topics changes around weather events, whether that response differs by publishing market or political content, and whether attention co-moves with accumulated event activity.</p>
             <div className="method-definition-grid three">
               <article><small>Event unit</small><strong>One GDACS event</strong><p>A stable provider ID, hazard type, start and end time, affected countries, point geometry and provider alert fields.</p></article>
               <article><small>Attention unit</small><strong>Topic × outlet country × UTC day</strong><p>A daily count of distinct matching article URLs. Original source language is retained where available.</p></article>
@@ -1541,7 +1542,7 @@ function MethodsView({ manifest }: { manifest: Manifest | null }) {
 
           <section className="protocol-section" id="before-after">
             <header><span>08</span><div><small>Exploratory inference</small><h2>What the single- and multi-event studies estimate</h2></div></header>
-            <p className="protocol-lede">Explore compares one selected event with its own pre-event period. Analysis Lab applies the same complete-day principle to every major 2025 event, then summarises event-level changes without allowing large media markets to dominate the result.</p>
+            <p className="protocol-lede">Explore compares one selected event with its own pre-event period. Analysis Lab applies the same complete-day principle to 2025 events, then summarises event-level changes without allowing large media markets to dominate the result. Orange and Red alerts are the primary cohort; Green and all-alert filters are sensitivity views.</p>
             <div className="window-diagram" aria-label="Before and after event window">
               <div className="window-before"><span>7, 14 or 28 days</span><strong>Before mean</strong><small>Days ending immediately before the start</small></div>
               <div className="window-event"><span>Event duration</span><strong>Excluded</strong><small>Start through end date</small></div>
@@ -1555,8 +1556,12 @@ function MethodsView({ manifest }: { manifest: Manifest | null }) {
             </div>
             <details className="technical-details">
               <summary>Exact test, simulation and eligibility <ChevronRight size={14} /></summary>
-              <ul><li>Every day in both periods must be present; absent dates are never converted to zero.</li><li>The primary Lab cohort contains GDACS Orange and Red floods and wildfires beginning in 2025.</li><li>The default Lab result excludes another major event affecting the same country during the analysis window; users may include overlaps as a sensitivity check.</li><li>Explore evaluates every label allocation when there are no more than 50,000 combinations and otherwise uses a deterministic 10,000-shuffle approximation.</li></ul>
+              <ul><li>Every day in both periods must be present; absent dates are never converted to zero.</li><li>The primary Lab cohort contains GDACS Orange and Red floods and wildfires beginning in 2025; Green and all-alert cohorts use the same estimator.</li><li>The default Lab result excludes another selected-cohort event affecting the same country during the analysis window; users may include overlaps as a sensitivity check.</li><li>Explore evaluates every label allocation when there are no more than 50,000 combinations and otherwise uses a deterministic 10,000-shuffle approximation.</li></ul>
             </details>
+            <div className="method-definition-grid two">
+              <article><small>Event activity panel</small><strong>Rolling event starts by affected geography</strong><p>Multi-country events count once in every affected country, while global and EU27 aggregates count each unique event once. The chart offers 7- and 28-day windows.</p></article>
+              <article><small>Lead / lag panel</small><strong>Pearson correlation across −28 to +28 days</strong><p>Attention is expressed relative to its preceding 28-day baseline. Positive lag means attention follows event activity. Autocorrelation and common shocks make this exploratory, not causal.</p></article>
+            </div>
             <div className="method-callout caution"><CircleAlert size={17} /><p><strong>Interpretation.</strong> These are unadjusted temporal associations, not causal estimates or confidence intervals. News cycles are autocorrelated; seasonality, weekday patterns and concurrent stories can confound comparisons. A confirmatory release should pre-register outcomes and add matched dates, untreated markets or interrupted time-series controls.</p></div>
           </section>
 

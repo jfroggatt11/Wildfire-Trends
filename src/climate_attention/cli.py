@@ -20,7 +20,7 @@ from .config import (
     load_political_config,
 )
 from .comparison import compare_trends, write_comparisons
-from .event_study import build_event_study_files
+from .event_study import build_analysis_warehouse, build_event_study_files
 from .manifest import build_run_manifest, package_version
 from .models import (
     CollectionRequest,
@@ -62,6 +62,7 @@ from .storage import LocalParquetStorage
 from .supabase_sync import (
     MVP_TOPICS,
     dotenv_value,
+    sync_analysis_warehouse,
     sync_daily_attention,
 )
 
@@ -427,6 +428,39 @@ def build_parser() -> argparse.ArgumentParser:
         default=Path("frontend/public/data/event-study.json"),
     )
 
+    analysis_warehouse = subparsers.add_parser(
+        "build-analysis-warehouse",
+        help="build all-alert event effects and daily activity tables",
+    )
+    analysis_warehouse.add_argument("--data-dir", type=Path, default=Path("data"))
+    analysis_warehouse.add_argument("--year", type=int, default=2025)
+
+    sync_analysis = subparsers.add_parser(
+        "sync-analysis-supabase",
+        help="build and upsert Analysis Lab datasets into Supabase",
+    )
+    sync_analysis.add_argument("--data-dir", type=Path, default=Path("data"))
+    sync_analysis.add_argument("--year", type=int, default=2025)
+    sync_analysis.add_argument(
+        "--database-url",
+        help="Postgres URL; defaults to SUPABASE_DB_URL in the environment or .env",
+    )
+    sync_analysis.add_argument(
+        "--skip-build",
+        action="store_true",
+        help="sync existing analysis Parquet files without rebuilding them",
+    )
+    sync_analysis.add_argument(
+        "--apply-migration",
+        action="store_true",
+        help="apply the bundled Analysis Lab schema before syncing",
+    )
+    sync_analysis.add_argument(
+        "--migration",
+        type=Path,
+        default=Path("supabase/migrations/20260823190000_create_analysis_lab.sql"),
+    )
+
     aggregate = subparsers.add_parser(
         "aggregate", aliases=["rebuild-aggregates"], help="rebuild daily Parquet"
     )
@@ -488,6 +522,10 @@ def main(argv: list[str] | None = None) -> int:
             return _sync_supabase(args)
         if args.command == "build-event-study":
             return _build_event_study(args)
+        if args.command == "build-analysis-warehouse":
+            return _build_analysis_warehouse(args)
+        if args.command == "sync-analysis-supabase":
+            return _sync_analysis_supabase(args)
         if args.command in {"aggregate", "rebuild-aggregates"}:
             return _aggregate(args.data_dir)
         if args.command == "runs":
@@ -1587,6 +1625,38 @@ def _build_event_study(args: argparse.Namespace) -> int:
         f"{complete:,} complete event-topic-scope specification(s). "
         f"Canonical effects: {args.data_dir / 'analysis' / 'event_effects.parquet'}. "
         f"Frontend dataset: {args.frontend_output}."
+    )
+    return 0
+
+
+def _build_analysis_warehouse(args: argparse.Namespace) -> int:
+    result = build_analysis_warehouse(data_dir=args.data_dir, study_year=args.year)
+    print(
+        f"Analysis warehouse complete: {result['events']:,} events, "
+        f"{result['effects']:,} effects, {result['activityRows']:,} activity rows and "
+        f"{result['regionRows']:,} regional attention rows. Dataset: "
+        f"{args.data_dir / 'analysis'}."
+    )
+    return 0
+
+
+def _sync_analysis_supabase(args: argparse.Namespace) -> int:
+    database_url = args.database_url or dotenv_value("SUPABASE_DB_URL")
+    if not database_url:
+        raise ValueError(
+            "missing SUPABASE_DB_URL; add it to .env or pass --database-url"
+        )
+    if not args.skip_build:
+        _build_analysis_warehouse(args)
+    counts = sync_analysis_warehouse(
+        database_url=database_url,
+        data_dir=args.data_dir,
+        migration_path=args.migration,
+        apply_migration=args.apply_migration,
+    )
+    print(
+        "Supabase Analysis Lab sync complete: "
+        + ", ".join(f"{table}={count:,}" for table, count in counts.items())
     )
     return 0
 

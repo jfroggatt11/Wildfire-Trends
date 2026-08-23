@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -15,6 +16,7 @@ import pyarrow.parquet as pq
 STUDY_TOPICS = ("climate_change", "electric_vehicles")
 STUDY_HAZARDS = {"wildfire", "flood"}
 STUDY_ALERTS = {"Orange", "Red"}
+ALL_ALERTS = {"Green", "Orange", "Red"}
 STUDY_WINDOWS = (7, 14, 28)
 STUDY_TIMINGS = ("onset", "persistence")
 STUDY_SCOPES = ("affected", "other_eu27", "rest_world", "global")
@@ -59,33 +61,19 @@ def _period_value(before: list[float], after: list[float]) -> PeriodValue:
     )
 
 
-def _study_events(rows: Iterable[dict[str, Any]], study_year: int) -> list[dict[str, Any]]:
+def _study_events(
+    rows: Iterable[dict[str, Any]], study_year: int, alerts: set[str]
+) -> list[dict[str, Any]]:
     return sorted(
         (
             row
             for row in rows
             if row["hazard_type"] in STUDY_HAZARDS
-            and row["alert_level"] in STUDY_ALERTS
+            and row["alert_level"] in alerts
             and _day(row["start_at"]).year == study_year
         ),
         key=lambda row: (_day(row["start_at"]), row["record_id"]),
     )
-
-
-def _scope_geographies(
-    scope: str, affected: set[str], available: set[str]
-) -> list[str]:
-    if scope == "affected":
-        selected = affected
-    elif scope == "other_eu27":
-        selected = EU27 - affected
-    elif scope == "rest_world":
-        selected = available - EU27 - affected
-    elif scope == "global":
-        selected = available
-    else:
-        raise ValueError(f"unsupported event-study scope: {scope}")
-    return sorted(selected & available)
 
 
 def _overlaps(
@@ -115,9 +103,13 @@ def build_event_study(
     attention_rows: Iterable[dict[str, Any]],
     *,
     study_year: int = 2025,
+    alerts: set[str] | None = None,
+    include_series: bool = True,
 ) -> dict[str, Any]:
     """Build event-level effects and onset series from complete topic-country days."""
     attention: dict[tuple[date, str, str], tuple[float, float]] = {}
+    global_totals: dict[tuple[date, str], list[float]] = defaultdict(lambda: [0.0, 0.0, 0.0])
+    eu_totals: dict[tuple[date, str], list[float]] = defaultdict(lambda: [0.0, 0.0, 0.0])
     geographies: set[str] = set()
     coverage_dates: set[date] = set()
     for row in attention_rows:
@@ -138,56 +130,97 @@ def build_event_study(
         if key in attention and attention[key] != value:
             raise ValueError(f"conflicting event-study observation: {key}")
         attention[key] = value
+        totals = global_totals[(day, topic)]
+        totals[0] += value[0]
+        totals[1] += value[1]
+        totals[2] += 1
+        if geography in EU27:
+            eu = eu_totals[(day, topic)]
+            eu[0] += value[0]
+            eu[1] += value[1]
+            eu[2] += 1
         geographies.add(geography)
         coverage_dates.add(day)
 
-    candidates = _study_events(event_rows, study_year)
+    selected_alerts = set(alerts or STUDY_ALERTS)
+    unsupported_alerts = selected_alerts - ALL_ALERTS
+    if unsupported_alerts:
+        raise ValueError("unsupported event-study alert(s): " + ", ".join(sorted(unsupported_alerts)))
+    candidates = _study_events(event_rows, study_year, selected_alerts)
     effects: list[dict[str, Any]] = []
     series: list[dict[str, Any]] = []
 
-    def aggregate(day: date, topic: str, selected: list[str]) -> tuple[float, float] | None:
+    def sum_geographies(day: date, topic: str, selected: set[str]) -> tuple[float, float] | None:
         values = [attention.get((day, topic, geography)) for geography in selected]
         if not selected or any(value is None for value in values):
             return None
         complete = [value for value in values if value is not None]
         return sum(value[0] for value in complete), sum(value[1] for value in complete)
 
+    def aggregate(
+        day: date, topic: str, scope: str, affected: set[str]
+    ) -> tuple[float, float] | None:
+        totals = global_totals.get((day, topic))
+        if totals is None or int(totals[2]) != len(geographies):
+            return None
+        affected_available = affected & geographies
+        if scope == "global":
+            return totals[0], totals[1]
+        if scope == "affected":
+            return sum_geographies(day, topic, affected_available)
+        eu = eu_totals.get((day, topic), [0.0, 0.0, 0.0])
+        affected_eu = sum_geographies(day, topic, affected_available & EU27) or (0.0, 0.0)
+        if scope == "other_eu27":
+            return eu[0] - affected_eu[0], eu[1] - affected_eu[1]
+        if scope == "rest_world":
+            affected_rest = sum_geographies(day, topic, affected_available - EU27) or (0.0, 0.0)
+            return (
+                totals[0] - eu[0] - affected_rest[0],
+                totals[1] - eu[1] - affected_rest[1],
+            )
+        raise ValueError(f"unsupported event-study scope: {scope}")
+
     for event in candidates:
         event_start = _day(event["start_at"])
         event_end = _day(event["end_at"])
         affected = set(event.get("geography_ids") or [])
         for scope in STUDY_SCOPES:
-            selected = _scope_geographies(scope, affected, geographies)
             for topic in STUDY_TOPICS:
-                for timing in STUDY_TIMINGS:
-                    origin = event_start if timing == "onset" else event_end + timedelta(days=1)
-                    points: list[list[float | int | None]] = []
-                    for relative_day in range(-max(STUDY_WINDOWS), max(STUDY_WINDOWS) + 1):
-                        value = aggregate(origin + timedelta(days=relative_day), topic, selected)
-                        points.append(
-                            [relative_day, value[0], value[1]] if value is not None
-                            else [relative_day, None, None]
+                if include_series:
+                    for timing in STUDY_TIMINGS:
+                        origin = event_start if timing == "onset" else event_end + timedelta(days=1)
+                        points: list[list[float | int | None]] = []
+                        for relative_day in range(-max(STUDY_WINDOWS), max(STUDY_WINDOWS) + 1):
+                            value = aggregate(origin + timedelta(days=relative_day), topic, scope, affected)
+                            points.append(
+                                [relative_day, value[0], value[1]] if value is not None
+                                else [relative_day, None, None]
+                            )
+                        series.append(
+                            {
+                                "eventId": event["record_id"],
+                                "scope": scope,
+                                "topicId": topic,
+                                "timing": timing,
+                                "points": points,
+                            }
                         )
-                    series.append(
-                        {
-                            "eventId": event["record_id"],
-                            "scope": scope,
-                            "topicId": topic,
-                            "timing": timing,
-                            "points": points,
-                        }
-                    )
 
                 for window in STUDY_WINDOWS:
                     before_dates = _days(event_start - timedelta(days=window), window)
                     for timing in STUDY_TIMINGS:
                         after_start = event_start if timing == "onset" else event_end + timedelta(days=1)
                         after_dates = _days(after_start, window)
-                        before = [aggregate(day, topic, selected) for day in before_dates]
-                        after = [aggregate(day, topic, selected) for day in after_dates]
+                        before = [aggregate(day, topic, scope, affected) for day in before_dates]
+                        after = [aggregate(day, topic, scope, affected) for day in after_dates]
                         complete = all(value is not None for value in before + after)
                         row: dict[str, Any] = {
                             "eventId": event["record_id"],
+                            "hazardType": event["hazard_type"],
+                            "alertLevel": event["alert_level"],
+                            "startAt": event_start.isoformat(),
+                            "endAt": event_end.isoformat(),
+                            "geographyIds": sorted(affected),
                             "scope": scope,
                             "topicId": topic,
                             "windowDays": window,
@@ -261,7 +294,7 @@ def build_event_study(
         },
         "topics": list(STUDY_TOPICS),
         "hazards": sorted(STUDY_HAZARDS),
-        "alerts": sorted(STUDY_ALERTS),
+        "alerts": sorted(selected_alerts),
         "windows": list(STUDY_WINDOWS),
         "timings": list(STUDY_TIMINGS),
         "scopes": list(STUDY_SCOPES),
@@ -318,6 +351,141 @@ def write_event_study(
         encoding="utf-8",
     )
     return parquet_path, json_path
+
+
+def build_daily_event_activity(
+    event_rows: Iterable[dict[str, Any]], *, study_year: int = 2025
+) -> list[dict[str, Any]]:
+    """Count event starts, active events and endings by affected country-day."""
+    first_day = date(study_year, 1, 1)
+    last_day = date(study_year, 12, 31)
+    counters: dict[tuple[date, str, str, str], list[int]] = defaultdict(
+        lambda: [0, 0, 0]
+    )
+    for event in event_rows:
+        hazard = event.get("hazard_type")
+        alert = event.get("alert_level")
+        if hazard not in STUDY_HAZARDS or alert not in ALL_ALERTS:
+            continue
+        start = _day(event["start_at"])
+        end = _day(event["end_at"])
+        if end < first_day or start > last_day or end < start:
+            continue
+        affected = set(event.get("geography_ids") or [])
+        locations = set(affected)
+        locations.add("__global__")
+        if affected & EU27:
+            locations.add("__eu27__")
+        active_start = max(start, first_day)
+        active_end = min(end, last_day)
+        active_days = _days(active_start, (active_end - active_start).days + 1)
+        for geography in locations:
+            if first_day <= start <= last_day:
+                counters[(start, geography, hazard, alert)][0] += 1
+            for day in active_days:
+                counters[(day, geography, hazard, alert)][1] += 1
+            if first_day <= end <= last_day:
+                counters[(end, geography, hazard, alert)][2] += 1
+    return [
+        {
+            "activityDate": day.isoformat(),
+            "geography": geography,
+            "hazardType": hazard,
+            "alertLevel": alert,
+            "eventsStarted": values[0],
+            "eventsActive": values[1],
+            "eventsEnded": values[2],
+        }
+        for (day, geography, hazard, alert), values in sorted(counters.items())
+    ]
+
+
+def build_daily_attention_regions(
+    attention_rows: Iterable[dict[str, Any]], *, study_year: int = 2025
+) -> list[dict[str, Any]]:
+    """Aggregate the existing country panel into global and EU27 daily rows."""
+    totals: dict[tuple[date, str, str], dict[str, float]] = defaultdict(
+        lambda: {
+            "matchedCount": 0.0,
+            "politicalCount": 0.0,
+            "politicalActorCount": 0.0,
+            "governmentActionCount": 0.0,
+            "partyPoliticsCount": 0.0,
+            "officialSourceCount": 0.0,
+        }
+    )
+    component_fields = {
+        "politicalActorCount": "political_actor_count",
+        "governmentActionCount": "government_action_count",
+        "partyPoliticsCount": "party_politics_count",
+        "officialSourceCount": "official_source_count",
+    }
+    for row in attention_rows:
+        day = _day(row["date"])
+        topic = row.get("topic_id")
+        geography = row.get("geography")
+        if (
+            row.get("source") != "gdelt_ngrams"
+            or topic not in STUDY_TOPICS
+            or not geography
+            or day.year != study_year
+            or row.get("matched_count") is None
+            or row.get("political_count") is None
+        ):
+            continue
+        regions = ["global"] + (["eu27"] if geography in EU27 else [])
+        for region in regions:
+            values = totals[(day, region, topic)]
+            values["matchedCount"] += float(row["matched_count"])
+            values["politicalCount"] += float(row["political_count"])
+            for output_field, input_field in component_fields.items():
+                values[output_field] += float(row.get(input_field) or 0)
+    return [
+        {
+            "observationDate": day.isoformat(),
+            "regionId": region,
+            "topicId": topic,
+            **values,
+            "politicalShare": (
+                values["politicalCount"] / values["matchedCount"] * 100
+                if values["matchedCount"] else None
+            ),
+        }
+        for (day, region, topic), values in sorted(totals.items())
+    ]
+
+
+def build_analysis_warehouse(
+    *, data_dir: Path, study_year: int = 2025
+) -> dict[str, Any]:
+    """Build all-alert effect and daily activity tables for Supabase serving."""
+    events, attention = load_event_study_inputs(data_dir)
+    study = build_event_study(
+        events,
+        attention,
+        study_year=study_year,
+        alerts=ALL_ALERTS,
+        include_series=False,
+    )
+    activity = build_daily_event_activity(events, study_year=study_year)
+    regions = build_daily_attention_regions(attention, study_year=study_year)
+    output = data_dir / "analysis"
+    output.mkdir(parents=True, exist_ok=True)
+    effect_path = output / "event_effects_all.parquet"
+    activity_path = output / "daily_event_activity.parquet"
+    region_path = output / "daily_attention_regions.parquet"
+    pq.write_table(pa.Table.from_pylist(study["effects"]), effect_path, compression="zstd")
+    pq.write_table(pa.Table.from_pylist(activity), activity_path, compression="zstd")
+    pq.write_table(pa.Table.from_pylist(regions), region_path, compression="zstd")
+    return {
+        "events": len(study["events"]),
+        "effects": len(study["effects"]),
+        "activityRows": len(activity),
+        "regionRows": len(regions),
+        "effectPath": effect_path,
+        "activityPath": activity_path,
+        "regionPath": region_path,
+    }
 
 
 def build_event_study_files(

@@ -6,6 +6,7 @@ from climate_attention.models import DailyTrend
 from climate_attention.storage import LocalParquetStorage
 from climate_attention.supabase_sync import (
     MVP_TOPICS,
+    _analysis_rows,
     attention_files,
     attention_rows,
     dotenv_value,
@@ -60,3 +61,24 @@ def test_attention_rows_map_and_filter_canonical_parquet(tmp_path):
 
 def test_supabase_scope_is_two_topic_mvp():
     assert MVP_TOPICS == {"climate_change", "electric_vehicles"}
+
+
+def test_analysis_rows_map_camel_case_parquet_to_database_columns(tmp_path):
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    path = tmp_path / "activity.parquet"
+    pq.write_table(
+        pa.Table.from_pylist(
+            [{"activityDate": date(2025, 1, 1), "eventsStarted": 2.0}]
+        ),
+        path,
+    )
+
+    assert list(
+        _analysis_rows(
+            path,
+            {"activity_date": "activityDate", "events_started": "eventsStarted"},
+            integer_columns={"events_started"},
+        )
+    ) == [{"activity_date": date(2025, 1, 1), "events_started": 2}]

@@ -233,7 +233,7 @@ test('analysis lab runs the major-event study for climate and electric vehicles'
   await openExplorer(page)
   await page.getByRole('button', { name: 'Analysis Lab', exact: true }).click()
 
-  await expect(page.getByRole('heading', { name: 'Compare attention across major events.' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Compare attention and event activity.' })).toBeVisible()
   await expect(page.locator('.cohort-flow')).toContainText('40')
   await expect(page.locator('.cohort-flow')).toContainText('37')
   await expect(page.locator('.cohort-flow')).toContainText('24')
@@ -255,6 +255,26 @@ test('analysis lab runs the major-event study for climate and electric vehicles'
   await page.locator('.ranked-event-table > button').first().click()
   await expect(page.locator('.event-drawer')).toBeVisible()
   await expect(page.locator('.event-error')).toHaveCount(0)
+  expect(errors).toEqual([])
+})
+
+test('analysis lab exposes the all-alert activity and lag views', async ({ page }) => {
+  const errors = collectClientErrors(page)
+  await openExplorer(page)
+  await page.getByRole('button', { name: 'Analysis Lab', exact: true }).click()
+
+  await page.getByLabel('Event alerts').selectOption('green')
+  await expect(page.locator('.analysis-loading')).toHaveCount(0)
+  await expect(page.locator('.cohort-flow strong').first()).not.toHaveText('0')
+
+  await page.getByRole('tab', { name: 'Event activity' }).click()
+
+  await expect(page.getByRole('heading', { name: 'Configure activity' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Do attention anomalies move with event load?' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'When is event activity most associated with attention?' })).toBeVisible()
+  await expect(page.locator('.activity-kpis > article')).toHaveCount(4)
+  await expect(page.locator('.activity-chart')).toBeVisible()
+  await expect(page.locator('.lag-chart')).toBeVisible()
   expect(errors).toEqual([])
 })
 

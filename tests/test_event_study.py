@@ -3,7 +3,12 @@ from datetime import date, datetime, timedelta, timezone
 import pyarrow.parquet as pq
 import pytest
 
-from climate_attention.event_study import build_event_study, write_event_study
+from climate_attention.event_study import (
+    build_daily_attention_regions,
+    build_daily_event_activity,
+    build_event_study,
+    write_event_study,
+)
 
 
 def _event(event_id, hazard, alert, start, end, countries):
@@ -126,3 +131,65 @@ def test_event_study_writes_parquet_and_browser_json(tmp_path):
 
     assert json_path.exists()
     assert pq.read_table(parquet_path).num_rows == len(payload["effects"])
+
+
+def test_daily_event_activity_counts_country_exposure_and_regions_once():
+    events = [
+        _event(
+            "multi-country",
+            "flood",
+            "Green",
+            date(2025, 2, 1),
+            date(2025, 2, 3),
+            ["italy", "france"],
+        )
+    ]
+
+    rows = build_daily_event_activity(events)
+
+    global_start = next(
+        row for row in rows
+        if row["geography"] == "__global__" and row["activityDate"] == "2025-02-01"
+    )
+    eu_start = next(
+        row for row in rows
+        if row["geography"] == "__eu27__" and row["activityDate"] == "2025-02-01"
+    )
+    italy_middle = next(
+        row for row in rows
+        if row["geography"] == "italy" and row["activityDate"] == "2025-02-02"
+    )
+    assert global_start["eventsStarted"] == 1
+    assert eu_start["eventsStarted"] == 1
+    assert italy_middle["eventsActive"] == 1
+    assert italy_middle["eventsStarted"] == 0
+
+
+def test_daily_attention_regions_sum_global_and_eu_without_inventing_shares():
+    rows = [
+        {
+            "date": date(2025, 2, 1),
+            "source": "gdelt_ngrams",
+            "topic_id": "climate_change",
+            "geography": "italy",
+            "matched_count": 10,
+            "political_count": 2,
+        },
+        {
+            "date": date(2025, 2, 1),
+            "source": "gdelt_ngrams",
+            "topic_id": "climate_change",
+            "geography": "brazil",
+            "matched_count": 30,
+            "political_count": 3,
+        },
+    ]
+
+    result = build_daily_attention_regions(rows)
+
+    global_row = next(row for row in result if row["regionId"] == "global")
+    eu_row = next(row for row in result if row["regionId"] == "eu27")
+    assert global_row["matchedCount"] == 40
+    assert global_row["politicalShare"] == 12.5
+    assert eu_row["matchedCount"] == 10
+    assert eu_row["politicalShare"] == 20

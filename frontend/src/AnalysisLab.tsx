@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Activity, ArrowRight, Check, CircleAlert, Info } from 'lucide-react'
 import {
   CartesianGrid,
@@ -10,18 +10,22 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
+import EventActivityView from './EventActivity'
+import { fetchEventEffects, isSupabaseEnabled } from './supabase'
+import type { EventEffectObservation } from './supabase'
 
 type HazardType = 'wildfire' | 'flood'
 type LabScope = 'affected' | 'other_eu27' | 'rest_world' | 'global'
 type LabTiming = 'onset' | 'persistence'
 type LabMeasure = 'matched' | 'political' | 'political_share'
 type TopicId = 'climate_change' | 'electric_vehicles'
+type AlertCohort = 'major' | 'green' | 'all'
 
 type StudyEvent = {
   id: string
   name: string
   hazardType: HazardType
-  alertLevel: 'Orange' | 'Red'
+  alertLevel: 'Green' | 'Orange' | 'Red'
   alertScore: number | null
   startAt: string
   endAt: string
@@ -30,6 +34,11 @@ type StudyEvent = {
 
 type StudyEffect = {
   eventId: string
+  hazardType: HazardType
+  alertLevel: 'Green' | 'Orange' | 'Red'
+  startAt: string
+  endAt: string
+  geographyIds: string[]
   scope: LabScope
   topicId: TopicId
   windowDays: number
@@ -99,6 +108,12 @@ const HYPOTHESES = [
   { id: 'geography', number: 'H3', title: 'Geographic diffusion', copy: 'Does the response extend into other EU media markets?' },
   { id: 'political', number: 'H4', title: 'Politicisation', copy: 'Does political content grow as a share of topic coverage?' },
 ] as const
+
+const COHORT_ALERTS: Record<AlertCohort, EventEffectObservation['alertLevel'][]> = {
+  major: ['Orange', 'Red'],
+  green: ['Green'],
+  all: ['Green', 'Orange', 'Red'],
+}
 
 function median(values: number[]) {
   if (!values.length) return null
@@ -190,13 +205,17 @@ function StudyTimeline({ points, measure, timing }: { points: ReturnType<typeof 
 export default function AnalysisLab({
   study,
   geographyLabels,
+  eventGeographies,
   onOpenEvent,
 }: {
   study: EventStudyData | null
   geographyLabels: Record<string, string>
+  eventGeographies: string[]
   onOpenEvent: (id: string) => void
 }) {
+  const [mode, setMode] = useState<'study' | 'activity'>('study')
   const [hypothesis, setHypothesis] = useState('attention')
+  const [cohort, setCohort] = useState<AlertCohort>('major')
   const [hazard, setHazard] = useState<'all' | HazardType>('all')
   const [scope, setScope] = useState<LabScope>('affected')
   const [windowDays, setWindowDays] = useState(14)
@@ -204,19 +223,76 @@ export default function AnalysisLab({
   const [topic, setTopic] = useState<TopicId>('climate_change')
   const [measure, setMeasure] = useState<LabMeasure>('matched')
   const [excludeOverlaps, setExcludeOverlaps] = useState(true)
+  const [remoteEffects, setRemoteEffects] = useState<StudyEffect[] | null>(null)
+  const [remoteLoading, setRemoteLoading] = useState(false)
+  const [remoteError, setRemoteError] = useState<string | null>(null)
 
-  const eventMap = useMemo(() => new Map(study?.events.map((event) => [event.id, event]) ?? []), [study])
+  useEffect(() => {
+    if (cohort === 'major') {
+      setRemoteEffects(null)
+      setRemoteError(null)
+      setRemoteLoading(false)
+      return
+    }
+    if (!isSupabaseEnabled()) {
+      setRemoteEffects(null)
+      setRemoteError('All-alert event effects require the Supabase analysis tables.')
+      return
+    }
+    let active = true
+    setRemoteLoading(true)
+    setRemoteError(null)
+    fetchEventEffects({
+      scope,
+      windowDays,
+      timing,
+      alerts: COHORT_ALERTS[cohort],
+      hazard: hazard === 'all' ? undefined : hazard,
+    })
+      .then((rows) => active && setRemoteEffects(rows as StudyEffect[]))
+      .catch(() => {
+        if (!active) return
+        setRemoteEffects(null)
+        setRemoteError('The all-alert event-effect table is not available from Supabase yet.')
+      })
+      .finally(() => active && setRemoteLoading(false))
+    return () => { active = false }
+  }, [cohort, hazard, scope, timing, windowDays])
+
+  const sourceEffects = cohort === 'major' ? study?.effects ?? [] : remoteEffects ?? []
+  const eventMap = useMemo(() => {
+    const map = new Map(study?.events.map((event) => [event.id, event]) ?? [])
+    for (const effect of remoteEffects ?? []) {
+      if (map.has(effect.eventId)) continue
+      map.set(effect.eventId, {
+        id: effect.eventId,
+        name: effect.eventId,
+        hazardType: effect.hazardType,
+        alertLevel: effect.alertLevel,
+        alertScore: null,
+        startAt: effect.startAt,
+        endAt: effect.endAt,
+        geographyIds: effect.geographyIds,
+      })
+    }
+    return map
+  }, [remoteEffects, study])
   const candidateEvents = useMemo(
-    () => study?.events.filter((event) => hazard === 'all' || event.hazardType === hazard) ?? [],
-    [hazard, study],
+    () => {
+      if (cohort === 'major') return study?.events.filter((event) => hazard === 'all' || event.hazardType === hazard) ?? []
+      return [...new Set(sourceEffects.map((effect) => effect.eventId))]
+        .map((id) => eventMap.get(id))
+        .filter((event): event is StudyEvent => Boolean(event))
+    },
+    [cohort, eventMap, hazard, sourceEffects, study],
   )
   const specification = useMemo(
-    () => study?.effects.filter((effect) => {
+    () => sourceEffects.filter((effect) => {
       const event = eventMap.get(effect.eventId)
       return effect.scope === scope && effect.windowDays === windowDays && effect.timing === timing &&
         effect.topicId === topic && Boolean(event) && (hazard === 'all' || event?.hazardType === hazard)
-    }) ?? [],
-    [eventMap, hazard, scope, study, timing, topic, windowDays],
+    }),
+    [eventMap, hazard, scope, sourceEffects, timing, topic, windowDays],
   )
   const completeEffects = useMemo(() => specification.filter((effect) => effect.complete), [specification])
   const includedEffects = useMemo(
@@ -230,7 +306,7 @@ export default function AnalysisLab({
   )
 
   const topicSummaries = (Object.keys(TOPICS) as TopicId[]).map((topicId) => {
-    const rows = study?.effects.filter((effect) => effect.topicId === topicId && effect.scope === scope && effect.windowDays === windowDays && effect.timing === timing && effect.complete && includedIds.has(effect.eventId)) ?? []
+    const rows = sourceEffects.filter((effect) => effect.topicId === topicId && effect.scope === scope && effect.windowDays === windowDays && effect.timing === timing && effect.complete && includedIds.has(effect.eventId))
     return {
       topic: topicId,
       count: rows.length,
@@ -280,11 +356,13 @@ export default function AnalysisLab({
   return (
     <main className="lab-view">
       <section className="lab-hero">
-        <div><span className="eyebrow">Analysis Lab · {study.studyYear}</span><h1>Compare attention across major events.</h1><p>Explore how Orange and Red GDACS wildfires and floods changed climate and electric-vehicle coverage across affected countries, the EU and the wider world.</p></div>
+        <div><span className="eyebrow">Analysis Lab · {study.studyYear}</span><h1>Compare attention and event activity.</h1><p>Study individual flood and wildfire responses or compare rolling event exposure with climate and electric-vehicle attention across countries, the EU and the world.</p></div>
         <div className="lab-status"><span className="live-dot" /><div><strong>{study.coverage.observedDays} continuous days</strong><small>{study.coverage.geographies} publishing markets · both topics</small></div></div>
       </section>
 
-      <section className="lab-hypothesis-strip" aria-label="Research hypotheses">
+      <div className="lab-mode-switch" role="tablist" aria-label="Analysis mode"><button role="tab" aria-selected={mode === 'study'} className={mode === 'study' ? 'active' : ''} onClick={() => setMode('study')}>Event study</button><button role="tab" aria-selected={mode === 'activity'} className={mode === 'activity' ? 'active' : ''} onClick={() => setMode('activity')}>Event activity</button></div>
+
+      {mode === 'study' ? <><section className="lab-hypothesis-strip" aria-label="Research hypotheses">
         {HYPOTHESES.map((item) => <button key={item.id} className={hypothesis === item.id ? 'active' : ''} onClick={() => selectHypothesis(item.id)}><span>{item.number}</span><div><strong>{item.title}</strong><small>{item.copy}</small></div>{hypothesis === item.id && <Check size={15} />}</button>)}
       </section>
 
@@ -292,6 +370,7 @@ export default function AnalysisLab({
         <aside className="study-config-panel">
           <div className="lab-section-heading"><span>1</span><div><small>Study design</small><h2>Configure comparison</h2></div></div>
           <div className="lab-form">
+            <label><span>Event alerts</span><select value={cohort} onChange={(event) => setCohort(event.target.value as AlertCohort)}><option value="major">Orange and Red</option><option value="green">Green only</option><option value="all">All alerts</option></select></label>
             <label><span>Event type</span><select value={hazard} onChange={(event) => setHazard(event.target.value as typeof hazard)}><option value="all">Floods and wildfires</option><option value="flood">Floods</option><option value="wildfire">Wildfires</option></select></label>
             <label><span>Media group</span><select value={scope} onChange={(event) => setScope(event.target.value as LabScope)}>{Object.entries(SCOPES).map(([id, item]) => <option key={id} value={id}>{item.label}</option>)}</select><small>{SCOPES[scope].description}</small></label>
             <label><span>Timing</span><select value={timing} onChange={(event) => setTiming(event.target.value as LabTiming)}><option value="onset">Response from event onset</option><option value="persistence">Persistence after event end</option></select></label>
@@ -304,8 +383,10 @@ export default function AnalysisLab({
         </aside>
 
         <div className="lab-results-panel">
+          {remoteLoading && <div className="analysis-loading"><Activity size={15} /> Loading the selected all-alert cohort…</div>}
+          {remoteError && <div className="analysis-loading error"><CircleAlert size={15} /> {remoteError}</div>}
           <div className="cohort-flow" aria-label="Event cohort eligibility">
-            <div><strong>{candidateEvents.length}</strong><span>Major candidates</span></div><ArrowRight size={15} />
+            <div><strong>{candidateEvents.length}</strong><span>Cohort candidates</span></div><ArrowRight size={15} />
             <div><strong>{completeEffects.length}</strong><span>Complete windows</span></div><ArrowRight size={15} />
             <div className="included"><strong>{includedEffects.length}</strong><span>Included events</span></div>
           </div>
@@ -318,8 +399,7 @@ export default function AnalysisLab({
                 <article><small>Middle 50% of events</small><strong>{formatEffect(lowerQuartile, measure)} to {formatEffect(upperQuartile, measure)}</strong><span>Event-level interquartile range</span></article>
                 <article><small>Events with an increase</small><strong>{positiveShare == null ? '—' : `${positiveShare.toFixed(0)}%`}</strong><span>Direction only, not significance</span></article>
               </div>
-              <div className="result-chart-heading"><div><strong>Median event-time pattern</strong><small>Daily change from each event’s own {windowDays}-day baseline · day 0 is {timing === 'onset' ? 'event onset' : 'the first day after event end'}</small></div><span><i style={{ background: TOPICS[topic].color }} />{TOPICS[topic].label}</span></div>
-              <StudyTimeline points={timeline} measure={measure} timing={timing} />
+              {cohort === 'major' ? <><div className="result-chart-heading"><div><strong>Median event-time pattern</strong><small>Daily change from each event’s own {windowDays}-day baseline · day 0 is {timing === 'onset' ? 'event onset' : 'the first day after event end'}</small></div><span><i style={{ background: TOPICS[topic].color }} />{TOPICS[topic].label}</span></div><StudyTimeline points={timeline} measure={measure} timing={timing} /></> : <div className="all-alert-chart-note"><Info size={16} /><div><strong>Detailed timelines remain available for the major-event cohort.</strong><p>The all-alert table serves event-level effects without downloading millions of daily event points. Use Event activity for the full time-series view.</p></div></div>}
             </section>
 
             <section className="topic-result-grid">
@@ -335,6 +415,7 @@ export default function AnalysisLab({
           </>}
         </div>
       </section>
+      </> : <EventActivityView studyYear={study.studyYear} geographyLabels={geographyLabels} eventGeographies={eventGeographies} />}
     </main>
   )
 }
