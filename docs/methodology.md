@@ -169,6 +169,14 @@ once to each. The batch window is the operational retry unit; canonical record
 identity remains topic-specific and is backward-compatible with earlier per-topic
 runs.
 
+The interval from 14 June through 1 July 2025 is excluded from GDELT NGrams
+analysis. GDELT confirmed multiple infrastructure outages during the observed
+coverage collapse; direct GAL checks show 14 June was partial, coverage remained
+unusable through 1 July, and normal article volumes returned on 2 July. Stored zero
+scaffolds in this interval are provider missingness, not observed zero attention.
+Event windows crossing the interval therefore fail completeness, and collection
+planning skips it on future runs.
+
 When a political configuration is supplied, the same NGram scan also accumulates
 URL-level co-occurrence flags for `political_actor`, `government_action`, and
 `party_politics`. The daily political measure is the distinct-URL union of those
@@ -256,6 +264,7 @@ dominate cost; estimate it independently.
 - [GDELT's June 2026 non-consumptive NGrams guidance](https://blog.gdeltproject.org/using-the-new-web-ngrams-dataset-to-find-relevant-coverage/)
 - [GDELT Web NGrams 3.0 dataset](https://blog.gdeltproject.org/announcing-the-new-web-news-ngrams-3-0-dataset/)
 - [GDELT domain-country segmentation example](https://blog.gdeltproject.org/using-web-ngrams-3-0-custom-media-catalogs-to-segment-by-country-state-ownership-partisanship-or-other-attributes/)
+- [GDELT infrastructure outage notice, June 2025](https://www.linkedin.com/posts/kalevleetaru_we-are-aware-of-multiple-gdelt-infrastructure-activity-7340435180601393154-_SDg)
 - [Google Trends data normalization](https://support.google.com/trends/answer/4365533?hl=en-GB)
 - [Google Trends search terms and topics](https://support.google.com/trends/answer/17309543)
 - [Google Trends API alpha](https://developers.google.com/search/apis/trends)

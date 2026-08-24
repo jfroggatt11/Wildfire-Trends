@@ -480,6 +480,8 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
 .lag-chart { height: 235px; margin-top: 12px; }
 .activity-chart .recharts-default-tooltip, .lag-chart .recharts-default-tooltip { border: 1px solid #d8e0db !important; border-radius: 7px; box-shadow: 0 8px 20px rgba(18,49,40,.1); font-size: 8px; }
 .lag-chart-card > .analysis-definition { margin-top: 12px; }
+.activity-chart-card > .outage-note { margin-top: 8px; color: #6a5930; background: #f4eedc; }
+.activity-chart-card > .outage-note svg { color: #9a7126; }
 
 .methods-hero { align-items: center; padding-bottom: 53px; }
 .methods-hero > div:first-child { max-width: 770px; }

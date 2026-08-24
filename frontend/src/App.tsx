@@ -1362,6 +1362,13 @@ function MethodsView({ manifest }: { manifest: Manifest | null }) {
       note: 'First-order administrative polygons used to label the region containing each event point.',
       href: 'https://www.naturalearthdata.com/downloads/10m-cultural-vectors/10m-admin-1-states-provinces/',
     },
+    {
+      number: '08',
+      title: 'GDELT infrastructure outage notice',
+      organisation: 'Kalev Hannes Leetaru / GDELT, June 2025',
+      note: 'Provider confirmation of multiple GDELT infrastructure outages during the observed June 2025 coverage collapse.',
+      href: 'https://www.linkedin.com/posts/kalevleetaru_we-are-aware-of-multiple-gdelt-infrastructure-activity-7340435180601393154-_SDg',
+    },
   ]
 
   return (
@@ -1482,6 +1489,10 @@ function MethodsView({ manifest }: { manifest: Manifest | null }) {
               <Database size={18} />
               <div><strong>There is no manually curated global outlet list.</strong><p>Eligible sources are outlets indexed by GDELT whose domains map unambiguously to a publishing country. Ambiguous or unmapped domains are excluded. Official-domain overrides are transparent in the political configuration. The 2015 country catalogue is old and incomplete, so country coverage is a measurement limitation rather than a complete census of national media.</p></div>
             </div>
+            <div className="method-callout caution">
+              <CircleAlert size={17} />
+              <p><strong>Confirmed provider gap.</strong> GDELT reported multiple infrastructure outages in June 2025. Direct coverage checks show a partial collapse on 14 June and no usable Web NGrams coverage through 1 July, with normal volumes returning on 2 July. The Atlas therefore excludes 14 June–1 July 2025 as missing data, removes previously stored zero scaffolds, and marks any event window crossing those dates incomplete.</p>
+            </div>
             <details className="technical-details">
               <summary>Technical query safeguards <ChevronRight size={14} /></summary>
               <ul><li>Every job receives a dry run, explicit billing project and per-window byte cap.</li><li>Job estimates, completed byte statistics, batched topic IDs and phrase metadata are retained.</li><li>The affordable anchor strategy can miss uppercase and punctuation-adjacent forms; this requires sensitivity testing.</li><li>No article bodies are downloaded by the frontend export.</li></ul>
@@ -1587,6 +1598,7 @@ function MethodsView({ manifest }: { manifest: Manifest | null }) {
               <div><strong>Use Orange and Red events as the primary cohort</strong><p>Prevents thousands of low-salience Green alerts from dominating pooled estimates.</p><span className="status-chip active">In use</span></div>
               <div><strong>Exclude same-country overlaps by default</strong><p>Reduces attribution of one event’s news response to another concurrent major event.</p><span className="status-chip active">In use</span></div>
               <div><strong>Do not impute missing days</strong><p>Prevents provider gaps from becoming false evidence of low attention.</p><span className="status-chip active">In use</span></div>
+              <div><strong>Exclude the confirmed June 2025 GDELT outage</strong><p>Coverage failure is provider unavailability, not a collapse in real news attention.</p><span className="status-chip active">In use</span></div>
               <div><strong>Add normalized country shares</strong><p>Needed for stronger cross-market comparison when denominator coverage is validated.</p><span className="status-chip planned">Planned</span></div>
             </div>
           </section>

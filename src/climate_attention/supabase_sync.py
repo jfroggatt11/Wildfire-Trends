@@ -10,6 +10,8 @@ from typing import Any
 
 import pyarrow.parquet as pq
 
+from .source_coverage import known_outages
+
 
 MVP_TOPICS = {"climate_change", "electric_vehicles"}
 ATTENTION_COLUMNS = (
@@ -31,7 +33,6 @@ ATTENTION_COLUMNS = (
     "collected_at",
 )
 ATTENTION_SYNC_BATCH_SIZE = 50_000
-ANALYSIS_SYNC_BATCH_SIZE = 50_000
 
 EVENT_EFFECT_COLUMNS = (
     "event_id", "hazard_type", "alert_level", "start_at", "end_at",
@@ -144,6 +145,20 @@ def sync_daily_attention(
             connection.execute(migration_path.read_text(encoding="utf-8"))
             connection.commit()
 
+        with connection.transaction():
+            for outage in known_outages("gdelt_ngrams"):
+                connection.execute(
+                    "delete from public.daily_attention "
+                    "where source = %s and topic_id = any(%s) "
+                    "and observation_date between %s and %s",
+                    (
+                        "gdelt_ngrams",
+                        sorted(selected_topics),
+                        outage.start,
+                        outage.end,
+                    ),
+                )
+
         def upsert_batch(rows: list[dict[str, Any]]) -> None:
             with connection.transaction():
                 connection.execute(
@@ -199,8 +214,9 @@ def sync_analysis_warehouse(
     data_dir: Path,
     migration_path: Path,
     apply_migration: bool = False,
+    study_year: int = 2025,
 ) -> dict[str, int]:
-    """Idempotently upsert derived Analysis Lab tables via COPY."""
+    """Transactionally replace one study year's derived Analysis Lab rows."""
     try:
         import psycopg
     except ImportError as exc:
@@ -231,6 +247,7 @@ def sync_analysis_warehouse(
             },
             "event_id, scope, topic_id, window_days, timing",
             {"window_days", "missing_days"},
+            "start_at",
         ),
         (
             "daily_event_activity",
@@ -244,6 +261,7 @@ def sync_analysis_warehouse(
             },
             "activity_date, geography, hazard_type, alert_level",
             {"events_started", "events_active", "events_ended"},
+            "activity_date",
         ),
         (
             "daily_attention_regions",
@@ -265,9 +283,10 @@ def sync_analysis_warehouse(
                 "government_action_count", "party_politics_count",
                 "official_source_count",
             },
+            "observation_date",
         ),
     ]
-    for _, path, _, _, _, _ in specifications:
+    for _, path, _, _, _, _, _ in specifications:
         if not path.exists():
             raise ValueError(f"missing analysis Parquet file: {path}")
 
@@ -276,42 +295,45 @@ def sync_analysis_warehouse(
         if apply_migration:
             connection.execute(migration_path.read_text(encoding="utf-8"))
             connection.commit()
-        for table, path, columns, mapping, conflict_columns, integer_columns in specifications:
+        for (
+            table,
+            path,
+            columns,
+            mapping,
+            conflict_columns,
+            integer_columns,
+            year_column,
+        ) in specifications:
             column_sql = ", ".join(columns)
             update_sql = ", ".join(
                 f"{column} = excluded.{column}"
                 for column in columns
                 if column not in {item.strip() for item in conflict_columns.split(",")}
             )
-            rows = _analysis_rows(path, mapping, integer_columns=integer_columns)
             copied = 0
-            batch: list[dict[str, Any]] = []
-
-            def upsert_batch(selected: list[dict[str, Any]]) -> None:
-                with connection.transaction():
-                    stage = f"{table}_sync_stage"
-                    connection.execute(
-                        f"create temp table {stage} "
-                        f"(like public.{table} including defaults) on commit drop"
-                    )
-                    with connection.cursor().copy(
-                        f"copy {stage} ({column_sql}) from stdin"
-                    ) as copy:
-                        for item in selected:
-                            copy.write_row([item[column] for column in columns])
-                    connection.execute(
-                        f"insert into public.{table} ({column_sql}) "
-                        f"select {column_sql} from {stage} "
-                        f"on conflict ({conflict_columns}) do update set {update_sql}"
-                    )
-
-            for row in rows:
-                batch.append(row)
-                copied += 1
-                if len(batch) >= ANALYSIS_SYNC_BATCH_SIZE:
-                    upsert_batch(batch)
-                    batch = []
-            if batch:
-                upsert_batch(batch)
+            with connection.transaction():
+                stage = f"{table}_sync_stage"
+                connection.execute(
+                    f"create temp table {stage} "
+                    f"(like public.{table} including defaults) on commit drop"
+                )
+                with connection.cursor().copy(
+                    f"copy {stage} ({column_sql}) from stdin"
+                ) as copy:
+                    for item in _analysis_rows(
+                        path, mapping, integer_columns=integer_columns
+                    ):
+                        copy.write_row([item[column] for column in columns])
+                        copied += 1
+                connection.execute(
+                    f"delete from public.{table} "
+                    f"where extract(year from {year_column}) = %s",
+                    (study_year,),
+                )
+                connection.execute(
+                    f"insert into public.{table} ({column_sql}) "
+                    f"select {column_sql} from {stage} "
+                    f"on conflict ({conflict_columns}) do update set {update_sql}"
+                )
             counts[table] = copied
     return counts

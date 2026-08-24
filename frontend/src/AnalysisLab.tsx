@@ -71,7 +71,13 @@ export type EventStudyData = {
   schemaVersion: number
   generatedAt: string
   studyYear: number
-  coverage: { start: string; end: string; observedDays: number; geographies: number }
+  coverage: {
+    start: string
+    end: string
+    observedDays: number
+    geographies: number
+    excludedPeriods?: { start: string; end: string; label: string; evidenceUrl: string }[]
+  }
   topics: TopicId[]
   hazards: HazardType[]
   alerts: ('Orange' | 'Red')[]
@@ -357,7 +363,7 @@ export default function AnalysisLab({
     <main className="lab-view">
       <section className="lab-hero">
         <div><span className="eyebrow">Analysis Lab · {study.studyYear}</span><h1>Compare attention and event activity.</h1><p>Study individual flood and wildfire responses or compare rolling event exposure with climate and electric-vehicle attention across countries, the EU and the world.</p></div>
-        <div className="lab-status"><span className="live-dot" /><div><strong>{study.coverage.observedDays} continuous days</strong><small>{study.coverage.geographies} publishing markets · both topics</small></div></div>
+        <div className="lab-status"><span className="live-dot" /><div><strong>{study.coverage.observedDays} observed days</strong><small>{study.coverage.geographies} markets · {study.coverage.excludedPeriods?.length ? 'confirmed provider gap excluded' : 'both topics'}</small></div></div>
       </section>
 
       <div className="lab-mode-switch" role="tablist" aria-label="Analysis mode"><button role="tab" aria-selected={mode === 'study'} className={mode === 'study' ? 'active' : ''} onClick={() => setMode('study')}>Event study</button><button role="tab" aria-selected={mode === 'activity'} className={mode === 'activity' ? 'active' : ''} onClick={() => setMode('activity')}>Event activity</button></div>

@@ -7,6 +7,7 @@ import {
   Legend,
   Line,
   LineChart,
+  ReferenceArea,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
@@ -39,6 +40,8 @@ const COHORT_ALERTS: Record<Cohort, EventActivityObservation['alertLevel'][]> = 
   green: ['Green'],
   all: ['Green', 'Orange', 'Red'],
 }
+
+const GDELT_OUTAGE = { start: '2025-06-14', end: '2025-07-01' }
 
 const shiftDate = (value: string, days: number) => {
   const result = new Date(`${value}T00:00:00Z`)
@@ -254,11 +257,13 @@ export default function EventActivityView({
                   <Legend wrapperStyle={{ fontSize: 9 }} />
                   <ReferenceLine yAxisId="attention" y={0} stroke="#9eaaa4" />
                   <Bar yAxisId="events" dataKey="rollingStarts" name="Rolling event starts" fill="#d7b878" opacity={0.38} barSize={4} />
-                  <Line yAxisId="attention" type="monotone" dataKey="climate_change" name="Climate change" stroke={TOPICS.climate_change.color} strokeWidth={2} dot={false} connectNulls />
-                  <Line yAxisId="attention" type="monotone" dataKey="electric_vehicles" name="Electric vehicles" stroke={TOPICS.electric_vehicles.color} strokeWidth={2} dot={false} connectNulls />
+                  {studyYear === 2025 && <ReferenceArea yAxisId="attention" x1={GDELT_OUTAGE.start} x2={GDELT_OUTAGE.end} fill="#bd8b3b" fillOpacity={0.12} stroke="#bd8b3b" strokeOpacity={0.45} label={{ value: 'GDELT outage · excluded', position: 'insideTop', fill: '#806127', fontSize: 8 }} />}
+                  <Line yAxisId="attention" type="monotone" dataKey="climate_change" name="Climate change" stroke={TOPICS.climate_change.color} strokeWidth={2} dot={false} connectNulls={false} />
+                  <Line yAxisId="attention" type="monotone" dataKey="electric_vehicles" name="Electric vehicles" stroke={TOPICS.electric_vehicles.color} strokeWidth={2} dot={false} connectNulls={false} />
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
+            {studyYear === 2025 && <div className="analysis-definition outage-note"><CircleAlert size={15} /><p><strong>Provider gap.</strong> GDELT infrastructure was unavailable from 14 June through 1 July 2025. Those dates are excluded—not treated as zero—and lines deliberately break across the gap.</p></div>}
           </section>
 
           <section className="lag-chart-card">

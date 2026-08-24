@@ -29,6 +29,7 @@ from .models import (
     PoliticalArticleSample,
 )
 from .run_state import CollectionRunState, RunStore
+from .source_coverage import remove_known_outage_rows
 from .sources import GoogleTrendsUnofficialProvider
 from .sources.base import ProviderCollectionError, ProviderError
 from .sources.gdelt import GDELTProvider, plan_gdelt_windows
@@ -461,6 +462,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=Path("supabase/migrations/20260823190000_create_analysis_lab.sql"),
     )
 
+    repair_outages = subparsers.add_parser(
+        "repair-known-outages",
+        help="remove confirmed provider-outage rows from canonical trend data",
+    )
+    repair_outages.add_argument("--data-dir", type=Path, default=Path("data"))
+
     aggregate = subparsers.add_parser(
         "aggregate", aliases=["rebuild-aggregates"], help="rebuild daily Parquet"
     )
@@ -526,6 +533,8 @@ def main(argv: list[str] | None = None) -> int:
             return _build_analysis_warehouse(args)
         if args.command == "sync-analysis-supabase":
             return _sync_analysis_supabase(args)
+        if args.command == "repair-known-outages":
+            return _repair_known_outages(args.data_dir)
         if args.command in {"aggregate", "rebuild-aggregates"}:
             return _aggregate(args.data_dir)
         if args.command == "runs":
@@ -1589,6 +1598,15 @@ def _aggregate(data_dir: Path) -> int:
     return 0
 
 
+def _repair_known_outages(data_dir: Path) -> int:
+    removed, files = remove_known_outage_rows(data_dir)
+    print(
+        f"Known-outage repair complete: removed {removed:,} invalid row(s) "
+        f"from {files:,} Parquet partition(s)."
+    )
+    return 0
+
+
 def _sync_supabase(args: argparse.Namespace) -> int:
     if args.start and args.end and args.end < args.start:
         raise ValueError("Supabase sync end date must not precede start date")
@@ -1653,6 +1671,7 @@ def _sync_analysis_supabase(args: argparse.Namespace) -> int:
         data_dir=args.data_dir,
         migration_path=args.migration,
         apply_migration=args.apply_migration,
+        study_year=args.year,
     )
     print(
         "Supabase Analysis Lab sync complete: "

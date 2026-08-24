@@ -193,3 +193,39 @@ def test_daily_attention_regions_sum_global_and_eu_without_inventing_shares():
     assert global_row["politicalShare"] == 12.5
     assert eu_row["matchedCount"] == 10
     assert eu_row["politicalShare"] == 20
+
+
+def test_confirmed_gdelt_outage_is_missing_not_zero():
+    rows = _attention_rows()
+    for day in (date(2025, 6, 14), date(2025, 7, 1)):
+        for topic in ("climate_change", "electric_vehicles"):
+            for geography in ("italy", "france", "brazil"):
+                rows.append(
+                    {
+                        "date": day,
+                        "source": "gdelt_ngrams",
+                        "topic_id": topic,
+                        "geography": geography,
+                        "matched_count": 0,
+                        "political_count": 0,
+                    }
+                )
+    payload = build_event_study(
+        [_event("gap", "flood", "Orange", date(2025, 6, 14), date(2025, 6, 15), ["italy"])],
+        rows,
+    )
+
+    effect = next(
+        row for row in payload["effects"]
+        if row["scope"] == "affected"
+        and row["topicId"] == "climate_change"
+        and row["windowDays"] == 7
+        and row["timing"] == "onset"
+    )
+    assert effect["complete"] is False
+    assert effect["missingDays"] >= 7
+    assert payload["coverage"]["excludedPeriods"][0]["start"] == "2025-06-14"
+    assert not any(
+        row["observationDate"] in {"2025-06-14", "2025-07-01"}
+        for row in build_daily_attention_regions(rows)
+    )

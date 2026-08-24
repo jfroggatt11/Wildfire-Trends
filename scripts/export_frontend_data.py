@@ -13,6 +13,7 @@ import pyarrow.parquet as pq
 from climate_attention.config import load_country_config
 from climate_attention.event_study import build_event_study_files
 from climate_attention.geography import load_country_boundaries, load_region_boundaries
+from climate_attention.source_coverage import is_known_outage
 from climate_attention.supabase_sync import dotenv_value
 
 
@@ -196,6 +197,8 @@ def summarize_attention() -> dict[str, Any]:
             if row["topic_id"] not in FRONTEND_TOPIC_IDS:
                 continue
             day = clean(row["date"])
+            if is_known_outage(row["source"], day):
+                continue
             source_counts[row["source"]] += 1
             source_dates[row["source"]].append(day)
             source_geographies[row["source"]].add(row["geography"])
@@ -337,6 +340,7 @@ def main() -> None:
                 "Media geography is publishing-outlet country, not event location.",
                 "The Analysis Lab uses GDACS Orange and Red events with complete daily attention windows.",
                 "Coverage intervals use actual stored dates; gaps are never rendered as continuous coverage.",
+                "GDELT's confirmed 14 June–1 July 2025 infrastructure outage is excluded as missing data.",
             ],
         },
     )

@@ -98,6 +98,10 @@ const ATTENTION_SELECT = [
   'official_source_count',
 ].join(',')
 
+export function isKnownAttentionOutage(value: string) {
+  return value >= '2025-06-14' && value <= '2025-07-01'
+}
+
 function runtimeConfig(): SupabaseConfig | null {
   const enabled = import.meta.env.VITE_USE_SUPABASE === 'true' || deployedConfig.enabled
   if (!enabled) return null
@@ -167,7 +171,7 @@ export async function fetchAttentionWindow(query: WindowQuery): Promise<Attentio
       headers: requestHeaders(config),
     })
     const rows = await responseJson(response) as Record<string, unknown>[]
-    result.push(...rows.map(mapAttentionRow))
+    result.push(...rows.map(mapAttentionRow).filter((row) => !isKnownAttentionOutage(row.date)))
     if (rows.length < pageSize) return result
   }
 }
@@ -255,7 +259,7 @@ export async function fetchRegionAttention(
     params.append('observation_date', `lte.${end}`)
     return `${config.url}/rest/v1/daily_attention_regions?${params}`
   })
-  return rows.map(mapRegionAttentionRow)
+  return rows.map(mapRegionAttentionRow).filter((row) => !isKnownAttentionOutage(row.date))
 }
 
 export function mapRegionAttentionRow(row: Record<string, unknown>): RegionAttentionObservation {

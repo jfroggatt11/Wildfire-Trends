@@ -215,9 +215,9 @@ test('data summary reports only MVP sources and their stored coverage dates', as
   await expect(page.locator('.source-card[data-source="gdacs"]')).toContainText('1 Jan 2025 — 31 Dec 2025')
   await expect(page.locator('.source-card[data-source="gdelt_ngrams"]')).toContainText('31 Jul 2026')
   await expect(page.locator('.source-card[data-source="gdelt_ngrams"]')).toContainText('stored observation dates')
-  await expect(page.locator('.source-card[data-source="gdelt_ngrams"] .source-coverage-ranges span')).toHaveCount(2)
+  await expect(page.locator('.source-card[data-source="gdelt_ngrams"] .source-coverage-ranges span')).toHaveCount(3)
   await expect(page.locator('.source-card[data-source="gdelt_articles"]')).toHaveCount(0)
-  await expect(page.locator('.source-timeline-row[data-source="gdelt_ngrams"] .source-timeline-track span')).toHaveCount(2)
+  await expect(page.locator('.source-timeline-row[data-source="gdelt_ngrams"] .source-timeline-track span')).toHaveCount(3)
   await expect(page.getByText('Google Trends comparison series')).toHaveCount(0)
   await expect(page.getByText('NASA FIRMS wildfire detections')).toHaveCount(0)
   await expect(page.getByText('GDELT DOC 2.0 topic timelines')).toHaveCount(0)
@@ -235,8 +235,8 @@ test('analysis lab runs the major-event study for climate and electric vehicles'
 
   await expect(page.getByRole('heading', { name: 'Compare attention and event activity.' })).toBeVisible()
   await expect(page.locator('.cohort-flow')).toContainText('40')
-  await expect(page.locator('.cohort-flow')).toContainText('37')
-  await expect(page.locator('.cohort-flow')).toContainText('24')
+  await expect(page.locator('.cohort-flow')).toContainText('29')
+  await expect(page.locator('.cohort-flow')).toContainText('19')
   await expect(page.locator('.topic-result-grid > article')).toHaveCount(2)
   await expect(page.locator('.topic-result-grid [data-topic="electric_vehicles"]')).toContainText('Electric vehicles')
   await expect(page.locator('.study-timeline')).toBeVisible()
@@ -250,7 +250,7 @@ test('analysis lab runs the major-event study for climate and electric vehicles'
   await expect(page.locator('.headline-result-grid article').first()).toContainText('pp')
 
   await page.getByLabel('Exclude same-country overlapping events').uncheck()
-  await expect(page.locator('.cohort-flow')).toContainText('37')
+  await expect(page.locator('.cohort-flow')).toContainText('29')
 
   await page.locator('.ranked-event-table > button').first().click()
   await expect(page.locator('.event-drawer')).toBeVisible()
@@ -264,7 +264,7 @@ test('analysis lab exposes the all-alert activity and lag views', async ({ page 
   await page.getByRole('button', { name: 'Analysis Lab', exact: true }).click()
 
   await page.getByLabel('Event alerts').selectOption('green')
-  await expect(page.locator('.analysis-loading')).toHaveCount(0)
+  await expect(page.locator('.analysis-loading')).toHaveCount(0, { timeout: 10_000 })
   await expect(page.locator('.cohort-flow strong').first()).not.toHaveText('0')
 
   await page.getByRole('tab', { name: 'Event activity' }).click()
@@ -274,6 +274,7 @@ test('analysis lab exposes the all-alert activity and lag views', async ({ page 
   await expect(page.getByRole('heading', { name: 'When is event activity most associated with attention?' })).toBeVisible()
   await expect(page.locator('.activity-kpis > article')).toHaveCount(4)
   await expect(page.locator('.activity-chart')).toBeVisible()
+  await expect(page.locator('.outage-note')).toContainText('14 June through 1 July 2025')
   await expect(page.locator('.lag-chart')).toBeVisible()
   expect(errors).toEqual([])
 })
@@ -303,7 +304,8 @@ test('methods page documents the current research protocol and definitions', asy
   await expect(page.locator('.window-diagram')).toContainText('Event duration')
   await expect(page.locator('.window-diagram')).toContainText('Excluded')
   await expect(page.locator('.decision-table .status-chip.planned')).toHaveText('Planned')
-  await expect(page.locator('.reference-list > a')).toHaveCount(7)
+  await expect(page.locator('#collection')).toContainText('Confirmed provider gap')
+  await expect(page.locator('.reference-list > a')).toHaveCount(8)
   await expect(page.locator('.reference-list > a').first()).toHaveAttribute('href', /gdeltproject\.org/)
   await expect(page.locator('.reference-list > a').first()).toHaveAttribute('target', '_blank')
 

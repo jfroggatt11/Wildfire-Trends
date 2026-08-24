@@ -91,6 +91,19 @@ def test_ngram_planning_batches_all_topics_per_date_window():
     assert all(window.query.query_id == "topics_distinct_urls" for window in windows)
 
 
+def test_ngram_planning_skips_confirmed_provider_outage():
+    request = _request().model_copy(
+        update={"start": date(2025, 6, 13), "end": date(2025, 7, 2)}
+    )
+
+    windows, _ = plan_ngram_windows(request, window_days=30)
+
+    assert [(window.start.date(), window.end.date()) for window in windows] == [
+        (date(2025, 6, 13), date(2025, 6, 13)),
+        (date(2025, 7, 2), date(2025, 7, 2)),
+    ]
+
+
 def test_batch_sql_scans_ngram_table_once_and_keeps_topic_membership():
     sql, parameters = build_ngram_batch_sql(
         phrases_by_topic={

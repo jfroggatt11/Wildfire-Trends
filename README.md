@@ -78,6 +78,18 @@ starts, both MVP attention topics, and exploratory lead/lag correlations. Positi
 lag means attention follows event activity. These correlations are descriptive and
 do not adjust for autocorrelation, seasonality or common news shocks.
 
+GDELT's confirmed infrastructure outage is treated as missing coverage from
+14 June through 1 July 2025. Collection plans skip that interval, analytical windows
+crossing it are incomplete, and the frontend renders a visible gap. To repair a
+dataset created before this rule was added, run:
+
+```bash
+climate-attention repair-known-outages --data-dir data
+```
+
+Then rebuild the frontend and Analysis Lab exports and resync Supabase. The repair is
+idempotent; it never converts missing dates to zero.
+
 At the current 2025 scale the derived warehouse is small enough for Supabase and a
 static frontend. A separate Render service is not required; it would become useful
 only for scheduled multi-year recomputation or heavier statistical models.

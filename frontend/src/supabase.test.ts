@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildAttentionUrl,
+  isKnownAttentionOutage,
   mapAttentionRow,
   mapEventActivityRow,
   mapEventEffect,
@@ -22,6 +23,13 @@ describe('Supabase REST queries', () => {
     expect(url.searchParams.get('topic_id')).toBe('in.(climate_change,electric_vehicles)')
     expect(url.searchParams.get('offset')).toBe('1000')
     expect(url.searchParams.get('limit')).toBe('500')
+  })
+
+  it('classifies the confirmed GDELT outage as an inclusive missing interval', () => {
+    expect(isKnownAttentionOutage('2025-06-13')).toBe(false)
+    expect(isKnownAttentionOutage('2025-06-14')).toBe(true)
+    expect(isKnownAttentionOutage('2025-07-01')).toBe(true)
+    expect(isKnownAttentionOutage('2025-07-02')).toBe(false)
   })
 })
 

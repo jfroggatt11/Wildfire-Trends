@@ -20,6 +20,7 @@ from ..models import (
     TrendProviderResult,
     utc_now,
 )
+from ..source_coverage import available_date_segments
 from .base import ProviderCollectionError, ProviderUnavailableError
 from .gdelt import GDELTWindow
 
@@ -208,21 +209,24 @@ def plan_ngram_windows(
         return [], phrases_by_topic
     windows: list[GDELTWindow] = []
     expression = ",".join(sorted(phrases_by_topic))
-    current = request.start
-    while current <= request.end:
-        chunk_end = min(request.end, current + timedelta(days=window_days - 1))
-        windows.append(
-            GDELTWindow(
-                query=Query(
-                    topic_id=BATCH_TOPIC_ID,
-                    query_id=BATCH_QUERY_ID,
-                    expression=expression,
-                ),
-                start=datetime.combine(current, dt_time.min, tzinfo=timezone.utc),
-                end=datetime.combine(chunk_end, dt_time.max, tzinfo=timezone.utc),
+    for available_start, available_end in available_date_segments(
+        SOURCE, request.start, request.end
+    ):
+        current = available_start
+        while current <= available_end:
+            chunk_end = min(available_end, current + timedelta(days=window_days - 1))
+            windows.append(
+                GDELTWindow(
+                    query=Query(
+                        topic_id=BATCH_TOPIC_ID,
+                        query_id=BATCH_QUERY_ID,
+                        expression=expression,
+                    ),
+                    start=datetime.combine(current, dt_time.min, tzinfo=timezone.utc),
+                    end=datetime.combine(chunk_end, dt_time.max, tzinfo=timezone.utc),
+                )
             )
-        )
-        current = chunk_end + timedelta(days=1)
+            current = chunk_end + timedelta(days=1)
     return windows, phrases_by_topic
 
 

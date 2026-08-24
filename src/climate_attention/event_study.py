@@ -12,6 +12,8 @@ from typing import Any, Iterable
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from .source_coverage import is_known_outage, known_outages
+
 
 STUDY_TOPICS = ("climate_change", "electric_vehicles")
 STUDY_HAZARDS = {"wildfire", "flood"}
@@ -118,6 +120,7 @@ def build_event_study(
         geography = row.get("geography")
         if (
             row.get("source") != "gdelt_ngrams"
+            or is_known_outage("gdelt_ngrams", day)
             or topic not in STUDY_TOPICS
             or not geography
             or day.year != study_year
@@ -291,6 +294,15 @@ def build_event_study(
             "end": max(coverage_dates).isoformat() if coverage_dates else None,
             "observedDays": len(coverage_dates),
             "geographies": len(geographies),
+            "excludedPeriods": [
+                {
+                    "start": outage.start.isoformat(),
+                    "end": outage.end.isoformat(),
+                    "label": outage.label,
+                    "evidenceUrl": outage.evidence_url,
+                }
+                for outage in known_outages("gdelt_ngrams", year=study_year)
+            ],
         },
         "topics": list(STUDY_TOPICS),
         "hazards": sorted(STUDY_HAZARDS),
@@ -426,6 +438,7 @@ def build_daily_attention_regions(
         geography = row.get("geography")
         if (
             row.get("source") != "gdelt_ngrams"
+            or is_known_outage("gdelt_ngrams", day)
             or topic not in STUDY_TOPICS
             or not geography
             or day.year != study_year
