@@ -76,7 +76,10 @@ country, rather than downloading raw articles or millions of event-day rows. The
 Event activity view offers Green/major/all-alert filters, 7- or 28-day rolling event
 starts, both MVP attention topics, and exploratory lead/lag correlations. Positive
 lag means attention follows event activity. These correlations are descriptive and
-do not adjust for autocorrelation, seasonality or common news shocks.
+do not adjust for autocorrelation, seasonality or common news shocks. Country
+comparison mode overlays one selected attention topic and rolling event starts for
+two to five countries. Country-response rankings require at least two eligible
+events so a single event cannot appear as a country-level result.
 
 GDELT's confirmed infrastructure outage is treated as missing coverage from
 14 June through 1 July 2025. Collection plans skip that interval, analytical windows

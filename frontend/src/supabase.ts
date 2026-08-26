@@ -205,7 +205,8 @@ export async function fetchEventEffects(query: EventEffectQuery): Promise<EventE
 }
 
 export async function fetchEventActivity(query: {
-  geography: string
+  geography?: string
+  geographies?: string[]
   start: string
   end: string
   alerts?: EventActivityObservation['alertLevel'][]
@@ -216,12 +217,13 @@ export async function fetchEventActivity(query: {
   const rows = await fetchPagedRows((offset, limit) => {
     const params = new URLSearchParams({
       select: 'activity_date,geography,hazard_type,alert_level,events_started,events_active,events_ended',
-      geography: `eq.${query.geography}`,
       activity_date: `gte.${query.start}`,
       order: 'activity_date.asc',
       offset: String(offset),
       limit: String(limit),
     })
+    if (query.geographies?.length) params.set('geography', `in.(${query.geographies.join(',')})`)
+    else if (query.geography) params.set('geography', `eq.${query.geography}`)
     params.append('activity_date', `lte.${query.end}`)
     if (query.alerts?.length) params.set('alert_level', `in.(${query.alerts.join(',')})`)
     if (query.hazard) params.set('hazard_type', `eq.${query.hazard}`)

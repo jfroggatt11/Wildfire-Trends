@@ -451,6 +451,7 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
 .country-row:last-child { border-bottom: 0; }
 .country-row small { color: #8b9690; }
 .country-row strong { color: #34463e; font-family: Georgia, serif; font-size: 12px; font-weight: 500; text-align: right; }
+.country-ranking-empty { margin: 12px 0 0; padding: 12px; border-radius: 7px; color: #7b8881; background: #f0f4f1; font-size: 8px; line-height: 1.5; }
 .ranked-events { padding: 16px; }
 .ranked-event-table { margin-top: 12px; }
 .ranked-event-table > div, .ranked-event-table > button { width: 100%; display: grid; grid-template-columns: minmax(180px, 1fr) 85px 70px 80px; align-items: center; gap: 9px; padding: 8px 9px; border: 0; border-bottom: 1px solid #e5e9e6; color: #596961; background: transparent; font-size: 8px; text-align: left; }
@@ -470,7 +471,7 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
 .activity-state.error { flex-direction: column; text-align: center; }
 .activity-state.error strong { color: #6c4d2e; font-size: 11px; }
 .activity-state.error p { margin: 0; color: #8b7258; }
-.activity-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.activity-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); gap: 8px; }
 .activity-kpis article { min-height: 88px; display: flex; flex-direction: column; padding: 12px; border: 1px solid #dbe3de; border-radius: 9px; background: var(--paper); }
 .activity-kpis small { color: #7f8c85; font-size: 7px; }
 .activity-kpis strong { margin: 5px 0 2px; color: var(--green); font-family: Georgia, serif; font-size: 22px; font-weight: 500; }
@@ -482,6 +483,11 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
 .lag-chart-card > .analysis-definition { margin-top: 12px; }
 .activity-chart-card > .outage-note { margin-top: 8px; color: #6a5930; background: #f4eedc; }
 .activity-chart-card > .outage-note svg { color: #9a7126; }
+.comparison-country-list { display: flex; flex-wrap: wrap; gap: 5px; padding: 8px; border-radius: 7px; background: #eef3ef; }
+.comparison-country-list > span { display: inline-flex; align-items: center; gap: 5px; padding: 5px 6px 5px 7px; border: 1px solid #d6e0da; border-radius: 999px; color: #43574d; background: #fbfcfa; font-size: 7.5px; font-weight: 700; }
+.comparison-country-list i { width: 7px; height: 7px; flex: 0 0 auto; border-radius: 50%; }
+.comparison-country-list button { width: 15px; height: 15px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 50%; color: #65776e; background: #e5ebe7; font-size: 11px; line-height: 1; cursor: pointer; }
+.comparison-country-list button:disabled { opacity: .35; cursor: not-allowed; }
 
 .methods-hero { align-items: center; padding-bottom: 53px; }
 .methods-hero > div:first-child { max-width: 770px; }

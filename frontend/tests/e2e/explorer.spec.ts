@@ -241,6 +241,8 @@ test('analysis lab runs the major-event study for climate and electric vehicles'
   await expect(page.locator('.topic-result-grid [data-topic="electric_vehicles"]')).toContainText('Electric vehicles')
   await expect(page.locator('.study-timeline')).toBeVisible()
   await expect(page.locator('.ranked-event-table > button').first()).toBeVisible()
+  await expect(page.locator('.country-comparison')).toContainText('at least 2 events')
+  expect((await page.locator('.country-comparison .country-row small').allTextContents()).some((value) => value.trim() === '1 event')).toBe(false)
 
   await page.getByRole('button', { name: /H2 EV spillover/ }).click()
   await expect(page.locator('.pooled-result')).toContainText('Electric vehicles · Article attention')
@@ -276,6 +278,17 @@ test('analysis lab exposes the all-alert activity and lag views', async ({ page 
   await expect(page.locator('.activity-chart')).toBeVisible()
   await expect(page.locator('.outage-note')).toContainText('14 June through 1 July 2025')
   await expect(page.locator('.lag-chart')).toBeVisible()
+
+  await page.getByLabel('Place view').selectOption('compare')
+  await expect(page.locator('.activity-state')).toHaveCount(0, { timeout: 10_000 })
+  await expect(page.locator('.comparison-country-list > span')).toHaveCount(3)
+  await page.getByLabel('Add country').selectOption('italy')
+  await expect(page.locator('.activity-state')).toHaveCount(0, { timeout: 10_000 })
+  await expect(page.locator('.comparison-country-list > span')).toHaveCount(4)
+  const comparisonLegend = page.locator('.activity-chart .recharts-legend-item-text')
+  for (const country of ['United Kingdom', 'France', 'Germany', 'Italy']) {
+    await expect(comparisonLegend.filter({ hasText: country }).first()).toBeVisible()
+  }
   expect(errors).toEqual([])
 })
 
