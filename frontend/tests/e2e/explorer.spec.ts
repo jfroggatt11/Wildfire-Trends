@@ -276,6 +276,7 @@ test('analysis lab exposes the all-alert activity and lag views', async ({ page 
   await expect(page.getByRole('heading', { name: 'When is event activity most associated with attention?' })).toBeVisible()
   await expect(page.locator('.activity-kpis > article')).toHaveCount(4)
   await expect(page.locator('.activity-chart')).toBeVisible()
+  await expect(page.locator('.chart-scale-note')).toContainText('symmetric 98% range')
   await expect(page.locator('.outage-note')).toContainText('14 June through 1 July 2025')
   await expect(page.locator('.lag-chart')).toBeVisible()
 
@@ -289,6 +290,12 @@ test('analysis lab exposes the all-alert activity and lag views', async ({ page 
   for (const country of ['United Kingdom', 'France', 'Germany', 'Italy']) {
     await expect(comparisonLegend.filter({ hasText: country }).first()).toBeVisible()
   }
+  await expect(comparisonLegend).toHaveCount(4)
+  const lagTicks = (await page.locator('.lag-chart .recharts-yAxis .recharts-cartesian-axis-tick-value').allTextContents()).map(Number).filter(Number.isFinite)
+  expect(Math.max(...lagTicks.map(Math.abs))).toBeLessThan(1)
+
+  await page.getByLabel('Attention scale').selectOption('full')
+  await expect(page.locator('.chart-scale-note')).toHaveCount(0)
   expect(errors).toEqual([])
 })
 

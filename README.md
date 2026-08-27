@@ -79,7 +79,9 @@ lag means attention follows event activity. These correlations are descriptive a
 do not adjust for autocorrelation, seasonality or common news shocks. Country
 comparison mode overlays one selected attention topic and rolling event starts for
 two to five countries. Country-response rankings require at least two eligible
-events so a single event cannot appear as a country-level result.
+events so a single event cannot appear as a country-level result. The attention
+chart defaults to a labelled symmetric 98%-range focus scale with a full-range
+option, while the lead/lag axis adapts to the observed correlations.
 
 GDELT's confirmed infrastructure outage is treated as missing coverage from
 14 June through 1 July 2025. Collection plans skip that interval, analytical windows

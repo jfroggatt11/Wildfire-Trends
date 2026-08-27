@@ -30,6 +30,7 @@ type Cohort = 'major' | 'green' | 'all'
 type Measure = 'matched' | 'political' | 'political_share'
 type Topic = 'climate_change' | 'electric_vehicles'
 type PlaceMode = 'single' | 'compare'
+type ScaleMode = 'focus' | 'full'
 
 const TOPICS: Record<Topic, { label: string; color: string }> = {
   climate_change: { label: 'Climate change', color: '#286e59' },
@@ -62,6 +63,22 @@ const dateRange = (year: number) => {
 }
 
 const mean = (values: number[]) => values.reduce((total, value) => total + value, 0) / values.length
+
+function niceAxisBound(value: number, minimum: number) {
+  const target = Math.max(Math.abs(value), minimum)
+  const roughStep = target / 4
+  const magnitude = 10 ** Math.floor(Math.log10(roughStep))
+  const normalized = roughStep / magnitude
+  const niceStep = (normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 2.5 ? 2.5 : normalized <= 5 ? 5 : 10) * magnitude
+  return Math.ceil(target / niceStep) * niceStep
+}
+
+function symmetricBound(values: number[], quantile: number, minimum: number) {
+  const magnitudes = values.filter(Number.isFinite).map((value) => Math.abs(value)).sort((left, right) => left - right)
+  if (!magnitudes.length) return minimum
+  const index = Math.min(magnitudes.length - 1, Math.ceil((magnitudes.length - 1) * quantile))
+  return niceAxisBound(magnitudes[index], minimum)
+}
 
 function pearson(left: number[], right: number[]) {
   if (left.length < 10 || left.length !== right.length) return null
@@ -113,6 +130,7 @@ export default function EventActivityView({
   const [hazard, setHazard] = useState<Hazard>('all')
   const [cohort, setCohort] = useState<Cohort>('all')
   const [measure, setMeasure] = useState<Measure>('matched')
+  const [scaleMode, setScaleMode] = useState<ScaleMode>('focus')
   const [rollingDays, setRollingDays] = useState(28)
   const [activityRows, setActivityRows] = useState<EventActivityObservation[]>([])
   const [attentionRows, setAttentionRows] = useState<(AttentionObservation | RegionAttentionObservation)[]>([])
@@ -250,6 +268,18 @@ export default function EventActivityView({
       })),
   [activeLocations, comparisonTopic, geographyLabels, location, placeMode])
 
+  const attentionValues = useMemo(() => points.flatMap((point) => chartSeries
+    .map((series) => point[series.key])
+    .filter((value): value is number => typeof value === 'number' && Number.isFinite(value))), [chartSeries, points])
+  const attentionBound = useMemo(
+    () => symmetricBound(attentionValues, scaleMode === 'focus' ? 0.98 : 1, measure === 'political_share' ? 2 : 25),
+    [attentionValues, measure, scaleMode],
+  )
+  const attentionDomain: [number, number] = [-attentionBound, attentionBound]
+  const clippedAttentionValues = scaleMode === 'focus'
+    ? attentionValues.filter((value) => Math.abs(value) > attentionBound).length
+    : 0
+
   const lagPoints = useMemo(() => Array.from({ length: 57 }, (_, index) => index - 28).map((lag) => {
     const result: Record<string, number | null> = { lag }
     for (const series of chartSeries) {
@@ -271,6 +301,12 @@ export default function EventActivityView({
 
   const totalStarts = activityRows.reduce((total, row) => total + row.eventsStarted, 0)
   const peakRolling = Math.max(0, ...points.flatMap((point) => activeLocations.map((selectedLocation) => Number(point[eventKey(selectedLocation)]))))
+  const eventDomain: [number, number] = [0, Math.max(1, niceAxisBound(peakRolling, 1))]
+  const lagValues = lagPoints.flatMap((point) => chartSeries
+    .map((series) => point[series.key])
+    .filter((value): value is number => typeof value === 'number' && Number.isFinite(value)))
+  const lagBound = Math.min(1, symmetricBound(lagValues, 1, 0.05))
+  const lagDomain: [number, number] = [-lagBound, lagBound]
   const bestLag = chartSeries.map((series) => {
     const available = lagPoints.filter((point) => typeof point[series.key] === 'number')
     return {
@@ -298,6 +334,7 @@ export default function EventActivityView({
           <label><span>Event alerts</span><select value={cohort} onChange={(event) => setCohort(event.target.value as Cohort)}><option value="all">All alerts</option><option value="green">Green only</option><option value="major">Orange and Red</option></select></label>
           <label><span>Event type</span><select value={hazard} onChange={(event) => setHazard(event.target.value as Hazard)}><option value="all">Floods and wildfires</option><option value="flood">Floods</option><option value="wildfire">Wildfires</option></select></label>
           <label><span>Attention measure</span><select value={measure} onChange={(event) => setMeasure(event.target.value as Measure)}><option value="matched">All matching articles</option><option value="political">Political articles</option><option value="political_share">Political share</option></select></label>
+          <label><span>Attention scale</span><select value={scaleMode} onChange={(event) => setScaleMode(event.target.value as ScaleMode)}><option value="focus">Focus on typical range</option><option value="full">Show every extreme</option></select><small>{scaleMode === 'focus' ? 'Symmetric 98% range; extremes are flagged below the chart' : 'Symmetric range including every daily value'}</small></label>
           <label><span>Rolling event window</span><select value={rollingDays} onChange={(event) => setRollingDays(Number(event.target.value))}><option value={7}>7 days</option><option value={28}>28 days</option></select></label>
         </div>
         <div className="analysis-definition"><Info size={15} /><p><strong>Country exposure.</strong> Multi-country events count once in every affected country. Comparison mode uses solid attention lines and dashed rolling-event lines, with a maximum of five countries.</p></div>
@@ -318,18 +355,20 @@ export default function EventActivityView({
                 <ComposedChart data={points} margin={{ top: 12, right: 8, bottom: 0, left: 0 }}>
                   <CartesianGrid stroke="#dce4df" strokeDasharray="3 5" vertical={false} />
                   <XAxis dataKey="date" tickFormatter={(value) => new Intl.DateTimeFormat('en-GB', { month: 'short', timeZone: 'UTC' }).format(new Date(value))} minTickGap={45} tick={{ fontSize: 8, fill: '#738179' }} />
-                  <YAxis yAxisId="attention" width={45} tickFormatter={(value) => `${value > 0 ? '+' : ''}${Math.round(value)}${measure === 'political_share' ? '' : '%'}`} tick={{ fontSize: 8, fill: '#738179' }} />
-                  <YAxis yAxisId="events" orientation="right" width={35} allowDecimals={false} tick={{ fontSize: 8, fill: '#a17b42' }} />
+                  <YAxis yAxisId="attention" domain={attentionDomain} allowDataOverflow width={45} tickFormatter={(value) => `${value > 0 ? '+' : ''}${Math.round(value)}${measure === 'political_share' ? ' pp' : '%'}`} tick={{ fontSize: 8, fill: '#738179' }} />
+                  <YAxis yAxisId="events" domain={eventDomain} orientation="right" width={35} allowDecimals={false} tick={{ fontSize: 8, fill: '#a17b42' }} />
                   <Tooltip labelFormatter={(value) => new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(String(value)))} formatter={(value, name) => String(name).includes('event starts') ? [Number(value).toFixed(0), name] : [formatAnomaly(value, measure), name]} />
                   <Legend wrapperStyle={{ fontSize: 9 }} />
                   <ReferenceLine yAxisId="attention" y={0} stroke="#9eaaa4" />
                   {placeMode === 'single' && <Bar yAxisId="events" dataKey={eventKey(location)} name="Rolling event starts" fill="#d7b878" opacity={0.38} barSize={4} />}
                   {studyYear === 2025 && <ReferenceArea yAxisId="attention" x1={GDELT_OUTAGE.start} x2={GDELT_OUTAGE.end} fill="#bd8b3b" fillOpacity={0.12} stroke="#bd8b3b" strokeOpacity={0.45} label={{ value: 'GDELT outage · excluded', position: 'insideTop', fill: '#806127', fontSize: 8 }} />}
-                  {placeMode === 'compare' && chartSeries.map((series) => <Line key={`events-${series.location}`} yAxisId="events" type="monotone" dataKey={series.eventKey} name={`${series.label} · event starts`} stroke={series.color} strokeWidth={1.2} strokeDasharray="4 4" strokeOpacity={0.55} dot={false} connectNulls={false} />)}
-                  {chartSeries.map((series) => <Line key={series.key} yAxisId="attention" type="monotone" dataKey={series.key} name={series.label} stroke={series.color} strokeWidth={2} dot={false} connectNulls={false} />)}
+                  {placeMode === 'compare' && chartSeries.map((series) => <Line key={`events-${series.location}`} yAxisId="events" type="monotone" dataKey={series.eventKey} name={`${series.label} · event starts`} legendType="none" stroke={series.color} strokeWidth={1} strokeDasharray="3 5" strokeOpacity={0.3} dot={false} connectNulls={false} />)}
+                  {chartSeries.map((series) => <Line key={series.key} yAxisId="attention" type="monotone" dataKey={series.key} name={series.label} stroke={series.color} strokeWidth={2.4} dot={false} connectNulls={false} />)}
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
+            {placeMode === 'compare' && <div className="chart-line-key"><span><i className="solid" />Attention anomaly</span><span><i className="dashed" />Rolling event starts</span></div>}
+            {scaleMode === 'focus' && <div className="chart-scale-note"><Info size={14} /><p><strong>Focused scale.</strong> The axis shows the symmetric 98% range ({formatAnomaly(-attentionBound, measure)} to {formatAnomaly(attentionBound, measure)}). {clippedAttentionValues ? `${clippedAttentionValues} extreme daily value${clippedAttentionValues === 1 ? ' is' : 's are'} outside the plot; choose “Show every extreme” to inspect ${clippedAttentionValues === 1 ? 'it' : 'them'}.` : 'No plotted values are clipped.'}</p></div>}
             {studyYear === 2025 && <div className="analysis-definition outage-note"><CircleAlert size={15} /><p><strong>Provider gap.</strong> GDELT infrastructure was unavailable from 14 June through 1 July 2025. Those dates are excluded—not treated as zero—and lines deliberately break across the gap.</p></div>}
           </section>
 
@@ -340,7 +379,7 @@ export default function EventActivityView({
                 <LineChart data={lagPoints} margin={{ top: 10, right: 12, bottom: 0, left: 0 }}>
                   <CartesianGrid stroke="#dce4df" strokeDasharray="3 5" vertical={false} />
                   <XAxis dataKey="lag" tickFormatter={(value) => `${value > 0 ? '+' : ''}${value}d`} tick={{ fontSize: 8, fill: '#738179' }} />
-                  <YAxis domain={[-1, 1]} width={36} tick={{ fontSize: 8, fill: '#738179' }} />
+                  <YAxis domain={lagDomain} allowDataOverflow width={40} tickFormatter={(value) => Number(value).toFixed(lagBound <= 0.2 ? 2 : 1)} tick={{ fontSize: 8, fill: '#738179' }} />
                   <Tooltip formatter={(value) => Number(value).toFixed(3)} labelFormatter={(value) => `${Number(value) > 0 ? '+' : ''}${value} day lag`} />
                   <ReferenceLine x={0} stroke="#bd8b3b" strokeDasharray="4 4" />
                   <ReferenceLine y={0} stroke="#9eaaa4" />
