@@ -78,8 +78,8 @@ starts, both MVP attention topics, and exploratory lead/lag correlations. Positi
 lag means attention follows event activity. These correlations are descriptive and
 do not adjust for autocorrelation, seasonality or common news shocks. Country
 comparison mode overlays one selected attention topic and rolling event starts for
-two to five countries. Country-response rankings require at least two eligible
-events so a single event cannot appear as a country-level result. The attention
+two to five countries. Country rankings default to at least three eligible events,
+offer 1/2/3/5/10-event thresholds, and sort by event count or absolute response. The attention
 chart defaults to a labelled symmetric 98%-range focus scale with a full-range
 option, while the lead/lag axis adapts to the observed correlations.
 

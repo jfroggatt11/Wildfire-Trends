@@ -20,6 +20,7 @@ type LabTiming = 'onset' | 'persistence'
 type LabMeasure = 'matched' | 'political' | 'political_share'
 type TopicId = 'climate_change' | 'electric_vehicles'
 type AlertCohort = 'major' | 'green' | 'all'
+type CountryRankingSort = 'events' | 'response'
 
 type StudyEvent = {
   id: string
@@ -121,7 +122,7 @@ const COHORT_ALERTS: Record<AlertCohort, EventEffectObservation['alertLevel'][]>
   all: ['Green', 'Orange', 'Red'],
 }
 
-const MIN_COUNTRY_RANKING_EVENTS = 2
+const COUNTRY_RANKING_THRESHOLDS = [1, 2, 3, 5, 10]
 
 function median(values: number[]) {
   if (!values.length) return null
@@ -231,6 +232,8 @@ export default function AnalysisLab({
   const [topic, setTopic] = useState<TopicId>('climate_change')
   const [measure, setMeasure] = useState<LabMeasure>('matched')
   const [excludeOverlaps, setExcludeOverlaps] = useState(true)
+  const [countryRankingMinimum, setCountryRankingMinimum] = useState(3)
+  const [countryRankingSort, setCountryRankingSort] = useState<CountryRankingSort>('events')
   const [remoteEffects, setRemoteEffects] = useState<StudyEffect[] | null>(null)
   const [remoteLoading, setRemoteLoading] = useState(false)
   const [remoteError, setRemoteError] = useState<string | null>(null)
@@ -342,7 +345,12 @@ export default function AnalysisLab({
       .map((effect) => effectValue(effect, measure))
       .filter((value): value is number => value != null)
     return { country, count: countryValues.length, value: median(countryValues) }
-  }).filter((row) => row.count >= MIN_COUNTRY_RANKING_EVENTS).sort((left, right) => Math.abs(right.value ?? 0) - Math.abs(left.value ?? 0)).slice(0, 8)
+  }).filter((row) => row.count >= countryRankingMinimum).sort((left, right) => {
+    if (countryRankingSort === 'events') {
+      return right.count - left.count || Math.abs(right.value ?? 0) - Math.abs(left.value ?? 0)
+    }
+    return Math.abs(right.value ?? 0) - Math.abs(left.value ?? 0) || right.count - left.count
+  }).slice(0, 8)
   const rankedEvents = includedEffects
     .map((effect) => ({ effect, event: eventMap.get(effect.eventId), value: effectValue(effect, measure) }))
     .filter((row): row is typeof row & { event: StudyEvent; value: number } => Boolean(row.event) && row.value != null)
@@ -416,7 +424,14 @@ export default function AnalysisLab({
 
             <section className="comparison-grid">
               <article className="hazard-comparison"><div className="result-heading"><div><span className="eyebrow">Event type</span><h3>Floods versus wildfires</h3></div></div>{hazardSummaries.map((row) => <div className="comparison-row" key={row.hazard}><span>{row.hazard === 'flood' ? 'Floods' : 'Wildfires'}<small>{row.count} events</small></span><i><b style={{ width: `${Math.min(100, Math.abs(row.value ?? 0))}%`, marginLeft: (row.value ?? 0) < 0 ? 'auto' : undefined }} /></i><strong>{formatEffect(row.value, measure)}</strong></div>)}</article>
-              <article className="country-comparison"><div className="result-heading"><div><span className="eyebrow">Affected geography</span><h3>Largest country responses</h3></div><small>Median change · at least {MIN_COUNTRY_RANKING_EVENTS} events</small></div>{countryRows.length ? countryRows.map((row) => <div className="country-row" key={row.country}><span>{geographyLabels[row.country] || row.country}</span><small>{row.count} events</small><strong>{formatEffect(row.value, measure)}</strong></div>) : <p className="country-ranking-empty">No country has at least {MIN_COUNTRY_RANKING_EVENTS} eligible events for this specification.</p>}</article>
+              <article className="country-comparison">
+                <div className="result-heading"><div><span className="eyebrow">Affected geography</span><h3>{countryRankingSort === 'events' ? 'Most frequently affected countries' : 'Largest country responses'}</h3></div><small>Event count and median response</small></div>
+                <div className="country-ranking-controls">
+                  <label><span>Minimum eligible events</span><select aria-label="Minimum eligible events" value={countryRankingMinimum} onChange={(event) => setCountryRankingMinimum(Number(event.target.value))}>{COUNTRY_RANKING_THRESHOLDS.map((minimum) => <option key={minimum} value={minimum}>{minimum}+</option>)}</select></label>
+                  <label><span>Sort countries by</span><select aria-label="Sort countries by" value={countryRankingSort} onChange={(event) => setCountryRankingSort(event.target.value as CountryRankingSort)}><option value="events">Number of events</option><option value="response">Absolute response</option></select></label>
+                </div>
+                {countryRows.length ? countryRows.map((row) => <div className="country-row" key={row.country}><span>{geographyLabels[row.country] || row.country}</span><small>{row.count} event{row.count === 1 ? '' : 's'}</small><strong>{formatEffect(row.value, measure)}</strong></div>) : <p className="country-ranking-empty">No country has at least {countryRankingMinimum} eligible events for this specification. Lower the threshold or select the all-alert cohort to inspect repeated activity.</p>}
+              </article>
             </section>
 
             <section className="ranked-events"><div className="result-heading"><div><span className="eyebrow">Event estimates</span><h3>Largest increases in this cohort</h3></div><small>Select an event to inspect its daily evidence</small></div><div className="ranked-event-table" role="table" aria-label="Ranked event effects"><div role="row"><span role="columnheader">Event</span><span role="columnheader">Type</span><span role="columnheader">Start</span><span role="columnheader">Change</span></div>{rankedEvents.map(({ event, value }) => <button role="row" key={event.id} onClick={() => onOpenEvent(event.id)}><span role="cell"><strong>{eventLabel(event, geographyLabels)}</strong><small>{event.alertLevel} alert</small></span><span role="cell">{event.hazardType === 'flood' ? 'Flood' : 'Wildfire'}</span><span role="cell">{new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(event.startAt))}</span><span role="cell"><b>{formatEffect(value, measure, 1)}</b><ArrowRight size={13} /></span></button>)}</div></section>
