@@ -11,7 +11,7 @@ import {
   YAxis,
 } from 'recharts'
 import EventActivityView from './EventActivity'
-import CumulativeAttention from './CumulativeAttention'
+import AttentionTimeline from './AttentionTimeline'
 import { fetchEventEffects, isSupabaseEnabled } from './supabase'
 import type { EventEffectObservation } from './supabase'
 
@@ -216,11 +216,13 @@ export default function AnalysisLab({
   studies,
   geographyLabels,
   eventGeographies,
+  catalogueEvents,
   onOpenEvent,
 }: {
   studies: EventStudyData[]
   geographyLabels: Record<string, string>
   eventGeographies: string[]
+  catalogueEvents: StudyEvent[]
   onOpenEvent: (id: string) => void
 }) {
   const availableYears = useMemo(
@@ -229,7 +231,7 @@ export default function AnalysisLab({
   )
   const [selectedYear, setSelectedYear] = useState<number | null>(null)
   const study = studies.find((item) => item.studyYear === selectedYear) ?? studies.at(-1) ?? null
-  const [mode, setMode] = useState<'study' | 'activity' | 'cumulative'>('study')
+  const [mode, setMode] = useState<'study' | 'activity' | 'timeline'>('study')
   const [hypothesis, setHypothesis] = useState('attention')
   const [cohort, setCohort] = useState<AlertCohort>('major')
   const [hazard, setHazard] = useState<'all' | HazardType>('all')
@@ -390,7 +392,7 @@ export default function AnalysisLab({
         </div>
       </section>
 
-      <div className="lab-mode-switch" role="tablist" aria-label="Analysis mode"><button role="tab" aria-selected={mode === 'study'} className={mode === 'study' ? 'active' : ''} onClick={() => setMode('study')}>Event study</button><button role="tab" aria-selected={mode === 'activity'} className={mode === 'activity' ? 'active' : ''} onClick={() => setMode('activity')}>Event activity</button><button role="tab" aria-selected={mode === 'cumulative'} className={mode === 'cumulative' ? 'active' : ''} onClick={() => setMode('cumulative')}>Cumulative attention</button></div>
+      <div className="lab-mode-switch" role="tablist" aria-label="Analysis mode"><button role="tab" aria-selected={mode === 'study'} className={mode === 'study' ? 'active' : ''} onClick={() => setMode('study')}>Event study</button><button role="tab" aria-selected={mode === 'activity'} className={mode === 'activity' ? 'active' : ''} onClick={() => setMode('activity')}>Event activity</button><button role="tab" aria-selected={mode === 'timeline'} className={mode === 'timeline' ? 'active' : ''} onClick={() => setMode('timeline')}>Attention timeline</button></div>
 
       {mode === 'study' ? <><section className="lab-hypothesis-strip" aria-label="Research hypotheses">
         {HYPOTHESES.map((item) => <button key={item.id} className={hypothesis === item.id ? 'active' : ''} onClick={() => selectHypothesis(item.id)}><span>{item.number}</span><div><strong>{item.title}</strong><small>{item.copy}</small></div>{hypothesis === item.id && <Check size={15} />}</button>)}
@@ -452,7 +454,7 @@ export default function AnalysisLab({
           </>}
         </div>
       </section>
-      </> : mode === 'activity' ? <EventActivityView studyYear={study.studyYear} coverageStart={study.coverage.start} coverageEnd={study.coverage.end} geographyLabels={geographyLabels} eventGeographies={eventGeographies} /> : <CumulativeAttention coverageStart={study.coverage.start} coverageEnd={study.coverage.end} geographyLabels={geographyLabels} keyEvents={study.events} />}
+      </> : mode === 'activity' ? <EventActivityView studyYear={study.studyYear} coverageStart={study.coverage.start} coverageEnd={study.coverage.end} geographyLabels={geographyLabels} eventGeographies={eventGeographies} /> : <AttentionTimeline coverageStart={study.coverage.start} coverageEnd={study.coverage.end} geographyLabels={geographyLabels} keyEvents={catalogueEvents} />}
     </main>
   )
 }

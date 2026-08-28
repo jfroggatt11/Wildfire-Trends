@@ -381,6 +381,7 @@ function App() {
             studies={eventStudies}
             geographyLabels={manifest?.geographyLabels ?? {}}
             eventGeographies={[...new Set(events?.features.flatMap((event) => event.properties.geographyIds) ?? [])]}
+            catalogueEvents={events?.features.map((event) => event.properties) ?? []}
             onOpenEvent={(id) => { selectEvent(id); setView('explore') }}
           />
         </Suspense>
@@ -1589,6 +1590,12 @@ function MethodsView({ manifest }: { manifest: Manifest | null }) {
               <article><Flame size={18} /><strong>Wildfire</strong><p>A named GDACS wildfire event. It is not an individual satellite hotspot and does not imply a burned-area estimate.</p></article>
               <article><CloudRain size={18} /><strong>Flood</strong><p>A GDACS flood event assembled from authoritative institutions, media and scientific sources under provider impact rules.</p></article>
             </div>
+            <div className="method-definition-grid three">
+              <article><small>Green alert</small><strong>Lower expected humanitarian impact</strong><p>For wildfires, fires of at least 5,000 hectares can be assigned Green automatically even without documented impacts; smaller fires can enter after minor impacts or preparedness actions. For floods, Green covers events below the provider’s Orange thresholds.</p></article>
+              <article><small>Orange alert</small><strong>Serious impacts may require assistance</strong><p>For wildfires, this includes direct effects on people or built-up areas, possible fatalities or relevant UCPM activation. For floods, GDACS currently uses more than 100 deaths or 80,000 displaced people.</p></article>
+              <article><small>Red alert</small><strong>Severe humanitarian impacts</strong><p>For wildfires, this means severe effects on people and assets, often major displacement or fatalities. For floods, GDACS currently uses more than 1,000 deaths or 800,000 displaced people.</p></article>
+            </div>
+            <p className="method-caption"><strong>These are provider impact classes, not a common physical-severity scale.</strong> GDACS applies hazard-specific rules and expert assessment. A Green wildfire can therefore still be large and analytically relevant, particularly for a discourse study.</p>
             <dl className="definition-list">
               <div><dt>Event identity</dt><dd>Provider + hazard code + event ID. This remains stable when an upstream record is revised.</dd></div>
               <div><dt>Event dates</dt><dd>Provider start and end timestamps in UTC. Later provider modification dates replace the stored version.</dd></div>
@@ -1655,7 +1662,7 @@ function MethodsView({ manifest }: { manifest: Manifest | null }) {
             <div className="method-definition-grid two">
               <article><small>Event activity panel</small><strong>Rolling event starts by affected geography</strong><p>Multi-country events count once in every affected country, while global and EU27 aggregates count each unique event once. The chart offers 7- and 28-day windows and can overlay two to five countries for one selected attention topic. Its default symmetric focus scale covers 98% of plotted attention anomalies, flags clipped extremes and retains a full-range option.</p></article>
               <article><small>Lead / lag panel</small><strong>Pearson correlation across −28 to +28 days</strong><p>Attention is expressed relative to its preceding 28-day baseline. Positive lag means attention follows event activity. Autocorrelation and common shocks make this exploratory, not causal.</p></article>
-              <article><small>Cumulative attention panel</small><strong>Observed publishing volume with major-event onsets</strong><p>Daily distinct-URL counts accumulate for the world, EU27, one publishing market or a custom country group. Dotted lines mark Orange and Red event starts relevant to the selected geography. Missing provider days break the line and contribute nothing to the observed total; they are not imputed as zero.</p></article>
+              <article><small>Attention timeline</small><strong>Daily publishing volume with event onsets</strong><p>Observed daily distinct-URL counts are shown for the world, EU27, one publishing market or a custom country group. Dotted lines can mark Orange/Red, Green-only or all relevant event starts. Missing provider days break the line and are not imputed as zero.</p></article>
             </div>
             <div className="method-callout caution"><CircleAlert size={17} /><p><strong>Interpretation.</strong> These are unadjusted temporal associations, not causal estimates or confidence intervals. News cycles are autocorrelated; seasonality, weekday patterns and concurrent stories can confound comparisons. A confirmatory release should pre-register outcomes and add matched dates, untreated markets or interrupted time-series controls.</p></div>
           </section>

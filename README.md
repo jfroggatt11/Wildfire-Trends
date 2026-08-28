@@ -82,10 +82,11 @@ two to five countries. Country rankings default to at least three eligible event
 offer 1/2/3/5/10-event thresholds, and sort by event count or absolute response. The attention
 chart defaults to a labelled symmetric 98%-range focus scale with a full-range
 option, while the lead/lag axis adapts to the observed correlations. A separate
-Cumulative attention view sums observed distinct-URL counts through time for the
-world, EU27, one country or a custom country group. It can show either MVP topic and
-all or political matching URLs, with dotted Orange/Red event-onset markers. Missing
-provider dates remain visible gaps and are never imputed.
+Attention timeline shows observed daily distinct-URL counts for the world, EU27,
+one country or a custom country group. It can show either MVP topic and all or
+political matching URLs, with dotted event-onset markers. The marker filter supports
+Orange/Red, Green-only or all GDACS tiers; missing provider dates remain visible
+gaps and are never imputed.
 
 GDELT's confirmed infrastructure outage is treated as missing coverage from
 14 June through 1 July 2025. Collection plans skip that interval, analytical windows
