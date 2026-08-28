@@ -23,7 +23,10 @@ and political-attention counts, and a multi-event Analysis Lab. The Lab compares
 wildfire and flood events across climate-change and electric-vehicle attention,
 retains only complete daily windows, and flags same-country overlaps. Orange and
 Red alerts remain the primary cohort; Green alerts and the complete catalogue are
-available as sensitivity filters.
+available as sensitivity filters. A stable period control supports either year, the
+whole available 2025–2026 series, and a custom start/end range shared by every Lab
+tab. Timeline markers can use either GDACS alert tiers or wildfire burned-area
+bands; no comparable flood-size category is inferred from the current export.
 
 Export the current Parquet datasets to compact browser assets, then run the app:
 
@@ -45,8 +48,9 @@ retained locally for validation, but the public interface is not an article find
 and does not publish URLs or detailed article records.
 
 The frontend export also rebuilds the 2025 and 2026 major-event study assets. The
-Analysis Lab exposes a year selector and bounds partial-year charts to actual stored
-attention coverage. Rebuild one analysis without the other frontend assets with:
+Analysis Lab exposes a study-period selector plus a date-range control and bounds
+partial-period charts to actual stored attention coverage. Rebuild one analysis
+without the other frontend assets with:
 
 ```bash
 climate-attention build-event-study \

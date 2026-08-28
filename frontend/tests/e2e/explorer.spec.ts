@@ -237,7 +237,8 @@ test('analysis lab runs the major-event study for climate and electric vehicles'
   const errors = collectClientErrors(page)
   await openExplorer(page)
   await page.getByRole('button', { name: 'Analysis Lab', exact: true }).click()
-  await page.getByLabel('Study year').selectOption('2025')
+  await expect(page.getByLabel('Study period')).toHaveValue('all')
+  await page.getByLabel('Study period').selectOption('2025')
 
   await expect(page.getByRole('heading', { name: 'Compare attention and event activity.' })).toBeVisible()
   await expect(page.locator('.cohort-flow')).toContainText('40')
@@ -279,9 +280,9 @@ test('analysis lab exposes the all-alert activity and lag views', async ({ page 
   const errors = collectClientErrors(page)
   await openExplorer(page)
   await page.getByRole('button', { name: 'Analysis Lab', exact: true }).click()
-  await page.getByLabel('Study year').selectOption('2025')
+  await page.getByLabel('Study period').selectOption('2025')
 
-  await page.getByLabel('Event alerts').selectOption('green')
+  await page.getByLabel('Event alert tier').selectOption('green')
   await expect(page.locator('.analysis-loading')).toHaveCount(0, { timeout: 30_000 })
   await expect(page.locator('.cohort-flow strong').first()).not.toHaveText('0')
 
@@ -321,7 +322,7 @@ test('analysis lab charts daily attention with selectable event markers', async 
   const errors = collectClientErrors(page)
   await openExplorer(page)
   await page.getByRole('button', { name: 'Analysis Lab', exact: true }).click()
-  await page.getByLabel('Study year').selectOption('2025')
+  await page.getByLabel('Study period').selectOption('2025')
   await page.getByRole('tab', { name: 'Attention timeline' }).click()
 
   await expect(page.getByRole('heading', { name: 'Configure timeline' })).toBeVisible()
@@ -342,12 +343,24 @@ test('analysis lab charts daily attention with selectable event markers', async 
   await expect(page.locator('.timeline-tooltip')).toContainText('event started')
   await expect(page.locator('.timeline-tooltip')).not.toContainText('NaN')
   await expect(page.locator('.timeline-total')).toContainText('average matching articles/day')
-  await expect(page.locator('.timeline-key')).toContainText('Green alert')
+  await expect(page.locator('.timeline-key')).toContainText('Green tier')
+  await expect(page.locator('.timeline-key')).toContainText('Provider gap')
   await expect(page.locator('.timeline-key')).toContainText('unavailable days excluded')
+  const axisLabels = await page.locator('.timeline-chart .recharts-cartesian-axis-tick-value').allTextContents()
+  const dateTicks = axisLabels.filter((value) => /^1 [A-Z][a-z]{2}/.test(value))
+  expect(dateTicks.length).toBeGreaterThan(1)
+  expect(new Set(dateTicks).size).toBe(dateTicks.length)
 
   const majorEventCount = Number.parseInt((await page.locator('.timeline-total small').textContent())?.match(/· ([\d,]+) events/)?.[1].replaceAll(',', '') ?? '0', 10)
-  await page.getByLabel('Event alerts').selectOption('all')
+  await page.getByLabel('Event alert tier').selectOption('all')
   await expect.poll(async () => Number.parseInt((await page.locator('.timeline-total small').textContent())?.match(/· ([\d,]+) events/)?.[1].replaceAll(',', '') ?? '0', 10)).toBeGreaterThan(majorEventCount)
+
+  await page.getByLabel('Event marker category').selectOption('wildfire_size')
+  await expect(page.getByLabel('Event type')).toBeDisabled()
+  await expect(page.getByLabel('Wildfire size')).toBeVisible()
+  await page.getByLabel('Wildfire size').selectOption('50k_plus')
+  await expect(page.locator('.timeline-key')).toContainText('50,000+ ha')
+  await page.getByLabel('Event marker category').selectOption('alert')
 
   await page.getByLabel('Geography').selectOption('group')
   await expect(page.locator('.activity-state')).toHaveCount(0, { timeout: 30_000 })
@@ -377,6 +390,14 @@ test('analysis lab charts daily attention with selectable event markers', async 
   await expect(page.getByRole('heading', { name: 'Electric vehicles across 4 countries' })).toBeVisible()
   await page.getByLabel('Attention measure').selectOption('political')
   await expect(page.locator('.timeline-total')).toContainText('political articles')
+
+  await page.getByLabel('Study period').selectOption('all')
+  await expect(page.locator('.lab-date-range > div strong')).toContainText('2025')
+  await expect(page.locator('.lab-date-range > div strong')).toContainText('2026')
+  const january2026 = Math.floor(Date.parse('2026-01-01T00:00:00Z') / 86_400_000)
+  await page.getByLabel('Analysis start date').fill(String(january2026))
+  await expect(page.locator('.lab-date-range > div strong')).toContainText('1 Jan 2026')
+  await expect(page.locator('.activity-state')).toHaveCount(0, { timeout: 30_000 })
   expect(errors).toEqual([])
 })
 

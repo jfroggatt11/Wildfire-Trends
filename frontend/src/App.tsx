@@ -1602,7 +1602,7 @@ function MethodsView({ manifest }: { manifest: Manifest | null }) {
               <div><dt>Affected countries</dt><dd>The provider’s country array. Multi-country events stay multi-country and are not reduced to the map point.</dd></div>
               <div><dt>Alert level</dt><dd>GDACS Green, Orange or Red assessment of likely humanitarian consequences. Its logic is hazard-specific and incorporates factors such as hazard, exposure and vulnerability; it is not a pure physical-intensity scale.</dd></div>
               <div><dt>Alert score</dt><dd>The provider’s numeric alert field retained alongside the colour. It supports ordering within the GDACS record but is not treated as a universal hazard magnitude.</dd></div>
-              <div><dt>Severity</dt><dd>The hazard-specific value and unit supplied by GDACS. Flood severity and wildfire metrics do not share a common unit, so the MVP displays them but never pools them as equivalent.</dd></div>
+              <div><dt>Severity</dt><dd>The hazard-specific value and unit supplied by GDACS. The timeline can group wildfires by burned area: under 5,000; 5,000–9,999; 10,000–49,999; and at least 50,000 hectares. The current flood export has no comparable physical-extent value, so it is not assigned a size band and the hazards are never pooled as equivalent.</dd></div>
             </dl>
           </section>
 
@@ -1643,7 +1643,7 @@ function MethodsView({ manifest }: { manifest: Manifest | null }) {
 
           <section className="protocol-section" id="before-after">
             <header><span>08</span><div><small>Exploratory inference</small><h2>What the single- and multi-event studies estimate</h2></div></header>
-            <p className="protocol-lede">Explore compares one selected event with its own pre-event period. Analysis Lab applies the same complete-day principle to each available study year, then summarises event-level changes without allowing large media markets to dominate the result. Orange and Red alerts are the primary cohort; Green and all-alert filters are sensitivity views.</p>
+            <p className="protocol-lede">Explore compares one selected event with its own pre-event period. Analysis Lab applies the same complete-day principle to a selected year, the whole available period or a custom date range, then summarises event-level changes without allowing large media markets to dominate the result. Orange and Red alerts are the primary cohort; Green and all-tier filters are sensitivity views.</p>
             <div className="window-diagram" aria-label="Before and after event window">
               <div className="window-before"><span>7, 14 or 28 days</span><strong>Before mean</strong><small>Days ending immediately before the start</small></div>
               <div className="window-event"><span>Event duration</span><strong>Excluded</strong><small>Start through end date</small></div>
@@ -1662,7 +1662,7 @@ function MethodsView({ manifest }: { manifest: Manifest | null }) {
             <div className="method-definition-grid two">
               <article><small>Event activity panel</small><strong>Rolling event starts by affected geography</strong><p>Multi-country events count once in every affected country, while global and EU27 aggregates count each unique event once. The chart offers 7- and 28-day windows and can overlay two to five countries for one selected attention topic. Its default symmetric focus scale covers 98% of plotted attention anomalies, flags clipped extremes and retains a full-range option.</p></article>
               <article><small>Lead / lag panel</small><strong>Pearson correlation across −28 to +28 days</strong><p>Attention is expressed relative to its preceding 28-day baseline. Positive lag means attention follows event activity. Autocorrelation and common shocks make this exploratory, not causal.</p></article>
-              <article><small>Attention timeline</small><strong>Configurable publishing trends with event onsets</strong><p>Observed counts can compare both topics within one geography or draw separate lines for up to eight publishing markets. Daily and 7-, 14- or 28-day rolling-average views are available. Dotted lines can mark Orange/Red, Green-only or all relevant event starts; missing provider days break every affected line and are never imputed or smoothed across.</p></article>
+              <article><small>Attention timeline</small><strong>Configurable publishing trends with event onsets</strong><p>Observed counts can compare both topics within one geography or draw separate lines for up to eight publishing markets. Daily and 7-, 14- or 28-day rolling-average views are available. Dotted lines can mark consistent GDACS alert tiers or hazard-specific wildfire burned-area bands; missing provider days break every affected line and are never imputed or smoothed across.</p></article>
             </div>
             <div className="method-callout caution"><CircleAlert size={17} /><p><strong>Interpretation.</strong> These are unadjusted temporal associations, not causal estimates or confidence intervals. News cycles are autocorrelated; seasonality, weekday patterns and concurrent stories can confound comparisons. A confirmatory release should pre-register outcomes and add matched dates, untreated markets or interrupted time-series controls.</p></div>
           </section>

@@ -177,30 +177,25 @@ async function fetchPagedRows(urlForPage: (offset: number, limit: number) => str
   if (!config) throw new Error('Supabase frontend access is not enabled')
   const pageSize = 1000
   const pagesPerWave = 4
-  const first = await fetchJsonWithRetry(urlForPage(0, pageSize), config, true)
+  // An exact PostgREST count can be substantially more expensive than returning
+  // the selected rows and has timed out on the event-effects table. Page until a
+  // short response instead; bounded filters and deterministic ordering make this
+  // both cheaper and stable.
+  const first = await fetchJsonWithRetry(urlForPage(0, pageSize), config)
   const result: Record<string, unknown>[] = [...first.rows]
   if (first.rows.length < pageSize) return result
-  if (first.total != null) {
-    const offsets = Array.from(
-      { length: Math.max(0, Math.ceil(first.total / pageSize) - 1) },
-      (_, index) => (index + 1) * pageSize,
-    )
-    for (let index = 0; index < offsets.length; index += pagesPerWave) {
-      const pages = await Promise.all(offsets.slice(index, index + pagesPerWave).map((offset) =>
-        fetchJsonWithRetry(urlForPage(offset, pageSize), config),
-      ))
-      for (const page of pages) result.push(...page.rows)
-    }
-    return result
-  }
-  for (let offset = pageSize; ; offset += pageSize) {
-    const page = await fetchJsonWithRetry(urlForPage(offset, pageSize), config)
-    result.push(...page.rows)
-    if (page.rows.length < pageSize) return result
+
+  for (let offset = pageSize; ; offset += pageSize * pagesPerWave) {
+    const offsets = Array.from({ length: pagesPerWave }, (_, index) => offset + index * pageSize)
+    const pages = await Promise.all(offsets.map((pageOffset) =>
+      fetchJsonWithRetry(urlForPage(pageOffset, pageSize), config),
+    ))
+    for (const page of pages) result.push(...page.rows)
+    if (pages.some((page) => page.rows.length < pageSize)) return result
   }
 }
 
-async function fetchJsonWithRetry(url: string, config: SupabaseConfig, countExact = false) {
+async function fetchJsonWithRetry(url: string, config: SupabaseConfig) {
   let lastError: Error | null = null
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const controller = new AbortController()
@@ -208,7 +203,7 @@ async function fetchJsonWithRetry(url: string, config: SupabaseConfig, countExac
     let response: Response
     try {
       response = await fetch(url, {
-        headers: { ...requestHeaders(config), ...(countExact ? { Prefer: 'count=exact' } : {}) },
+        headers: requestHeaders(config),
         signal: controller.signal,
       })
     } catch (error) {
@@ -222,11 +217,8 @@ async function fetchJsonWithRetry(url: string, config: SupabaseConfig, countExac
     }
     window.clearTimeout(timeout)
     if (response.ok) {
-      const range = response.headers.get('content-range')
-      const totalText = range?.split('/')[1]
       return {
         rows: await response.json() as Record<string, unknown>[],
-        total: totalText && totalText !== '*' ? Number(totalText) : null,
       }
     }
     const detail = await response.text()
@@ -267,7 +259,7 @@ export async function fetchEventActivity(query: {
     const params = new URLSearchParams({
       select: 'activity_date,geography,hazard_type,alert_level,events_started,events_active,events_ended',
       activity_date: `gte.${query.start}`,
-      order: 'activity_date.asc',
+      order: 'activity_date.asc,geography.asc,hazard_type.asc,alert_level.asc',
       offset: String(offset),
       limit: String(limit),
     })

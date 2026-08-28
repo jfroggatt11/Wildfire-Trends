@@ -24,6 +24,7 @@ import type {
   EventActivityObservation,
   RegionAttentionObservation,
 } from './supabase'
+import { formatAxisDate, monthTicks } from './analysisTime'
 
 type Hazard = 'all' | 'wildfire' | 'flood'
 type Cohort = 'major' | 'green' | 'all'
@@ -109,13 +110,11 @@ function formatAnomaly(value: unknown, measure: Measure) {
 }
 
 export default function EventActivityView({
-  studyYear,
   coverageStart,
   coverageEnd,
   geographyLabels,
   eventGeographies,
 }: {
-  studyYear: number
   coverageStart: string
   coverageEnd: string
   geographyLabels: Record<string, string>
@@ -142,6 +141,8 @@ export default function EventActivityView({
   const [error, setError] = useState<string | null>(null)
   const start = coverageStart
   const end = coverageEnd
+  const axisTicks = useMemo(() => monthTicks(start, end), [end, start])
+  const multiYearAxis = start.slice(0, 4) !== end.slice(0, 4)
   const activeLocations = useMemo(
     () => placeMode === 'compare' ? comparisonLocations : [location],
     [comparisonLocations, location, placeMode],
@@ -335,7 +336,7 @@ export default function EventActivityView({
             <label><span>Add country</span><select aria-label="Add country" value="" disabled={comparisonLocations.length >= MAX_COMPARISON_COUNTRIES} onChange={(event) => addComparisonCountry(event.target.value)}><option value="">{comparisonLocations.length >= MAX_COMPARISON_COUNTRIES ? 'Five-country maximum' : 'Choose a country…'}</option>{countryOptions.filter((country) => !comparisonLocations.includes(country)).map((country) => <option key={country} value={country}>{geographyLabels[country] || country}</option>)}</select></label>
             <div className="comparison-country-list" aria-label="Countries being compared">{comparisonLocations.map((country, index) => <span key={country}><i style={{ background: COUNTRY_COLORS[index % COUNTRY_COLORS.length] }} />{geographyLabels[country] || country}<button type="button" aria-label={`Remove ${geographyLabels[country] || country}`} disabled={comparisonLocations.length <= 2} onClick={() => setComparisonLocations((current) => current.filter((item) => item !== country))}>×</button></span>)}</div>
           </>}
-          <label><span>Event alerts</span><select value={cohort} onChange={(event) => setCohort(event.target.value as Cohort)}><option value="all">All alerts</option><option value="green">Green only</option><option value="major">Orange and Red</option></select></label>
+          <label><span>Event alert tier</span><select value={cohort} onChange={(event) => setCohort(event.target.value as Cohort)}><option value="all">All tiers · Green, Orange, Red</option><option value="major">Major tiers · Orange and Red</option><option value="green">Green tier only</option></select></label>
           <label><span>Event type</span><select value={hazard} onChange={(event) => setHazard(event.target.value as Hazard)}><option value="all">Floods and wildfires</option><option value="flood">Floods</option><option value="wildfire">Wildfires</option></select></label>
           <label><span>Attention measure</span><select value={measure} onChange={(event) => setMeasure(event.target.value as Measure)}><option value="matched">All matching articles</option><option value="political">Political articles</option><option value="political_share">Political share</option></select></label>
           <label><span>Attention scale</span><select value={scaleMode} onChange={(event) => setScaleMode(event.target.value as ScaleMode)}><option value="focus">Focus on typical range</option><option value="full">Show every extreme</option></select><small>{scaleMode === 'focus' ? 'Symmetric 98% range; extremes are flagged below the chart' : 'Symmetric range including every daily value'}</small></label>
@@ -347,7 +348,7 @@ export default function EventActivityView({
       <div className="activity-results">
         {loading ? <div className="activity-state"><Activity size={20} /> Loading country-day panel…</div> : error ? <div className="activity-state error"><CircleAlert size={20} /><strong>Activity panel unavailable</strong><p>{error}</p></div> : <>
           <div className="activity-kpis">
-            <article><small>{placeMode === 'compare' ? 'Event-country starts' : 'Events started'}</small><strong>{totalStarts.toLocaleString()}</strong><span>{placeMode === 'compare' ? 'Country exposures; a multi-country event may repeat' : cohort === 'major' ? 'Orange and Red' : cohort === 'green' ? 'Green alerts' : 'All alert levels'}</span></article>
+            <article><small>{placeMode === 'compare' ? 'Event-country starts' : 'Events started'}</small><strong>{totalStarts.toLocaleString()}</strong><span>{placeMode === 'compare' ? 'Country exposures; a multi-country event may repeat' : cohort === 'major' ? 'Major tiers · Orange and Red' : cohort === 'green' ? 'Green tier only' : 'All tiers · Green, Orange, Red'}</span></article>
             <article><small>Peak rolling load</small><strong>{peakRolling.toLocaleString()}</strong><span>{placeMode === 'compare' ? `Highest selected country within ${rollingDays} days` : `Starts within ${rollingDays} days`}</span></article>
             {bestLag.map(({ series, point }) => <article key={series.key}><small>{series.label} strongest lag</small><strong>{point ? `${Number(point.lag) > 0 ? '+' : ''}${point.lag}d` : '—'}</strong><span>{point ? `r = ${Number(point[series.key]).toFixed(2)}` : 'Insufficient variation'}</span></article>)}
           </div>
@@ -358,14 +359,14 @@ export default function EventActivityView({
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={points} margin={{ top: 12, right: 8, bottom: 0, left: 0 }}>
                   <CartesianGrid stroke="#dce4df" strokeDasharray="3 5" vertical={false} />
-                  <XAxis dataKey="date" tickFormatter={(value) => new Intl.DateTimeFormat('en-GB', { month: 'short', timeZone: 'UTC' }).format(new Date(value))} minTickGap={45} tick={{ fontSize: 8, fill: '#738179' }} />
+                  <XAxis dataKey="date" ticks={axisTicks} tickFormatter={(value) => formatAxisDate(String(value), multiYearAxis)} minTickGap={38} tick={{ fontSize: 8, fill: '#738179' }} />
                   <YAxis yAxisId="attention" domain={attentionDomain} allowDataOverflow width={45} tickFormatter={(value) => `${value > 0 ? '+' : ''}${Math.round(value)}${measure === 'political_share' ? ' pp' : '%'}`} tick={{ fontSize: 8, fill: '#738179' }} />
                   <YAxis yAxisId="events" domain={eventDomain} orientation="right" width={35} allowDecimals={false} tick={{ fontSize: 8, fill: '#a17b42' }} />
                   <Tooltip labelFormatter={(value) => new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(String(value)))} formatter={(value, name) => String(name).includes('event starts') ? [Number(value).toFixed(0), name] : [formatAnomaly(value, measure), name]} />
                   <Legend wrapperStyle={{ fontSize: 9 }} />
                   <ReferenceLine yAxisId="attention" y={0} stroke="#9eaaa4" />
                   {placeMode === 'single' && <Bar yAxisId="events" dataKey={eventKey(location)} name="Rolling event starts" fill="#d7b878" opacity={0.38} barSize={4} />}
-                  {studyYear === 2025 && <ReferenceArea yAxisId="attention" x1={GDELT_OUTAGE.start} x2={GDELT_OUTAGE.end} fill="#bd8b3b" fillOpacity={0.12} stroke="#bd8b3b" strokeOpacity={0.45} label={{ value: 'GDELT outage · excluded', position: 'insideTop', fill: '#806127', fontSize: 8 }} />}
+                  {start <= GDELT_OUTAGE.end && end >= GDELT_OUTAGE.start && <ReferenceArea yAxisId="attention" x1={GDELT_OUTAGE.start} x2={GDELT_OUTAGE.end} fill="#70879a" fillOpacity={0.13} stroke="#60798d" strokeOpacity={0.55} label={{ value: 'Provider gap · excluded', position: 'insideTop', fill: '#506879', fontSize: 8 }} />}
                   {placeMode === 'compare' && chartSeries.map((series) => <Line key={`events-${series.location}`} yAxisId="events" type="monotone" dataKey={series.eventKey} name={`${series.label} · event starts`} legendType="none" stroke={series.color} strokeWidth={1} strokeDasharray="3 5" strokeOpacity={0.3} dot={false} connectNulls={false} />)}
                   {chartSeries.map((series) => <Line key={series.key} yAxisId="attention" type="monotone" dataKey={series.key} name={series.label} stroke={series.color} strokeWidth={2.4} dot={false} connectNulls={false} />)}
                 </ComposedChart>
@@ -373,7 +374,7 @@ export default function EventActivityView({
             </div>
             {placeMode === 'compare' && <div className="chart-line-key"><span><i className="solid" />Attention anomaly</span><span><i className="dashed" />Rolling event starts</span></div>}
             {scaleMode === 'focus' && <div className="chart-scale-note"><Info size={14} /><p><strong>Focused scale.</strong> The axis shows the symmetric 98% range ({formatAnomaly(-attentionBound, measure)} to {formatAnomaly(attentionBound, measure)}). {clippedAttentionValues ? `${clippedAttentionValues} extreme daily value${clippedAttentionValues === 1 ? ' is' : 's are'} outside the plot; choose “Show every extreme” to inspect ${clippedAttentionValues === 1 ? 'it' : 'them'}.` : 'No plotted values are clipped.'}</p></div>}
-            {studyYear === 2025 && <div className="analysis-definition outage-note"><CircleAlert size={15} /><p><strong>Provider gap.</strong> GDELT infrastructure was unavailable from 14 June through 1 July 2025. Those dates are excluded—not treated as zero—and lines deliberately break across the gap.</p></div>}
+            {start <= GDELT_OUTAGE.end && end >= GDELT_OUTAGE.start && <div className="analysis-definition outage-note"><CircleAlert size={15} /><p><strong>Provider gap.</strong> GDELT infrastructure was unavailable from 14 June through 1 July 2025. Those dates are excluded—not treated as zero—and lines deliberately break across the gap.</p></div>}
           </section>
 
           <section className="lag-chart-card">

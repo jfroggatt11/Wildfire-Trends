@@ -14,6 +14,7 @@ import EventActivityView from './EventActivity'
 import AttentionTimeline from './AttentionTimeline'
 import { fetchEventEffects, isSupabaseEnabled } from './supabase'
 import type { EventEffectObservation } from './supabase'
+import { fromUtcDay, inclusiveDays, toUtcDay } from './analysisTime'
 
 type HazardType = 'wildfire' | 'flood'
 type LabScope = 'affected' | 'other_eu27' | 'rest_world' | 'global'
@@ -32,6 +33,8 @@ type StudyEvent = {
   startAt: string
   endAt: string
   geographyIds: string[]
+  severity?: number | null
+  severityUnit?: string | null
 }
 
 type StudyEffect = {
@@ -124,6 +127,28 @@ const COHORT_ALERTS: Record<AlertCohort, EventEffectObservation['alertLevel'][]>
 }
 
 const COUNTRY_RANKING_THRESHOLDS = [1, 2, 3, 5, 10]
+
+function combineStudies(studies: EventStudyData[]): EventStudyData | null {
+  if (!studies.length) return null
+  const ordered = [...studies].sort((left, right) => left.coverage.start.localeCompare(right.coverage.start))
+  const events = new Map(ordered.flatMap((study) => study.events).map((event) => [event.id, event]))
+  const excludedPeriods = new Map(ordered.flatMap((study) => study.coverage.excludedPeriods ?? []).map((period) => [`${period.start}:${period.end}`, period]))
+  return {
+    ...ordered[0],
+    studyYear: 0,
+    generatedAt: ordered.map((study) => study.generatedAt).sort().at(-1) ?? ordered[0].generatedAt,
+    coverage: {
+      start: ordered[0].coverage.start,
+      end: ordered.at(-1)!.coverage.end,
+      observedDays: ordered.reduce((total, study) => total + study.coverage.observedDays, 0),
+      geographies: Math.max(...ordered.map((study) => study.coverage.geographies)),
+      excludedPeriods: [...excludedPeriods.values()],
+    },
+    events: [...events.values()],
+    effects: ordered.flatMap((study) => study.effects),
+    series: ordered.flatMap((study) => study.series),
+  }
+}
 
 function median(values: number[]) {
   if (!values.length) return null
@@ -229,8 +254,13 @@ export default function AnalysisLab({
     () => [...new Set(studies.map((item) => item.studyYear))].sort((left, right) => left - right),
     [studies],
   )
-  const [selectedYear, setSelectedYear] = useState<number | null>(null)
-  const study = studies.find((item) => item.studyYear === selectedYear) ?? studies.at(-1) ?? null
+  const combinedStudy = useMemo(() => combineStudies(studies), [studies])
+  const [selectedPeriod, setSelectedPeriod] = useState('all')
+  const study = selectedPeriod === 'all'
+    ? combinedStudy
+    : studies.find((item) => item.studyYear === Number(selectedPeriod)) ?? combinedStudy
+  const [rangeStart, setRangeStart] = useState(() => combinedStudy?.coverage.start ?? '')
+  const [rangeEnd, setRangeEnd] = useState(() => combinedStudy?.coverage.end ?? '')
   const [mode, setMode] = useState<'study' | 'activity' | 'timeline'>('study')
   const [hypothesis, setHypothesis] = useState('attention')
   const [cohort, setCohort] = useState<AlertCohort>('major')
@@ -246,6 +276,23 @@ export default function AnalysisLab({
   const [remoteEffects, setRemoteEffects] = useState<StudyEffect[] | null>(null)
   const [remoteLoading, setRemoteLoading] = useState(false)
   const [remoteError, setRemoteError] = useState<string | null>(null)
+
+  const updateSelectedPeriod = (period: string) => {
+    const nextStudy = period === 'all'
+      ? combinedStudy
+      : studies.find((item) => item.studyYear === Number(period)) ?? combinedStudy
+    setSelectedPeriod(period)
+    if (nextStudy) {
+      setRangeStart(nextStudy.coverage.start)
+      setRangeEnd(nextStudy.coverage.end)
+    }
+  }
+
+  useEffect(() => {
+    if (!study) return
+    setRangeStart(study.coverage.start)
+    setRangeEnd(study.coverage.end)
+  }, [study])
 
   useEffect(() => {
     if (cohort === 'major') {
@@ -265,8 +312,8 @@ export default function AnalysisLab({
     setRemoteEffects(null)
     setRemoteError(null)
     fetchEventEffects({
-      start: `${study.studyYear}-01-01`,
-      end: `${study.studyYear}-12-31`,
+      start: rangeStart,
+      end: rangeEnd,
       scope,
       windowDays,
       timing,
@@ -281,9 +328,12 @@ export default function AnalysisLab({
       })
       .finally(() => active && setRemoteLoading(false))
     return () => { active = false }
-  }, [cohort, hazard, scope, study, timing, windowDays])
+  }, [cohort, hazard, rangeEnd, rangeStart, scope, study, timing, windowDays])
 
-  const sourceEffects = cohort === 'major' ? study?.effects ?? [] : remoteEffects ?? []
+  const sourceEffects = useMemo(
+    () => (cohort === 'major' ? study?.effects ?? [] : remoteEffects ?? []).filter((effect) => effect.startAt.slice(0, 10) >= rangeStart && effect.startAt.slice(0, 10) <= rangeEnd),
+    [cohort, rangeEnd, rangeStart, remoteEffects, study],
+  )
   const eventMap = useMemo(() => {
     const map = new Map(study?.events.map((event) => [event.id, event]) ?? [])
     for (const effect of remoteEffects ?? []) {
@@ -303,12 +353,12 @@ export default function AnalysisLab({
   }, [remoteEffects, study])
   const candidateEvents = useMemo(
     () => {
-      if (cohort === 'major') return study?.events.filter((event) => hazard === 'all' || event.hazardType === hazard) ?? []
+      if (cohort === 'major') return study?.events.filter((event) => event.startAt.slice(0, 10) >= rangeStart && event.startAt.slice(0, 10) <= rangeEnd && (hazard === 'all' || event.hazardType === hazard)) ?? []
       return [...new Set(sourceEffects.map((effect) => effect.eventId))]
         .map((id) => eventMap.get(id))
         .filter((event): event is StudyEvent => Boolean(event))
     },
-    [cohort, eventMap, hazard, sourceEffects, study],
+    [cohort, eventMap, hazard, rangeEnd, rangeStart, sourceEffects, study],
   )
   const specification = useMemo(
     () => sourceEffects.filter((effect) => {
@@ -382,13 +432,33 @@ export default function AnalysisLab({
     return <main className="lab-view"><div className="lab-loading"><Activity size={22} /> Preparing event-study results…</div></main>
   }
 
+  const effectiveRangeStart = rangeStart || study.coverage.start
+  const effectiveRangeEnd = rangeEnd || study.coverage.end
+  const periodStartDay = toUtcDay(study.coverage.start)
+  const periodEndDay = toUtcDay(study.coverage.end)
+  const rangeStartDay = toUtcDay(effectiveRangeStart)
+  const rangeEndDay = toUtcDay(effectiveRangeEnd)
+  const excludedDays = (study.coverage.excludedPeriods ?? []).reduce((total, period) => {
+    const overlapStart = Math.max(rangeStartDay, toUtcDay(period.start))
+    const overlapEnd = Math.min(rangeEndDay, toUtcDay(period.end))
+    return total + Math.max(0, overlapEnd - overlapStart + 1)
+  }, 0)
+  const observedDays = inclusiveDays(effectiveRangeStart, effectiveRangeEnd) - excludedDays
+  const formatRangeDate = (value: string) => new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${value}T00:00:00Z`))
+  const periodLabel = selectedPeriod === 'all' ? 'Full period' : selectedPeriod
+
   return (
     <main className="lab-view">
       <section className="lab-hero">
-        <div><span className="eyebrow">Analysis Lab · {study.studyYear}</span><h1>Compare attention and event activity.</h1><p>Study individual flood and wildfire responses or compare rolling event exposure with climate and electric-vehicle attention across countries, the EU and the world.</p></div>
+        <div><span className="eyebrow">Analysis Lab · {periodLabel}</span><h1>Compare attention and event activity.</h1><p>Study individual flood and wildfire responses or compare rolling event exposure with climate and electric-vehicle attention across countries, the EU and the world.</p></div>
         <div className="lab-hero-controls">
-          <label className="lab-year-select"><span>Study year</span><select aria-label="Study year" value={study.studyYear} onChange={(event) => setSelectedYear(Number(event.target.value))}>{availableYears.map((year) => <option key={year} value={year}>{year}</option>)}</select></label>
-          <div className="lab-status"><span className="live-dot" /><div><strong>{study.coverage.observedDays} observed days</strong><small>{study.coverage.geographies} markets · {study.coverage.excludedPeriods?.length ? 'confirmed provider gap excluded' : 'both topics'}</small></div></div>
+          <label className="lab-year-select"><span>Study period</span><select aria-label="Study period" value={selectedPeriod} onChange={(event) => updateSelectedPeriod(event.target.value)}><option value="all">Whole available period</option>{availableYears.map((year) => <option key={year} value={year}>{year}</option>)}</select></label>
+          <div className="lab-status"><span className="live-dot" /><div><strong>{observedDays} observed days</strong><small>{study.coverage.geographies} markets · {excludedDays ? 'provider gap excluded' : 'both topics'}</small></div></div>
+          <div className="lab-date-range">
+            <div><span>Date range</span><strong>{formatRangeDate(effectiveRangeStart)} — {formatRangeDate(effectiveRangeEnd)}</strong></div>
+            <label><small>Start</small><input aria-label="Analysis start date" type="range" min={periodStartDay} max={periodEndDay} value={rangeStartDay} onChange={(event) => setRangeStart(fromUtcDay(Math.min(Number(event.target.value), rangeEndDay)))} /></label>
+            <label><small>End</small><input aria-label="Analysis end date" type="range" min={periodStartDay} max={periodEndDay} value={rangeEndDay} onChange={(event) => setRangeEnd(fromUtcDay(Math.max(Number(event.target.value), rangeStartDay)))} /></label>
+          </div>
         </div>
       </section>
 
@@ -402,7 +472,7 @@ export default function AnalysisLab({
         <aside className="study-config-panel">
           <div className="lab-section-heading"><span>1</span><div><small>Study design</small><h2>Configure comparison</h2></div></div>
           <div className="lab-form">
-            <label><span>Event alerts</span><select value={cohort} onChange={(event) => setCohort(event.target.value as AlertCohort)}><option value="major">Orange and Red</option><option value="green">Green only</option><option value="all">All alerts</option></select></label>
+            <label><span>Event alert tier</span><select value={cohort} onChange={(event) => setCohort(event.target.value as AlertCohort)}><option value="all">All tiers · Green, Orange, Red</option><option value="major">Major tiers · Orange and Red</option><option value="green">Green tier only</option></select></label>
             <label><span>Event type</span><select value={hazard} onChange={(event) => setHazard(event.target.value as typeof hazard)}><option value="all">Floods and wildfires</option><option value="flood">Floods</option><option value="wildfire">Wildfires</option></select></label>
             <label><span>Media group</span><select value={scope} onChange={(event) => setScope(event.target.value as LabScope)}>{Object.entries(SCOPES).map(([id, item]) => <option key={id} value={id}>{item.label}</option>)}</select><small>{SCOPES[scope].description}</small></label>
             <label><span>Timing</span><select value={timing} onChange={(event) => setTiming(event.target.value as LabTiming)}><option value="onset">Response from event onset</option><option value="persistence">Persistence after event end</option></select></label>
@@ -454,7 +524,7 @@ export default function AnalysisLab({
           </>}
         </div>
       </section>
-      </> : mode === 'activity' ? <EventActivityView studyYear={study.studyYear} coverageStart={study.coverage.start} coverageEnd={study.coverage.end} geographyLabels={geographyLabels} eventGeographies={eventGeographies} /> : <AttentionTimeline coverageStart={study.coverage.start} coverageEnd={study.coverage.end} geographyLabels={geographyLabels} keyEvents={catalogueEvents} />}
+      </> : mode === 'activity' ? <EventActivityView coverageStart={effectiveRangeStart} coverageEnd={effectiveRangeEnd} geographyLabels={geographyLabels} eventGeographies={eventGeographies} /> : <AttentionTimeline coverageStart={effectiveRangeStart} coverageEnd={effectiveRangeEnd} geographyLabels={geographyLabels} keyEvents={catalogueEvents} />}
     </main>
   )
 }
