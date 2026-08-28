@@ -20,11 +20,11 @@ type Topic = 'climate_change' | 'electric_vehicles'
 type Measure = 'matched' | 'political'
 type PlaceScope = 'world' | 'eu27' | 'country' | 'group'
 type Hazard = 'all' | 'wildfire' | 'flood'
-type AlertScope = 'major' | 'all' | 'green'
+type AlertTier = KeyEvent['alertLevel']
 type ComparisonMode = 'single' | 'topics' | 'countries'
 type RollingWindow = 1 | 7 | 14 | 28
 type MarkerMode = 'alert' | 'wildfire_size'
-type WildfireSizeBand = 'all' | 'under_5k' | '5k_10k' | '10k_50k' | '50k_plus'
+type WildfireSizeBand = 'under_5k' | '5k_10k' | '10k_50k' | '50k_plus'
 
 type KeyEvent = {
   id: string
@@ -76,19 +76,57 @@ const ALERT_COLORS: Record<KeyEvent['alertLevel'], string> = {
   Orange: '#bd8b3b',
   Red: '#b6523b',
 }
-const SIZE_BANDS: Record<Exclude<WildfireSizeBand, 'all'>, { label: string; color: string; rank: number }> = {
+const ALERT_OPTIONS: { id: AlertTier; label: string; color: string }[] = [
+  { id: 'Green', label: 'Green tier', color: ALERT_COLORS.Green },
+  { id: 'Orange', label: 'Orange tier', color: ALERT_COLORS.Orange },
+  { id: 'Red', label: 'Red tier', color: ALERT_COLORS.Red },
+]
+const SIZE_BANDS: Record<WildfireSizeBand, { label: string; color: string; rank: number }> = {
   under_5k: { label: 'Under 5,000 ha', color: '#9b8bc2', rank: 0 },
   '5k_10k': { label: '5,000–9,999 ha', color: '#7b6bb3', rank: 1 },
   '10k_50k': { label: '10,000–49,999 ha', color: '#5c4695', rank: 2 },
   '50k_plus': { label: '50,000+ ha', color: '#372466', rank: 3 },
 }
 
-export function wildfireSizeBand(event: Pick<KeyEvent, 'hazardType' | 'severity' | 'severityUnit'>): Exclude<WildfireSizeBand, 'all'> | null {
+export function wildfireSizeBand(event: Pick<KeyEvent, 'hazardType' | 'severity' | 'severityUnit'>): WildfireSizeBand | null {
   if (event.hazardType !== 'wildfire' || event.severity == null || event.severityUnit !== 'ha') return null
   if (event.severity < 5_000) return 'under_5k'
   if (event.severity < 10_000) return '5k_10k'
   if (event.severity < 50_000) return '10k_50k'
   return '50k_plus'
+}
+
+function MultiSelectDropdown<T extends string>({
+  label,
+  options,
+  selected,
+  onToggle,
+  help,
+}: {
+  label: string
+  options: { id: T; label: string; color: string }[]
+  selected: T[]
+  onToggle: (id: T) => void
+  help?: string
+}) {
+  const selectedLabels = options.filter((option) => selected.includes(option.id)).map((option) => option.label.replace(' tier', ''))
+  const summary = selectedLabels.join(', ')
+  return <div className="multi-select-field">
+    <span>{label}</span>
+    <details className="multi-select-dropdown" onBlur={(event) => {
+      if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) event.currentTarget.removeAttribute('open')
+    }}>
+      <summary aria-label={`Open ${label} options`}><span>{summary}</span><i /></summary>
+      <div className="multi-select-menu" role="group" aria-label={label}>
+        {options.map((option) => <label key={option.id}>
+          <input type="checkbox" checked={selected.includes(option.id)} disabled={selected.length === 1 && selected.includes(option.id)} onChange={() => onToggle(option.id)} />
+          <i style={{ background: option.color }} />
+          <span>{option.label}</span>
+        </label>)}
+      </div>
+    </details>
+    {help && <small>{help}</small>}
+  </div>
 }
 
 const shiftDate = (value: string, days: number) => {
@@ -185,9 +223,9 @@ export default function AttentionTimeline({
   const [measure, setMeasure] = useState<Measure>('matched')
   const [rollingWindow, setRollingWindow] = useState<RollingWindow>(1)
   const [hazard, setHazard] = useState<Hazard>('all')
-  const [alerts, setAlerts] = useState<AlertScope>('major')
+  const [selectedAlerts, setSelectedAlerts] = useState<AlertTier[]>(['Orange', 'Red'])
   const [markerMode, setMarkerMode] = useState<MarkerMode>('alert')
-  const [sizeBand, setSizeBand] = useState<WildfireSizeBand>('all')
+  const [selectedSizeBands, setSelectedSizeBands] = useState<WildfireSizeBand[]>(() => Object.keys(SIZE_BANDS) as WildfireSizeBand[])
   const [attentionRows, setAttentionRows] = useState<(AttentionObservation | RegionAttentionObservation)[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -247,17 +285,16 @@ export default function AttentionTimeline({
   const relevantEvents = useMemo(() => keyEvents.filter((event) => {
     const eventDate = event.startAt.slice(0, 10)
     if (eventDate < coverageStart || eventDate > coverageEnd) return false
-    if (alerts === 'major' && event.alertLevel === 'Green') return false
-    if (alerts === 'green' && event.alertLevel !== 'Green') return false
+    if (!selectedAlerts.includes(event.alertLevel)) return false
     if (hazard !== 'all' && event.hazardType !== hazard) return false
     if (markerMode === 'wildfire_size') {
       const eventSizeBand = wildfireSizeBand(event)
-      if (!eventSizeBand || (sizeBand !== 'all' && eventSizeBand !== sizeBand)) return false
+      if (!eventSizeBand || !selectedSizeBands.includes(eventSizeBand)) return false
     }
     if (comparisonMode !== 'countries' && placeScope === 'world') return true
     if (comparisonMode !== 'countries' && placeScope === 'eu27') return event.geographyIds.some((item) => EU27.has(item))
     return event.geographyIds.some((item) => activeLocations.includes(item))
-  }), [activeLocations, alerts, comparisonMode, coverageEnd, coverageStart, hazard, keyEvents, markerMode, placeScope, sizeBand])
+  }), [activeLocations, comparisonMode, coverageEnd, coverageStart, hazard, keyEvents, markerMode, placeScope, selectedAlerts, selectedSizeBands])
 
   const eventDates = useMemo(() => {
     const grouped = new Map<string, KeyEvent[]>()
@@ -315,7 +352,7 @@ export default function AttentionTimeline({
     const isOrange = events?.some((event) => event.alertLevel === 'Orange') ?? false
     const largestSizeBand = events
       ?.map(wildfireSizeBand)
-      .filter((value): value is Exclude<WildfireSizeBand, 'all'> => value != null)
+      .filter((value): value is WildfireSizeBand => value != null)
       .sort((left, right) => SIZE_BANDS[right].rank - SIZE_BANDS[left].rank)[0]
     return {
       ...point,
@@ -353,11 +390,16 @@ export default function AttentionTimeline({
 
   const updateMarkerMode = (mode: MarkerMode) => {
     setMarkerMode(mode)
-    if (mode === 'wildfire_size') {
-      setHazard('wildfire')
-      setAlerts('all')
-    }
+    if (mode === 'wildfire_size') setHazard('wildfire')
   }
+
+  const toggleAlert = (tier: AlertTier) => setSelectedAlerts((current) =>
+    current.includes(tier) ? (current.length === 1 ? current : current.filter((item) => item !== tier)) : ALERT_OPTIONS.map((option) => option.id).filter((item) => [...current, tier].includes(item)),
+  )
+
+  const toggleSizeBand = (band: WildfireSizeBand) => setSelectedSizeBands((current) =>
+    current.includes(band) ? (current.length === 1 ? current : current.filter((item) => item !== band)) : (Object.keys(SIZE_BANDS) as WildfireSizeBand[]).filter((item) => [...current, band].includes(item)),
+  )
 
   const eventMarkerColor = (events: KeyEvent[]) => {
     if (markerMode === 'alert') {
@@ -366,7 +408,7 @@ export default function AttentionTimeline({
       return ALERT_COLORS.Green
     }
     const largest = events.map(wildfireSizeBand)
-      .filter((value): value is Exclude<WildfireSizeBand, 'all'> => value != null)
+      .filter((value): value is WildfireSizeBand => value != null)
       .sort((left, right) => SIZE_BANDS[right].rank - SIZE_BANDS[left].rank)[0]
     return largest ? SIZE_BANDS[largest].color : SIZE_BANDS.under_5k.color
   }
@@ -387,9 +429,9 @@ export default function AttentionTimeline({
           <label><span>Attention measure</span><select value={measure} onChange={(event) => setMeasure(event.target.value as Measure)}><option value="matched">All matching articles</option><option value="political">Political articles</option></select></label>
           <label><span>Time aggregation</span><select value={rollingWindow} onChange={(event) => setRollingWindow(Number(event.target.value) as RollingWindow)}><option value="1">Daily count</option><option value="7">7-day rolling average</option><option value="14">14-day rolling average</option><option value="28">28-day rolling average</option></select><small>Rolling averages remain daily lines and require a complete trailing window.</small></label>
           <label><span>Event marker category</span><select value={markerMode} onChange={(event) => updateMarkerMode(event.target.value as MarkerMode)}><option value="alert">GDACS alert tier</option><option value="wildfire_size">Wildfire burned area</option></select><small>Burned-area categories use the provider’s hectares field. Comparable flood size is not available in the current export.</small></label>
-          <label><span>Event alert tier</span><select value={alerts} onChange={(event) => setAlerts(event.target.value as AlertScope)}><option value="all">All tiers · Green, Orange, Red</option><option value="major">Major tiers · Orange and Red</option><option value="green">Green tier only</option></select><small>Green is a lower humanitarian-impact tier, not an absence of an event.</small></label>
+          <MultiSelectDropdown label="Event alert tier" options={ALERT_OPTIONS} selected={selectedAlerts} onToggle={toggleAlert} help="Select any combination. Green is a lower humanitarian-impact tier, not an absence of an event." />
           <label><span>Event type</span><select value={markerMode === 'wildfire_size' ? 'wildfire' : hazard} disabled={markerMode === 'wildfire_size'} onChange={(event) => setHazard(event.target.value as Hazard)}><option value="all">Floods and wildfires</option><option value="flood">Floods</option><option value="wildfire">Wildfires</option></select></label>
-          {markerMode === 'wildfire_size' && <label><span>Wildfire size</span><select value={sizeBand} onChange={(event) => setSizeBand(event.target.value as WildfireSizeBand)}><option value="all">All burned areas</option>{Object.entries(SIZE_BANDS).map(([id, item]) => <option key={id} value={id}>{item.label}</option>)}</select></label>}
+          {markerMode === 'wildfire_size' && <MultiSelectDropdown label="Wildfire size" options={Object.entries(SIZE_BANDS).map(([id, item]) => ({ id: id as WildfireSizeBand, label: item.label, color: item.color }))} selected={selectedSizeBands} onToggle={toggleSizeBand} />}
         </div>
         <div className="analysis-definition"><Info size={15} /><p><strong>Comparable observed attention.</strong> Choose separate lines for topics or publishing markets. Rolling averages smooth weekday volatility but never bridge missing provider dates. {markerMode === 'alert' ? 'Event colours show GDACS impact tiers, whose rules differ by hazard.' : 'Event colours show wildfire burned-area bands; flood size is not inferred.'}</p></div>
       </aside>
@@ -419,7 +461,7 @@ export default function AttentionTimeline({
           </div>
           <div className="timeline-series-key">{series.map((item) => <span key={item.key}><i style={{ borderColor: item.color }} />{item.label}</span>)}</div>
           <div className="timeline-key">
-            {markerMode === 'alert' ? <><span><i style={{ borderColor: ALERT_COLORS.Green }} />Green tier</span><span><i style={{ borderColor: ALERT_COLORS.Orange }} />Orange tier</span><span><i style={{ borderColor: ALERT_COLORS.Red }} />Red tier</span></> : Object.values(SIZE_BANDS).map((item) => <span key={item.label}><i style={{ borderColor: item.color }} />{item.label}</span>)}
+            {markerMode === 'alert' ? ALERT_OPTIONS.filter((option) => selectedAlerts.includes(option.id)).map((option) => <span key={option.id}><i style={{ borderColor: option.color }} />{option.label}</span>) : Object.entries(SIZE_BANDS).filter(([id]) => selectedSizeBands.includes(id as WildfireSizeBand)).map(([, item]) => <span key={item.label}><i style={{ borderColor: item.color }} />{item.label}</span>)}
             {coverageStart <= GDELT_OUTAGE.end && coverageEnd >= GDELT_OUTAGE.start && <span className="provider-gap-key"><i />Provider gap</span>}
             <small>Hover a diamond for event names · {missingDays} unavailable day{missingDays === 1 ? '' : 's'} excluded</small>
           </div>

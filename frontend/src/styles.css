@@ -335,12 +335,22 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
 .lab-status div { display: flex; flex-direction: column; }
 .lab-status strong { font-size: 9.5px; }
 .lab-status small { margin-top: 2px; color: #9cb2aa; font-size: 8px; }
-.lab-date-range { grid-column: 1 / -1; display: grid; grid-template-columns: 178px 1fr 1fr; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid rgba(255,255,255,.14); border-radius: 8px; background: rgba(255,255,255,.05); }
-.lab-date-range > div { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-.lab-date-range > div span, .lab-date-range label small { color: #9cb2aa; font-size: 7px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
-.lab-date-range > div strong { overflow: hidden; color: white; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
-.lab-date-range label { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-.lab-date-range input[type="range"] { width: 100%; height: 14px; margin: 0; accent-color: var(--lime); cursor: pointer; }
+.lab-date-range { grid-column: 1 / -1; display: grid; grid-template-columns: 178px minmax(0, 1fr); align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid rgba(255,255,255,.14); border-radius: 8px; background: rgba(255,255,255,.05); }
+.lab-date-range-summary { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.lab-date-range-summary span { color: #9cb2aa; font-size: 7px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.lab-date-range-summary strong { overflow: hidden; color: white; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.lab-range-slider { position: relative; min-width: 0; height: 24px; }
+.lab-range-track { position: absolute; top: 10px; right: 8px; left: 8px; height: 4px; overflow: hidden; border-radius: 999px; background: rgba(255,255,255,.25); }
+.lab-range-track span { position: absolute; top: 0; right: calc(100% - var(--range-end)); bottom: 0; left: var(--range-start); border-radius: inherit; background: var(--lime); }
+.lab-range-slider input[type="range"] { position: absolute; z-index: 2; inset: 0; width: 100%; height: 24px; margin: 0; appearance: none; -webkit-appearance: none; background: transparent; pointer-events: none; }
+.lab-range-slider input.range-end { z-index: 3; }
+.lab-range-slider input[type="range"]::-webkit-slider-runnable-track { height: 4px; background: transparent; }
+.lab-range-slider input[type="range"]::-webkit-slider-thumb { width: 16px; height: 16px; margin-top: -6px; border: 2px solid #efffc0; border-radius: 50%; appearance: none; -webkit-appearance: none; background: var(--lime); box-shadow: 0 1px 4px rgba(0,0,0,.28); cursor: grab; pointer-events: auto; }
+.lab-range-slider input[type="range"]::-moz-range-track { height: 4px; background: transparent; }
+.lab-range-slider input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border: 2px solid #efffc0; border-radius: 50%; background: var(--lime); box-shadow: 0 1px 4px rgba(0,0,0,.28); cursor: grab; pointer-events: auto; }
+.lab-range-slider input[type="range"]:focus-visible { outline: none; }
+.lab-range-slider input[type="range"]:focus-visible::-webkit-slider-thumb { outline: 2px solid white; outline-offset: 2px; }
+.lab-range-slider input[type="range"]:focus-visible::-moz-range-thumb { outline: 2px solid white; outline-offset: 2px; }
 .lab-grid { max-width: 1320px; margin: 0 auto; display: grid; grid-template-columns: 1fr .8fr 1.2fr; gap: 16px; padding: 23px max(3vw, 24px) 40px; }
 .lab-grid > div { align-self: start; padding: 22px; border: 1px solid #dce3de; border-radius: 10px; background: var(--paper); box-shadow: 0 4px 16px rgba(18,49,40,.035); }
 .lab-section-heading { display: flex; align-items: center; gap: 9px; margin-bottom: 16px; }
@@ -514,6 +524,22 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
 .timeline-workspace { max-width: 1240px; margin: 0 auto; display: grid; grid-template-columns: 270px minmax(0, 1fr); align-items: start; gap: 15px; padding: 0 24px 55px; }
 .timeline-controls { position: sticky; top: 18px; padding: 19px; border: 1px solid #dce3de; border-radius: 10px; background: var(--paper); box-shadow: 0 4px 16px rgba(18,49,40,.035); }
 .timeline-controls .lab-form label > small { margin-top: -1px; color: #89958f; font-size: 7px; line-height: 1.35; }
+.multi-select-field { position: relative; display: flex; flex-direction: column; gap: 5px; }
+.lab-form .multi-select-field > span { color: #56655e; font-size: 8.5px; font-weight: 750; }
+.multi-select-field > small { margin-top: -1px; color: #89958f; font-size: 7px; line-height: 1.35; }
+.multi-select-dropdown { position: relative; }
+.multi-select-dropdown summary { height: 39px; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 11px; border: 1px solid #d4ddd7; border-radius: 7px; color: #2b3c35; background: white; font-size: 11px; font-weight: 650; list-style: none; cursor: pointer; }
+.multi-select-dropdown summary::-webkit-details-marker { display: none; }
+.multi-select-dropdown summary > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.multi-select-dropdown summary > i { width: 7px; height: 7px; flex: 0 0 auto; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg) translateY(-2px); transition: transform .15s ease; }
+.multi-select-dropdown[open] summary { border-color: #7ba18f; box-shadow: 0 0 0 2px rgba(40,110,89,.1); }
+.multi-select-dropdown[open] summary > i { transform: rotate(225deg) translate(-2px, -1px); }
+.multi-select-menu { position: absolute; z-index: 20; top: calc(100% + 4px); right: 0; left: 0; display: flex; flex-direction: column; gap: 1px; padding: 5px; border: 1px solid #d4ddd7; border-radius: 7px; background: white; box-shadow: 0 9px 24px rgba(18,49,40,.16); }
+.lab-form .multi-select-menu label { min-height: 31px; display: grid; grid-template-columns: 15px 9px 1fr; align-items: center; gap: 7px; padding: 4px 6px; border-radius: 5px; cursor: pointer; }
+.lab-form .multi-select-menu label:hover { background: #eef4f0; }
+.multi-select-menu input { width: 14px; height: 14px; margin: 0; accent-color: var(--green); }
+.multi-select-menu label > i { width: 8px; height: 8px; border-radius: 50%; }
+.lab-form .multi-select-menu label > span { color: #42534b; font-size: 8.5px; font-weight: 650; }
 .timeline-results { min-width: 0; }
 .timeline-chart-card { padding: 18px; border: 1px solid #dbe3de; border-radius: 10px; background: var(--paper); box-shadow: 0 4px 16px rgba(18,49,40,.025); }
 .timeline-chart { height: 460px; margin-top: 14px; }
@@ -816,8 +842,7 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
   .lab-hero-controls { width: 100%; flex: 0 0 auto; grid-template-columns: 1fr; }
   .lab-year-select { min-height: 62px; }
   .lab-status { width: 100%; }
-  .lab-date-range { grid-column: auto; grid-template-columns: 1fr 1fr; }
-  .lab-date-range > div { grid-column: 1 / -1; }
+  .lab-date-range { grid-column: auto; grid-template-columns: 1fr; }
   .lab-grid { grid-template-columns: 1fr; padding: 14px; }
   .results-panel { grid-column: auto; }
   .lab-hypothesis-strip { grid-template-columns: 1fr; margin-top: 14px; padding: 0 14px; }

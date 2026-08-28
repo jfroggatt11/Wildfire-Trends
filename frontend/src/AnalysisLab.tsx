@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import type { CSSProperties } from 'react'
 import { Activity, ArrowRight, Check, CircleAlert, Info } from 'lucide-react'
 import {
   CartesianGrid,
@@ -438,6 +439,11 @@ export default function AnalysisLab({
   const periodEndDay = toUtcDay(study.coverage.end)
   const rangeStartDay = toUtcDay(effectiveRangeStart)
   const rangeEndDay = toUtcDay(effectiveRangeEnd)
+  const periodSpan = Math.max(1, periodEndDay - periodStartDay)
+  const rangeStyle = {
+    '--range-start': `${((rangeStartDay - periodStartDay) / periodSpan) * 100}%`,
+    '--range-end': `${((rangeEndDay - periodStartDay) / periodSpan) * 100}%`,
+  } as CSSProperties
   const excludedDays = (study.coverage.excludedPeriods ?? []).reduce((total, period) => {
     const overlapStart = Math.max(rangeStartDay, toUtcDay(period.start))
     const overlapEnd = Math.min(rangeEndDay, toUtcDay(period.end))
@@ -455,9 +461,12 @@ export default function AnalysisLab({
           <label className="lab-year-select"><span>Study period</span><select aria-label="Study period" value={selectedPeriod} onChange={(event) => updateSelectedPeriod(event.target.value)}><option value="all">Whole available period</option>{availableYears.map((year) => <option key={year} value={year}>{year}</option>)}</select></label>
           <div className="lab-status"><span className="live-dot" /><div><strong>{observedDays} observed days</strong><small>{study.coverage.geographies} markets · {excludedDays ? 'provider gap excluded' : 'both topics'}</small></div></div>
           <div className="lab-date-range">
-            <div><span>Date range</span><strong>{formatRangeDate(effectiveRangeStart)} — {formatRangeDate(effectiveRangeEnd)}</strong></div>
-            <label><small>Start</small><input aria-label="Analysis start date" type="range" min={periodStartDay} max={periodEndDay} value={rangeStartDay} onChange={(event) => setRangeStart(fromUtcDay(Math.min(Number(event.target.value), rangeEndDay)))} /></label>
-            <label><small>End</small><input aria-label="Analysis end date" type="range" min={periodStartDay} max={periodEndDay} value={rangeEndDay} onChange={(event) => setRangeEnd(fromUtcDay(Math.max(Number(event.target.value), rangeStartDay)))} /></label>
+            <div className="lab-date-range-summary"><span>Date range</span><strong>{formatRangeDate(effectiveRangeStart)} — {formatRangeDate(effectiveRangeEnd)}</strong></div>
+            <div className="lab-range-slider" style={rangeStyle}>
+              <div className="lab-range-track" aria-hidden="true"><span /></div>
+              <input className="range-start" aria-label="Analysis start date" type="range" min={periodStartDay} max={periodEndDay} value={rangeStartDay} onChange={(event) => setRangeStart(fromUtcDay(Math.min(Number(event.target.value), rangeEndDay)))} />
+              <input className="range-end" aria-label="Analysis end date" type="range" min={periodStartDay} max={periodEndDay} value={rangeEndDay} onChange={(event) => setRangeEnd(fromUtcDay(Math.max(Number(event.target.value), rangeStartDay)))} />
+            </div>
           </div>
         </div>
       </section>
