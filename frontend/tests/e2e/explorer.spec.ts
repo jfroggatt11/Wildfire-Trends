@@ -316,6 +316,41 @@ test('analysis lab exposes the all-alert activity and lag views', async ({ page 
   expect(errors).toEqual([])
 })
 
+test('analysis lab charts cumulative attention with major-event markers', async ({ page }) => {
+  test.setTimeout(120_000)
+  const errors = collectClientErrors(page)
+  await openExplorer(page)
+  await page.getByRole('button', { name: 'Analysis Lab', exact: true }).click()
+  await page.getByLabel('Study year').selectOption('2025')
+  await page.getByRole('tab', { name: 'Cumulative attention' }).click()
+
+  await expect(page.getByRole('heading', { name: 'Configure cumulative view' })).toBeVisible()
+  await expect(page.locator('.activity-state')).toHaveCount(0, { timeout: 30_000 })
+  await expect(page.getByRole('heading', { name: 'Climate change in World' })).toBeVisible()
+  await expect(page.locator('.cumulative-chart')).toBeVisible()
+  const eventLines = page.locator('.cumulative-chart .recharts-reference-line-line')
+  expect(await eventLines.count()).toBeGreaterThan(0)
+  await expect(eventLines.first()).toHaveAttribute('stroke-dasharray', '3 4')
+  await expect(page.locator('.cumulative-total')).toContainText('key events')
+  await expect(page.locator('.cumulative-key')).toContainText('unavailable days excluded')
+
+  await page.getByLabel('Geography').selectOption('group')
+  await expect(page.locator('.activity-state')).toHaveCount(0, { timeout: 30_000 })
+  await expect(page.getByLabel('Cumulative country group').locator('> span')).toHaveCount(3)
+  expect(await page.getByLabel('Add cumulative country').locator('option').count()).toBeGreaterThan(150)
+  await page.getByLabel('Add cumulative country').selectOption('italy')
+  await expect(page.locator('.activity-state')).toHaveCount(0, { timeout: 30_000 })
+  await expect(page.getByLabel('Cumulative country group').locator('> span')).toHaveCount(4)
+  await expect(page.getByRole('heading', { name: 'Climate change in 4-country group' })).toBeVisible()
+
+  await page.getByLabel('Attention topic').selectOption('electric_vehicles')
+  await expect(page.locator('.activity-state')).toHaveCount(0, { timeout: 30_000 })
+  await expect(page.getByRole('heading', { name: 'Electric vehicles in 4-country group' })).toBeVisible()
+  await page.getByLabel('Attention measure').selectOption('political')
+  await expect(page.locator('.cumulative-total')).toContainText('political articles')
+  expect(errors).toEqual([])
+})
+
 test('methods page documents the current research protocol and definitions', async ({ page }) => {
   const errors = collectClientErrors(page)
   await openExplorer(page)
