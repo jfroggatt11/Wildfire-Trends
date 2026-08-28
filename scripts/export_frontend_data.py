@@ -83,21 +83,32 @@ def contiguous_date_ranges(values: list[str]) -> list[dict[str, Any]]:
     return ranges
 
 
-def latest_requested_range(source: str) -> dict[str, Any] | None:
-    """Return the latest successful requested window for collection-window sources."""
+def requested_date_ranges(source: str) -> list[dict[str, Any]]:
+    """Merge every successful requested window for collection-window sources."""
     manifests = ROOT / "data/manifests"
-    for path in sorted(manifests.glob("*.json"), reverse=True):
+    windows: list[tuple[date, date]] = []
+    for path in sorted(manifests.glob("*.json")):
         payload = json.loads(path.read_text(encoding="utf-8"))
         requested = payload.get("requested_date_range")
         if payload.get("source") == source and requested and not payload.get("error"):
-            start = requested["start"]
-            end = requested["end"]
-            return {
-                "start": start,
-                "end": end,
-                "dayCount": (date.fromisoformat(end) - date.fromisoformat(start)).days + 1,
-            }
-    return None
+            windows.append(
+                (date.fromisoformat(requested["start"]), date.fromisoformat(requested["end"]))
+            )
+    merged: list[tuple[date, date]] = []
+    for start, end in sorted(windows):
+        if not merged or start > merged[-1][1] + timedelta(days=1):
+            merged.append((start, end))
+            continue
+        previous_start, previous_end = merged[-1]
+        merged[-1] = (previous_start, max(previous_end, end))
+    return [
+        {
+            "start": start.isoformat(),
+            "end": end.isoformat(),
+            "dayCount": (end - start).days + 1,
+        }
+        for start, end in merged
+    ]
 
 
 def export_events() -> list[dict[str, Any]]:
@@ -256,8 +267,7 @@ def source_summaries(
         for feature in events
         for country in feature["properties"]["countryIso3s"]
     }
-    gdacs_requested = latest_requested_range("gdacs")
-    gdacs_ranges = [gdacs_requested] if gdacs_requested else contiguous_date_ranges(event_starts)
+    gdacs_ranges = requested_date_ranges("gdacs") or contiguous_date_ranges(event_starts)
     summaries = [
         {
             "id": "gdacs",
@@ -314,10 +324,16 @@ def main() -> None:
     export_supabase_config()
     export_world_map()
     events = export_events()
-    event_study = build_event_study_files(
+    event_study_2025 = build_event_study_files(
         data_dir=ROOT / "data",
         json_path=OUT / "event-study.json",
         study_year=2025,
+    )
+    event_study_2026 = build_event_study_files(
+        data_dir=ROOT / "data",
+        json_path=OUT / "event-study-2026.json",
+        parquet_path=ROOT / "data" / "analysis" / "event_effects_2026.parquet",
+        study_year=2026,
     )
     attention_summary = summarize_attention()
     article_summary = summarize_articles()
@@ -335,7 +351,7 @@ def main() -> None:
             "articles": {"count": article_summary["count"]},
             "geographyLabels": geography_labels,
             "dataSources": data_sources,
-            "analysisStatus": "2025_major_event_study_ready",
+            "analysisStatus": "2025_2026_event_studies_ready",
             "notes": [
                 "Media geography is publishing-outlet country, not event location.",
                 "The Analysis Lab uses GDACS Orange and Red events with complete daily attention windows.",
@@ -348,7 +364,8 @@ def main() -> None:
         f"Exported {len(events)} events and a manifest covering "
         f"{attention_summary['rowCount']} attention rows and "
         f"{article_summary['count']} articles and "
-        f"{len(event_study['events'])} major-event study candidates to {OUT}. "
+        f"{len(event_study_2025['events']) + len(event_study_2026['events'])} "
+        f"major-event study candidates across 2025 and 2026 to {OUT}. "
         "Aggregate attention is served by Supabase; article rows remain an offline validation archive."
     )
 

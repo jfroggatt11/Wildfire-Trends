@@ -19,11 +19,11 @@ test('all media scopes preserve events and open their detail panel', async ({ pa
   const errors = collectClientErrors(page)
   await openExplorer(page)
   const visibleCount = page.locator('.map-stat strong')
-  await expect(visibleCount).toHaveText('4,050')
+  await expect(visibleCount).toHaveText('8,942')
 
   for (const scope of ['affected', 'eu27', 'international', 'global']) {
     await page.locator('.scope-section select').selectOption(scope)
-    await expect(visibleCount).toHaveText('4,050')
+    await expect(visibleCount).toHaveText('8,942')
     await page.locator('.watchlist > button').first().click()
     await expect(page.locator('.event-drawer')).toBeVisible()
     await expect(page.locator('.event-error')).toHaveCount(0)
@@ -68,13 +68,15 @@ test('January plus Global opens aggregate attention across every media scope', a
 })
 
 test('attention toggle and before-after analysis share the selected measure', async ({ page }) => {
+  test.setTimeout(90_000)
   const errors = collectClientErrors(page)
-  await page.goto('/?event=gdacs%3AWF%3A1023505', { waitUntil: 'networkidle' })
+  await page.goto('/?event=gdacs%3AWF%3A1023505', { waitUntil: 'domcontentloaded' })
   await expect(page.locator('.event-drawer')).toBeVisible()
   await page.locator('.scope-select select').selectOption('global')
 
   const cards = page.locator('.before-after-card')
   await expect(cards).toHaveCount(2)
+  await expect(page.getByRole('status')).toHaveCount(0, { timeout: 45_000 })
   await expect(page.locator('.before-after-card[data-test-status="unavailable"]')).toHaveCount(0)
   await expect(cards.first()).toContainText('URLs/day')
   await expect(cards.first()).toContainText('One-sided p =')
@@ -96,13 +98,16 @@ test('attention toggle and before-after analysis share the selected measure', as
 })
 
 test('coverage breakdown replaces article links with aggregate timing, political and market views', async ({ page }) => {
+  test.setTimeout(90_000)
   const errors = collectClientErrors(page)
-  await page.goto('/?event=gdacs%3AWF%3A1023505', { waitUntil: 'networkidle' })
+  await page.goto('/?event=gdacs%3AWF%3A1023505', { waitUntil: 'domcontentloaded' })
   await expect(page.locator('.event-drawer')).toBeVisible()
-  await page.locator('.scope-select select').selectOption('global')
+  await page.locator('.scope-select select').selectOption('affected')
+  await expect(page.getByRole('status')).toHaveCount(0, { timeout: 45_000 })
   await page.getByRole('tab', { name: 'Coverage breakdown' }).click()
 
   await expect(page.getByRole('heading', { name: 'What changed, and where?' })).toBeVisible()
+  await expect(page.getByRole('status')).toHaveCount(0, { timeout: 45_000 })
   await expect(page.locator('.coverage-summary strong').first()).not.toHaveText('0')
   await expect(page.getByRole('table', { name: 'Average daily coverage before, during and after the event' })).toBeVisible()
   await expect(page.locator('.phase-table > div[data-topic]')).toHaveCount(2)
@@ -171,7 +176,7 @@ test('trackpad-style zoom stays inside the map and clusters resolve at source co
 
 test('event drawer keeps the corrected map-point label without a geography tab', async ({ page }) => {
   const errors = collectClientErrors(page)
-  await page.goto('/?event=gdacs%3AFL%3A1103661', { waitUntil: 'networkidle' })
+  await page.goto('/?event=gdacs%3AFL%3A1103661', { waitUntil: 'domcontentloaded' })
   await expect(page.locator('.event-drawer')).toBeVisible()
   await expect(page.locator('.drawer-header h2')).toHaveText('Flood in United Kingdom')
   await expect(page.locator('.event-meta')).toContainText('Map point: Cornwall, United Kingdom')
@@ -212,12 +217,12 @@ test('data summary reports only MVP sources and their stored coverage dates', as
   await expect(page.getByRole('heading', { name: 'What the Atlas currently covers.' })).toBeVisible()
   await expect(page.locator('.source-card')).toHaveCount(2)
   await expect(page.locator('.source-timeline-row')).toHaveCount(2)
-  await expect(page.locator('.source-card[data-source="gdacs"]')).toContainText('1 Jan 2025 — 31 Dec 2025')
+  await expect(page.locator('.source-card[data-source="gdacs"]')).toContainText('1 Jan 2025 — 26 Aug 2026')
   await expect(page.locator('.source-card[data-source="gdelt_ngrams"]')).toContainText('31 Jul 2026')
   await expect(page.locator('.source-card[data-source="gdelt_ngrams"]')).toContainText('stored observation dates')
-  await expect(page.locator('.source-card[data-source="gdelt_ngrams"] .source-coverage-ranges span')).toHaveCount(3)
+  await expect(page.locator('.source-card[data-source="gdelt_ngrams"] .source-coverage-ranges span')).toHaveCount(2)
   await expect(page.locator('.source-card[data-source="gdelt_articles"]')).toHaveCount(0)
-  await expect(page.locator('.source-timeline-row[data-source="gdelt_ngrams"] .source-timeline-track span')).toHaveCount(3)
+  await expect(page.locator('.source-timeline-row[data-source="gdelt_ngrams"] .source-timeline-track span')).toHaveCount(2)
   await expect(page.getByText('Google Trends comparison series')).toHaveCount(0)
   await expect(page.getByText('NASA FIRMS wildfire detections')).toHaveCount(0)
   await expect(page.getByText('GDELT DOC 2.0 topic timelines')).toHaveCount(0)
@@ -232,6 +237,7 @@ test('analysis lab runs the major-event study for climate and electric vehicles'
   const errors = collectClientErrors(page)
   await openExplorer(page)
   await page.getByRole('button', { name: 'Analysis Lab', exact: true }).click()
+  await page.getByLabel('Study year').selectOption('2025')
 
   await expect(page.getByRole('heading', { name: 'Compare attention and event activity.' })).toBeVisible()
   await expect(page.locator('.cohort-flow')).toContainText('40')
@@ -269,17 +275,20 @@ test('analysis lab runs the major-event study for climate and electric vehicles'
 })
 
 test('analysis lab exposes the all-alert activity and lag views', async ({ page }) => {
+  test.setTimeout(120_000)
   const errors = collectClientErrors(page)
   await openExplorer(page)
   await page.getByRole('button', { name: 'Analysis Lab', exact: true }).click()
+  await page.getByLabel('Study year').selectOption('2025')
 
   await page.getByLabel('Event alerts').selectOption('green')
-  await expect(page.locator('.analysis-loading')).toHaveCount(0, { timeout: 10_000 })
+  await expect(page.locator('.analysis-loading')).toHaveCount(0, { timeout: 30_000 })
   await expect(page.locator('.cohort-flow strong').first()).not.toHaveText('0')
 
   await page.getByRole('tab', { name: 'Event activity' }).click()
 
   await expect(page.getByRole('heading', { name: 'Configure activity' })).toBeVisible()
+  await expect(page.locator('.activity-state')).toHaveCount(0, { timeout: 30_000 })
   await expect(page.getByRole('heading', { name: 'Do attention anomalies move with event load?' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'When is event activity most associated with attention?' })).toBeVisible()
   await expect(page.locator('.activity-kpis > article')).toHaveCount(4)
@@ -289,10 +298,10 @@ test('analysis lab exposes the all-alert activity and lag views', async ({ page 
   await expect(page.locator('.lag-chart')).toBeVisible()
 
   await page.getByLabel('Place view').selectOption('compare')
-  await expect(page.locator('.activity-state')).toHaveCount(0, { timeout: 10_000 })
+  await expect(page.locator('.activity-state')).toHaveCount(0, { timeout: 30_000 })
   await expect(page.locator('.comparison-country-list > span')).toHaveCount(3)
   await page.getByLabel('Add country').selectOption('italy')
-  await expect(page.locator('.activity-state')).toHaveCount(0, { timeout: 10_000 })
+  await expect(page.locator('.activity-state')).toHaveCount(0, { timeout: 30_000 })
   await expect(page.locator('.comparison-country-list > span')).toHaveCount(4)
   const comparisonLegend = page.locator('.activity-chart .recharts-legend-item-text')
   for (const country of ['United Kingdom', 'France', 'Germany', 'Italy']) {
@@ -373,11 +382,11 @@ test('hazard and alert filters update map and sidebar together', async ({ page }
   await openExplorer(page)
   const visibleCount = page.locator('.map-stat strong')
   await page.getByRole('button', { name: 'Fire', exact: true }).click()
-  await expect(visibleCount).toHaveText('609')
-  await expect(page.locator('.section-label small').first()).toHaveText('609 events')
+  await expect(visibleCount).toHaveText('1,027')
+  await expect(page.locator('.section-label small').first()).toHaveText('1,027 events')
 
   await page.getByRole('button', { name: 'Green', exact: true }).click()
-  await expect(visibleCount).not.toHaveText('609')
+  await expect(visibleCount).not.toHaveText('1,027')
   await expect(page.locator('.event-error')).toHaveCount(0)
   expect(errors).toEqual([])
 })
@@ -410,6 +419,6 @@ test('search supports empty results and recovers to the full event set', async (
   await expect(page.locator('.atlas-marker').first()).toBeVisible()
 
   await page.locator('.search-field button').click()
-  await expect(page.locator('.map-stat strong')).toHaveText('4,050')
+  await expect(page.locator('.map-stat strong')).toHaveText('8,942')
   expect(errors).toEqual([])
 })

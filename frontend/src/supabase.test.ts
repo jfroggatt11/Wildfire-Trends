@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildAttentionUrl,
+  buildEventEffectsUrl,
   isKnownAttentionOutage,
   mapAttentionRow,
   mapEventActivityRow,
@@ -30,6 +31,16 @@ describe('Supabase REST queries', () => {
     expect(isKnownAttentionOutage('2025-06-14')).toBe(true)
     expect(isKnownAttentionOutage('2025-07-01')).toBe(true)
     expect(isKnownAttentionOutage('2025-07-02')).toBe(false)
+  })
+
+  it('bounds event effects to the selected study year', () => {
+    const url = new URL(buildEventEffectsUrl('https://example.supabase.co', {
+      start: '2026-01-01', end: '2026-12-31', scope: 'affected', windowDays: 14,
+      timing: 'onset', alerts: ['Orange', 'Red'],
+    }))
+
+    expect(url.searchParams.getAll('start_at')).toEqual(['gte.2026-01-01', 'lte.2026-12-31'])
+    expect(url.searchParams.get('alert_level')).toBe('in.(Orange,Red)')
   })
 })
 

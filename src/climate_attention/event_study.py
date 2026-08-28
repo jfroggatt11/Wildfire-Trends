@@ -502,13 +502,17 @@ def build_analysis_warehouse(
 
 
 def build_event_study_files(
-    *, data_dir: Path, json_path: Path, study_year: int = 2025
+    *,
+    data_dir: Path,
+    json_path: Path,
+    study_year: int = 2025,
+    parquet_path: Path | None = None,
 ) -> dict[str, Any]:
     events, attention = load_event_study_inputs(data_dir)
     payload = build_event_study(events, attention, study_year=study_year)
     write_event_study(
         payload,
-        parquet_path=data_dir / "analysis" / "event_effects.parquet",
+        parquet_path=parquet_path or data_dir / "analysis" / "event_effects.parquet",
         json_path=json_path,
     )
     return payload

@@ -30,9 +30,10 @@ import type { AttentionChartPoint } from './AttentionChart'
 import type { EventStudyData } from './AnalysisLab'
 import {
   fetchAttentionWindow,
+  fetchRegionAttention,
   isSupabaseEnabled,
 } from './supabase'
-import type { WindowQuery } from './supabase'
+import type { RegionAttentionObservation, WindowQuery } from './supabase'
 import { dateWithinRange, formatDate, permutationIncreaseTest } from './utils'
 
 const AttentionChart = lazy(() => import('./AttentionChart'))
@@ -213,7 +214,7 @@ function withinWindow(value: string, event: EventProperties, days = 28) {
 
 function scopeAllows(geography: string, event: EventProperties, scope: MediaScope) {
   if (scope === 'affected') return event.geographyIds.includes(geography)
-  if (scope === 'eu27') return EU27.has(geography)
+  if (scope === 'eu27') return geography === '__eu27__' || EU27.has(geography)
   if (scope === 'international') return !event.geographyIds.includes(geography)
   return true
 }
@@ -236,7 +237,7 @@ function useAtlasData() {
   const [world, setWorld] = useState<WorldGeoJSON | null>(null)
   const [attention, setAttention] = useState<AttentionRow[]>([])
   const [manifest, setManifest] = useState<Manifest | null>(null)
-  const [eventStudy, setEventStudy] = useState<EventStudyData | null>(null)
+  const [eventStudies, setEventStudies] = useState<EventStudyData[]>([])
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -246,13 +247,14 @@ function useAtlasData() {
       fetch('/data/world.geojson').then((response) => response.json()),
       fetch('/data/manifest.json').then((response) => response.json()),
       fetch('/data/event-study.json').then((response) => response.json()),
+      fetch('/data/event-study-2026.json').then((response) => response.json()),
     ])
-      .then(([eventsData, worldData, manifestData, eventStudyData]) => {
+      .then(([eventsData, worldData, manifestData, eventStudy2025, eventStudy2026]) => {
         if (!active) return
         setEvents(eventsData)
         setWorld(worldData)
         setManifest(manifestData)
-        setEventStudy(eventStudyData)
+        setEventStudies([eventStudy2025, eventStudy2026])
       })
       .catch(() => active && setError('The local research datasets could not be loaded.'))
     if (!isSupabaseEnabled()) setError('Supabase aggregate data access is not configured.')
@@ -261,7 +263,7 @@ function useAtlasData() {
     }
   }, [])
 
-  return { events, world, attention, manifest, eventStudy, error }
+  return { events, world, attention, manifest, eventStudies, error }
 }
 
 class EventDetailBoundary extends Component<{ children: ReactNode; onClose: () => void }, { failed: boolean }> {
@@ -289,7 +291,7 @@ class EventDetailBoundary extends Component<{ children: ReactNode; onClose: () =
 }
 
 function App() {
-  const { events, world, attention, manifest, eventStudy, error } = useAtlasData()
+  const { events, world, attention, manifest, eventStudies, error } = useAtlasData()
   const [view, setView] = useState<View>('explore')
   const [selectedId, setSelectedId] = useState<string | null>(() => {
     const id = new URLSearchParams(window.location.search).get('event')
@@ -376,7 +378,7 @@ function App() {
       ) : view === 'lab' ? (
         <Suspense fallback={<LoadingView />}>
           <AnalysisLab
-            study={eventStudy}
+            studies={eventStudies}
             geographyLabels={manifest?.geographyLabels ?? {}}
             eventGeographies={[...new Set(events?.features.flatMap((event) => event.properties.geographyIds) ?? [])]}
             onOpenEvent={(id) => { selectEvent(id); setView('explore') }}
@@ -430,7 +432,16 @@ function ExploreView({
   const [alerts, setAlerts] = useState<Set<AlertLevel>>(new Set(['Green', 'Orange', 'Red']))
   const [dateStart, setDateStart] = useState('2025-01-01')
   const [dateEnd, setDateEnd] = useState('2025-12-31')
+  const initializedDateRange = useRef(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
+
+  useEffect(() => {
+    if (!manifest || initializedDateRange.current) return
+    const eventCoverage = manifest.dataSources.find((source) => source.id === 'gdacs')
+    if (eventCoverage?.dateMin) setDateStart(eventCoverage.dateMin)
+    if (eventCoverage?.dateMax) setDateEnd(eventCoverage.dateMax)
+    initializedDateRange.current = true
+  }, [manifest])
 
   const filteredEvents = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase()
@@ -891,7 +902,7 @@ function EventDrawer({
   const HazardIcon = hazard.icon
   const displayName = eventDisplayName(event)
   const [attentionMode, setAttentionMode] = useState<AttentionMode>('all')
-  const remoteAttention = useRemoteAttention(event, scope)
+  const remoteAttention = useRemoteAttention(event, scope, tab === 'coverage')
   const chartRows = isSupabaseEnabled() ? remoteAttention.rows : attention
   const chart = useMemo(() => buildEventChart(event, chartRows, scope, attentionMode), [event, chartRows, scope, attentionMode])
   const coverageRows = useMemo(() => eventAttentionRows(event, chartRows, scope), [event, chartRows, scope])
@@ -934,7 +945,76 @@ function EventDrawer({
   )
 }
 
-function useRemoteAttention(event: EventProperties, scope: MediaScope) {
+function regionAttentionRow(row: RegionAttentionObservation, geography: string): AttentionRow {
+  return {
+    date: row.date,
+    source: 'gdelt_ngrams',
+    topicId: row.topicId,
+    geography,
+    matchedCount: row.matchedCount,
+    attentionShare: null,
+    attentionIndex: null,
+    politicalCount: row.politicalCount,
+    politicalActorCount: row.politicalActorCount,
+    governmentActionCount: row.governmentActionCount,
+    partyPoliticsCount: row.partyPoliticsCount,
+    officialSourceCount: row.officialSourceCount,
+  }
+}
+
+function aggregateAttentionRows(rows: AttentionRow[]) {
+  const totals = new Map<string, AttentionRow>()
+  for (const row of rows) {
+    const key = `${row.date}:${row.topicId}`
+    const current = totals.get(key) ?? {
+      ...row,
+      geography: '__aggregate__',
+      matchedCount: 0,
+      politicalCount: 0,
+      politicalActorCount: 0,
+      governmentActionCount: 0,
+      partyPoliticsCount: 0,
+      officialSourceCount: 0,
+    }
+    for (const field of ['matchedCount', 'politicalCount', 'politicalActorCount', 'governmentActionCount', 'partyPoliticsCount', 'officialSourceCount'] as const) {
+      current[field] = Number(current[field] ?? 0) + Number(row[field] ?? 0)
+    }
+    totals.set(key, current)
+  }
+  return totals
+}
+
+async function fetchAggregateAttention(event: EventProperties, scope: MediaScope) {
+  const { start, end } = eventWindow(event)
+  const startDate = start.toISOString().slice(0, 10)
+  const endDate = end.toISOString().slice(0, 10)
+  if (scope === 'affected') return fetchAttentionWindow(remoteWindowQuery(event, scope))
+  if (scope === 'global' || scope === 'eu27') {
+    const region = scope === 'global' ? 'global' : 'eu27'
+    return (await fetchRegionAttention(region, startDate, endDate))
+      .map((row) => regionAttentionRow(row, `__${region}__`))
+  }
+  const [globalRows, affectedRows] = await Promise.all([
+    fetchRegionAttention('global', startDate, endDate),
+    fetchAttentionWindow({
+      start: startDate,
+      end: endDate,
+      geographies: event.geographyIds,
+      topics: TOPICS.map((topic) => topic.id),
+    }),
+  ])
+  const affected = aggregateAttentionRows(affectedRows)
+  return globalRows.map((row) => {
+    const result = regionAttentionRow(row, '__international__')
+    const excluded = affected.get(`${row.date}:${row.topicId}`)
+    for (const field of ['matchedCount', 'politicalCount', 'politicalActorCount', 'governmentActionCount', 'partyPoliticsCount', 'officialSourceCount'] as const) {
+      result[field] = Math.max(0, Number(result[field] ?? 0) - Number(excluded?.[field] ?? 0))
+    }
+    return result
+  })
+}
+
+function useRemoteAttention(event: EventProperties, scope: MediaScope, detailed: boolean) {
   const [rows, setRows] = useState<AttentionRow[]>([])
   const [loading, setLoading] = useState(isSupabaseEnabled())
   const [error, setError] = useState<string | null>(null)
@@ -944,7 +1024,10 @@ function useRemoteAttention(event: EventProperties, scope: MediaScope) {
     let active = true
     setLoading(true)
     setError(null)
-    fetchAttentionWindow(remoteWindowQuery(event, scope))
+    const request = detailed
+      ? fetchAttentionWindow(remoteWindowQuery(event, scope))
+      : fetchAggregateAttention(event, scope)
+    request
       .then((result) => {
         if (active) setRows(result)
       })
@@ -958,7 +1041,7 @@ function useRemoteAttention(event: EventProperties, scope: MediaScope) {
         if (active) setLoading(false)
       })
     return () => { active = false }
-  }, [event, scope])
+  }, [detailed, event, scope])
 
   return { rows, loading, error }
 }
@@ -1553,7 +1636,7 @@ function MethodsView({ manifest }: { manifest: Manifest | null }) {
 
           <section className="protocol-section" id="before-after">
             <header><span>08</span><div><small>Exploratory inference</small><h2>What the single- and multi-event studies estimate</h2></div></header>
-            <p className="protocol-lede">Explore compares one selected event with its own pre-event period. Analysis Lab applies the same complete-day principle to 2025 events, then summarises event-level changes without allowing large media markets to dominate the result. Orange and Red alerts are the primary cohort; Green and all-alert filters are sensitivity views.</p>
+            <p className="protocol-lede">Explore compares one selected event with its own pre-event period. Analysis Lab applies the same complete-day principle to each available study year, then summarises event-level changes without allowing large media markets to dominate the result. Orange and Red alerts are the primary cohort; Green and all-alert filters are sensitivity views.</p>
             <div className="window-diagram" aria-label="Before and after event window">
               <div className="window-before"><span>7, 14 or 28 days</span><strong>Before mean</strong><small>Days ending immediately before the start</small></div>
               <div className="window-event"><span>Event duration</span><strong>Excluded</strong><small>Start through end date</small></div>
@@ -1567,7 +1650,7 @@ function MethodsView({ manifest }: { manifest: Manifest | null }) {
             </div>
             <details className="technical-details">
               <summary>Exact test, simulation and eligibility <ChevronRight size={14} /></summary>
-              <ul><li>Every day in both periods must be present; absent dates are never converted to zero.</li><li>The primary Lab cohort contains GDACS Orange and Red floods and wildfires beginning in 2025; Green and all-alert cohorts use the same estimator.</li><li>The default Lab result excludes another selected-cohort event affecting the same country during the analysis window; users may include overlaps as a sensitivity check.</li><li>Explore evaluates every label allocation when there are no more than 50,000 combinations and otherwise uses a deterministic 10,000-shuffle approximation.</li></ul>
+              <ul><li>Every day in both periods must be present; absent dates are never converted to zero.</li><li>The primary Lab cohort contains GDACS Orange and Red floods and wildfires in the selected year; Green and all-alert cohorts use the same estimator.</li><li>The default Lab result excludes another selected-cohort event affecting the same country during the analysis window; users may include overlaps as a sensitivity check.</li><li>Explore evaluates every label allocation when there are no more than 50,000 combinations and otherwise uses a deterministic 10,000-shuffle approximation.</li></ul>
             </details>
             <div className="method-definition-grid two">
               <article><small>Event activity panel</small><strong>Rolling event starts by affected geography</strong><p>Multi-country events count once in every affected country, while global and EU27 aggregates count each unique event once. The chart offers 7- and 28-day windows and can overlay two to five countries for one selected attention topic. Its default symmetric focus scale covers 98% of plotted attention anomalies, flags clipped extremes and retains a full-range option.</p></article>

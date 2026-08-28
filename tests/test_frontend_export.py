@@ -11,6 +11,7 @@ from scripts.export_frontend_data import (
     FRONTEND_HAZARD_TYPES,
     FRONTEND_TOPIC_IDS,
     contiguous_date_ranges,
+    requested_date_ranges,
 )
 
 
@@ -41,6 +42,25 @@ def test_contiguous_date_ranges_preserves_gaps() -> None:
 def test_contiguous_date_ranges_accepts_timestamp_values() -> None:
     assert contiguous_date_ranges(["2025-01-01T01:00:00+00:00", "2025-01-02T01:00:00+00:00"]) == [
         {"start": "2025-01-01", "end": "2025-01-02", "dayCount": 2}
+    ]
+
+
+def test_requested_date_ranges_merges_successful_collection_windows(tmp_path, monkeypatch) -> None:
+    manifests = tmp_path / "data" / "manifests"
+    manifests.mkdir(parents=True)
+    (manifests / "one.json").write_text(
+        '{"source":"gdacs","requested_date_range":{"start":"2025-01-01","end":"2025-12-31"}}'
+    )
+    (manifests / "two.json").write_text(
+        '{"source":"gdacs","requested_date_range":{"start":"2026-01-01","end":"2026-08-26"}}'
+    )
+    (manifests / "failed.json").write_text(
+        '{"source":"gdacs","requested_date_range":{"start":"2027-01-01","end":"2027-01-31"},"error":"failed"}'
+    )
+    monkeypatch.setattr("scripts.export_frontend_data.ROOT", tmp_path)
+
+    assert requested_date_ranges("gdacs") == [
+        {"start": "2025-01-01", "end": "2026-08-26", "dayCount": 603}
     ]
 
 

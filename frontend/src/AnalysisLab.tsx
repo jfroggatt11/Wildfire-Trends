@@ -212,16 +212,22 @@ function StudyTimeline({ points, measure, timing }: { points: ReturnType<typeof 
 }
 
 export default function AnalysisLab({
-  study,
+  studies,
   geographyLabels,
   eventGeographies,
   onOpenEvent,
 }: {
-  study: EventStudyData | null
+  studies: EventStudyData[]
   geographyLabels: Record<string, string>
   eventGeographies: string[]
   onOpenEvent: (id: string) => void
 }) {
+  const availableYears = useMemo(
+    () => [...new Set(studies.map((item) => item.studyYear))].sort((left, right) => left - right),
+    [studies],
+  )
+  const [selectedYear, setSelectedYear] = useState<number | null>(null)
+  const study = studies.find((item) => item.studyYear === selectedYear) ?? studies.at(-1) ?? null
   const [mode, setMode] = useState<'study' | 'activity'>('study')
   const [hypothesis, setHypothesis] = useState('attention')
   const [cohort, setCohort] = useState<AlertCohort>('major')
@@ -250,10 +256,14 @@ export default function AnalysisLab({
       setRemoteError('All-alert event effects require the Supabase analysis tables.')
       return
     }
+    if (!study) return
     let active = true
     setRemoteLoading(true)
+    setRemoteEffects(null)
     setRemoteError(null)
     fetchEventEffects({
+      start: `${study.studyYear}-01-01`,
+      end: `${study.studyYear}-12-31`,
       scope,
       windowDays,
       timing,
@@ -268,7 +278,7 @@ export default function AnalysisLab({
       })
       .finally(() => active && setRemoteLoading(false))
     return () => { active = false }
-  }, [cohort, hazard, scope, timing, windowDays])
+  }, [cohort, hazard, scope, study, timing, windowDays])
 
   const sourceEffects = cohort === 'major' ? study?.effects ?? [] : remoteEffects ?? []
   const eventMap = useMemo(() => {
@@ -373,7 +383,10 @@ export default function AnalysisLab({
     <main className="lab-view">
       <section className="lab-hero">
         <div><span className="eyebrow">Analysis Lab · {study.studyYear}</span><h1>Compare attention and event activity.</h1><p>Study individual flood and wildfire responses or compare rolling event exposure with climate and electric-vehicle attention across countries, the EU and the world.</p></div>
-        <div className="lab-status"><span className="live-dot" /><div><strong>{study.coverage.observedDays} observed days</strong><small>{study.coverage.geographies} markets · {study.coverage.excludedPeriods?.length ? 'confirmed provider gap excluded' : 'both topics'}</small></div></div>
+        <div className="lab-hero-controls">
+          <label className="lab-year-select"><span>Study year</span><select aria-label="Study year" value={study.studyYear} onChange={(event) => setSelectedYear(Number(event.target.value))}>{availableYears.map((year) => <option key={year} value={year}>{year}</option>)}</select></label>
+          <div className="lab-status"><span className="live-dot" /><div><strong>{study.coverage.observedDays} observed days</strong><small>{study.coverage.geographies} markets · {study.coverage.excludedPeriods?.length ? 'confirmed provider gap excluded' : 'both topics'}</small></div></div>
+        </div>
       </section>
 
       <div className="lab-mode-switch" role="tablist" aria-label="Analysis mode"><button role="tab" aria-selected={mode === 'study'} className={mode === 'study' ? 'active' : ''} onClick={() => setMode('study')}>Event study</button><button role="tab" aria-selected={mode === 'activity'} className={mode === 'activity' ? 'active' : ''} onClick={() => setMode('activity')}>Event activity</button></div>
@@ -438,7 +451,7 @@ export default function AnalysisLab({
           </>}
         </div>
       </section>
-      </> : <EventActivityView studyYear={study.studyYear} geographyLabels={geographyLabels} eventGeographies={eventGeographies} />}
+      </> : <EventActivityView studyYear={study.studyYear} coverageStart={study.coverage.start} coverageEnd={study.coverage.end} geographyLabels={geographyLabels} eventGeographies={eventGeographies} />}
     </main>
   )
 }

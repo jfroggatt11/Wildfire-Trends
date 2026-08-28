@@ -56,9 +56,9 @@ const shiftDate = (value: string, days: number) => {
   return result.toISOString().slice(0, 10)
 }
 
-const dateRange = (year: number) => {
+const dateRange = (start: string, end: string) => {
   const dates: string[] = []
-  for (let day = `${year}-01-01`; day <= `${year}-12-31`; day = shiftDate(day, 1)) dates.push(day)
+  for (let day = start; day <= end; day = shiftDate(day, 1)) dates.push(day)
   return dates
 }
 
@@ -110,10 +110,14 @@ function formatAnomaly(value: unknown, measure: Measure) {
 
 export default function EventActivityView({
   studyYear,
+  coverageStart,
+  coverageEnd,
   geographyLabels,
   eventGeographies,
 }: {
   studyYear: number
+  coverageStart: string
+  coverageEnd: string
   geographyLabels: Record<string, string>
   eventGeographies: string[]
 }) {
@@ -136,8 +140,8 @@ export default function EventActivityView({
   const [attentionRows, setAttentionRows] = useState<(AttentionObservation | RegionAttentionObservation)[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const start = `${studyYear}-01-01`
-  const end = `${studyYear}-12-31`
+  const start = coverageStart
+  const end = coverageEnd
   const activeLocations = useMemo(
     () => placeMode === 'compare' ? comparisonLocations : [location],
     [comparisonLocations, location, placeMode],
@@ -184,7 +188,7 @@ export default function EventActivityView({
   }, [activeLocations, cohort, end, hazard, start])
 
   const points = useMemo(() => {
-    const dates = dateRange(studyYear)
+    const dates = dateRange(start, end)
     const activityByLocation = new Map<string, Map<string, { started: number; active: number }>>()
     for (const row of activityRows) {
       const activityByDate = activityByLocation.get(row.geography) ?? new Map<string, { started: number; active: number }>()
@@ -247,7 +251,7 @@ export default function EventActivityView({
       }
       return point
     })
-  }, [activeLocations, activityRows, attentionRows, measure, rollingDays, studyYear])
+  }, [activeLocations, activityRows, attentionRows, end, measure, rollingDays, start])
 
   const chartSeries = useMemo(() => placeMode === 'compare'
     ? activeLocations.map((selectedLocation, index) => ({

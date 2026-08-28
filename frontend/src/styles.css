@@ -327,6 +327,10 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
 .lab-hero h1, .methods-hero h1 { margin: 7px 0 9px; font-family: Georgia, serif; font-size: clamp(31px, 4vw, 50px); font-weight: 500; line-height: .98; letter-spacing: -.035em; }
 .lab-hero p, .methods-hero p { max-width: 660px; margin: 0; color: #b9cbc4; font-size: 12px; line-height: 1.55; }
 .lab-hero .eyebrow, .methods-hero .eyebrow { color: var(--lime); }
+.lab-hero-controls { flex: 0 0 auto; display: flex; align-items: stretch; gap: 8px; }
+.lab-year-select { display: flex; flex-direction: column; justify-content: center; gap: 4px; min-width: 96px; padding: 9px 11px; border: 1px solid rgba(255,255,255,.14); border-radius: 8px; background: rgba(255,255,255,.05); }
+.lab-year-select span { color: #9cb2aa; font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
+.lab-year-select select { border: 0; color: white; background: transparent; font: inherit; font-size: 11px; font-weight: 700; cursor: pointer; }
 .lab-status { flex: 0 0 auto; display: flex; align-items: center; gap: 11px; padding: 12px 15px; border: 1px solid rgba(255,255,255,.14); border-radius: 8px; background: rgba(255,255,255,.05); }
 .lab-status div { display: flex; flex-direction: column; }
 .lab-status strong { font-size: 9.5px; }
@@ -766,6 +770,8 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
   .phase-table > div { min-width: 520px; }
   .lab-view, .methods-view, .data-summary-view { min-height: 0; }
   .lab-hero, .methods-hero { align-items: flex-start; flex-direction: column; padding: 28px 20px; }
+  .lab-hero-controls { width: 100%; }
+  .lab-year-select { flex: 0 0 96px; }
   .lab-status { width: 100%; }
   .lab-grid { grid-template-columns: 1fr; padding: 14px; }
   .results-panel { grid-column: auto; }

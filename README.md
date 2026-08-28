@@ -44,9 +44,9 @@ The root `netlify.toml` builds and publishes the Vite app. Article-level Parquet
 retained locally for validation, but the public interface is not an article finder
 and does not publish URLs or detailed article records.
 
-The frontend export also rebuilds `data/analysis/event_effects.parquet` and the
-compact `frontend/public/data/event-study.json` serving asset. Rebuild the analysis
-without the other frontend assets with:
+The frontend export also rebuilds the 2025 and 2026 major-event study assets. The
+Analysis Lab exposes a year selector and bounds partial-year charts to actual stored
+attention coverage. Rebuild one analysis without the other frontend assets with:
 
 ```bash
 climate-attention build-event-study \

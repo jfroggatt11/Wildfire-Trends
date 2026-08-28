@@ -76,11 +76,43 @@ export type RegionAttentionObservation = {
 }
 
 export type EventEffectQuery = {
+  start: string
+  end: string
   scope: EventEffectObservation['scope']
   windowDays: number
   timing: EventEffectObservation['timing']
   alerts?: EventEffectObservation['alertLevel'][]
   hazard?: EventEffectObservation['hazardType']
+}
+
+export function buildEventEffectsUrl(
+  baseUrl: string,
+  query: EventEffectQuery,
+  offset = 0,
+  limit = 1000,
+) {
+  const select = [
+    'event_id', 'hazard_type', 'alert_level', 'start_at', 'end_at', 'geography_ids',
+    'scope', 'topic_id', 'window_days', 'timing', 'complete', 'missing_days', 'overlap',
+    'matched_pre_mean', 'matched_post_mean', 'matched_change', 'matched_percent_change',
+    'political_pre_mean', 'political_post_mean', 'political_change',
+    'political_percent_change', 'political_share_pre', 'political_share_post',
+    'political_share_change',
+  ].join(',')
+  const params = new URLSearchParams({
+    select,
+    scope: `eq.${query.scope}`,
+    window_days: `eq.${query.windowDays}`,
+    timing: `eq.${query.timing}`,
+    start_at: `gte.${query.start}`,
+    order: 'event_id.asc,topic_id.asc',
+    offset: String(offset),
+    limit: String(limit),
+  })
+  params.append('start_at', `lte.${query.end}`)
+  if (query.alerts?.length) params.set('alert_level', `in.(${query.alerts.join(',')})`)
+  if (query.hazard) params.set('hazard_type', `eq.${query.hazard}`)
+  return `${baseUrl.replace(/\/$/, '')}/rest/v1/event_effects?${params}`
 }
 
 const ATTENTION_SELECT = [
@@ -144,63 +176,80 @@ async function fetchPagedRows(urlForPage: (offset: number, limit: number) => str
   const config = runtimeConfig()
   if (!config) throw new Error('Supabase frontend access is not enabled')
   const pageSize = 1000
-  const result: Record<string, unknown>[] = []
-  for (let offset = 0; ; offset += pageSize) {
-    const response = await fetch(urlForPage(offset, pageSize), { headers: requestHeaders(config) })
-    const rows = await responseJson(response) as Record<string, unknown>[]
-    result.push(...rows)
-    if (rows.length < pageSize) return result
+  const pagesPerWave = 4
+  const first = await fetchJsonWithRetry(urlForPage(0, pageSize), config, true)
+  const result: Record<string, unknown>[] = [...first.rows]
+  if (first.rows.length < pageSize) return result
+  if (first.total != null) {
+    const offsets = Array.from(
+      { length: Math.max(0, Math.ceil(first.total / pageSize) - 1) },
+      (_, index) => (index + 1) * pageSize,
+    )
+    for (let index = 0; index < offsets.length; index += pagesPerWave) {
+      const pages = await Promise.all(offsets.slice(index, index + pagesPerWave).map((offset) =>
+        fetchJsonWithRetry(urlForPage(offset, pageSize), config),
+      ))
+      for (const page of pages) result.push(...page.rows)
+    }
+    return result
+  }
+  for (let offset = pageSize; ; offset += pageSize) {
+    const page = await fetchJsonWithRetry(urlForPage(offset, pageSize), config)
+    result.push(...page.rows)
+    if (page.rows.length < pageSize) return result
   }
 }
 
-async function responseJson(response: Response) {
-  if (!response.ok) {
+async function fetchJsonWithRetry(url: string, config: SupabaseConfig, countExact = false) {
+  let lastError: Error | null = null
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const controller = new AbortController()
+    const timeout = window.setTimeout(() => controller.abort(), 12_000)
+    let response: Response
+    try {
+      response = await fetch(url, {
+        headers: { ...requestHeaders(config), ...(countExact ? { Prefer: 'count=exact' } : {}) },
+        signal: controller.signal,
+      })
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error))
+      window.clearTimeout(timeout)
+      if (attempt < 2) {
+        await new Promise((resolve) => window.setTimeout(resolve, 300 * 2 ** attempt))
+        continue
+      }
+      throw lastError
+    }
+    window.clearTimeout(timeout)
+    if (response.ok) {
+      const range = response.headers.get('content-range')
+      const totalText = range?.split('/')[1]
+      return {
+        rows: await response.json() as Record<string, unknown>[],
+        total: totalText && totalText !== '*' ? Number(totalText) : null,
+      }
+    }
     const detail = await response.text()
-    throw new Error(`Supabase request failed (${response.status}): ${detail.slice(0, 240)}`)
+    lastError = new Error(`Supabase request failed (${response.status}): ${detail.slice(0, 240)}`)
+    if (response.status !== 429 && response.status < 500) throw lastError
+    if (attempt < 2) await new Promise((resolve) => window.setTimeout(resolve, 300 * 2 ** attempt))
   }
-  return response.json()
+  throw lastError ?? new Error('Supabase request failed')
 }
 
 export async function fetchAttentionWindow(query: WindowQuery): Promise<AttentionObservation[]> {
   const config = runtimeConfig()
   if (!config) throw new Error('Supabase frontend access is not enabled')
-  const pageSize = 1000
-  const result: AttentionObservation[] = []
-  for (let offset = 0; ; offset += pageSize) {
-    const response = await fetch(buildAttentionUrl(config.url, query, offset, pageSize), {
-      headers: requestHeaders(config),
-    })
-    const rows = await responseJson(response) as Record<string, unknown>[]
-    result.push(...rows.map(mapAttentionRow).filter((row) => !isKnownAttentionOutage(row.date)))
-    if (rows.length < pageSize) return result
-  }
+  const rows = await fetchPagedRows((offset, limit) =>
+    buildAttentionUrl(config.url, query, offset, limit))
+  return rows.map(mapAttentionRow).filter((row) => !isKnownAttentionOutage(row.date))
 }
 
 export async function fetchEventEffects(query: EventEffectQuery): Promise<EventEffectObservation[]> {
   const config = runtimeConfig()
   if (!config) throw new Error('Supabase frontend access is not enabled')
-  const select = [
-    'event_id', 'hazard_type', 'alert_level', 'start_at', 'end_at', 'geography_ids',
-    'scope', 'topic_id', 'window_days', 'timing', 'complete', 'missing_days', 'overlap',
-    'matched_pre_mean', 'matched_post_mean', 'matched_change', 'matched_percent_change',
-    'political_pre_mean', 'political_post_mean', 'political_change',
-    'political_percent_change', 'political_share_pre', 'political_share_post',
-    'political_share_change',
-  ].join(',')
-  const rows = await fetchPagedRows((offset, limit) => {
-    const params = new URLSearchParams({
-      select,
-      scope: `eq.${query.scope}`,
-      window_days: `eq.${query.windowDays}`,
-      timing: `eq.${query.timing}`,
-      order: 'event_id.asc,topic_id.asc',
-      offset: String(offset),
-      limit: String(limit),
-    })
-    if (query.alerts?.length) params.set('alert_level', `in.(${query.alerts.join(',')})`)
-    if (query.hazard) params.set('hazard_type', `eq.${query.hazard}`)
-    return `${config.url}/rest/v1/event_effects?${params}`
-  })
+  const rows = await fetchPagedRows((offset, limit) =>
+    buildEventEffectsUrl(config.url, query, offset, limit))
   return rows.map(mapEventEffect)
 }
 
