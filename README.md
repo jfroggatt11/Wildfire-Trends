@@ -78,11 +78,14 @@ This materialises event-level effects, sparse country-day event activity, and da
 global/EU27 attention. The browser requests only the selected specification and
 country, rather than downloading raw articles or millions of event-day rows. The
 Event activity view offers Green/major/all-alert filters, 7- or 28-day rolling event
-starts, both MVP attention topics, and exploratory lead/lag correlations. Positive
-lag means attention follows event activity. These correlations are descriptive and
-do not adjust for autocorrelation, seasonality or common news shocks. Country
-comparison mode overlays one selected attention topic and rolling event starts for
-two to five countries. Country rankings default to at least three eligible events,
+starts, both MVP attention topics, and exploratory lead/lag correlations. Event load
+and attention use aligned panels rather than a dual axis; attention defaults to a
+strict 7-day trailing average, with raw daily values available as a display option.
+Positive lag means attention follows event activity. Lag series are faceted on a
+shared scale and values inside |r| < 0.10 are labelled as descriptively negligible.
+These correlations do not adjust for autocorrelation, seasonality or common news
+shocks. Country comparison mode shows one selected attention topic and rolling event
+starts for two to five countries. Country rankings default to at least three eligible events,
 offer 1/2/3/5/10-event thresholds, and sort by event count or absolute response. The attention
 chart defaults to a labelled symmetric 98%-range focus scale with a full-range
 option, while the lead/lag axis adapts to the observed correlations. A separate

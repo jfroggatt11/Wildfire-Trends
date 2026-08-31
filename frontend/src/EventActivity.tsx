@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Activity, BarChart3, CircleAlert, Info } from 'lucide-react'
 import {
-  Bar,
+  Area,
   CartesianGrid,
   ComposedChart,
-  Legend,
   Line,
   LineChart,
   ReferenceArea,
@@ -32,6 +31,7 @@ type Measure = 'matched' | 'political' | 'political_share'
 type Topic = 'climate_change' | 'electric_vehicles'
 type PlaceMode = 'single' | 'compare'
 type ScaleMode = 'focus' | 'full'
+type AttentionDetail = 'average' | 'daily'
 
 const TOPICS: Record<Topic, { label: string; color: string }> = {
   climate_change: { label: 'Climate change', color: '#286e59' },
@@ -47,6 +47,8 @@ const COHORT_ALERTS: Record<Cohort, EventActivityObservation['alertLevel'][]> = 
 const GDELT_OUTAGE = { start: '2025-06-14', end: '2025-07-01' }
 const COUNTRY_COLORS = ['#286e59', '#6575b7', '#c56f42', '#8a6aa8', '#2f8791']
 const MAX_COMPARISON_COUNTRIES = 5
+const ATTENTION_AVERAGE_DAYS = 7
+const NEGLIGIBLE_CORRELATION = 0.1
 
 const eventKey = (location: string) => `events_${location}`
 const attentionKey = (location: string, topic: Topic) => `attention_${location}_${topic}`
@@ -134,6 +136,7 @@ export default function EventActivityView({
   const [cohort, setCohort] = useState<Cohort>('all')
   const [measure, setMeasure] = useState<Measure>('matched')
   const [scaleMode, setScaleMode] = useState<ScaleMode>('focus')
+  const [attentionDetail, setAttentionDetail] = useState<AttentionDetail>('average')
   const [rollingDays, setRollingDays] = useState(28)
   const [activityRows, setActivityRows] = useState<EventActivityObservation[]>([])
   const [attentionRows, setAttentionRows] = useState<(AttentionObservation | RegionAttentionObservation)[]>([])
@@ -273,9 +276,24 @@ export default function EventActivityView({
       })),
   [activeLocations, comparisonTopic, geographyLabels, location, placeMode])
 
-  const attentionValues = useMemo(() => points.flatMap((point) => chartSeries
+  const attentionPlotPoints = useMemo(() => {
+    if (attentionDetail === 'daily') return points
+    return points.map((point, index) => {
+      const plottedPoint = { ...point }
+      for (const series of chartSeries) {
+        const window = points.slice(index - ATTENTION_AVERAGE_DAYS + 1, index + 1)
+          .map((item) => item[series.key])
+        plottedPoint[series.key] = window.length === ATTENTION_AVERAGE_DAYS && window.every((value) => typeof value === 'number' && Number.isFinite(value))
+          ? mean(window as number[])
+          : null
+      }
+      return plottedPoint
+    })
+  }, [attentionDetail, chartSeries, points])
+
+  const attentionValues = useMemo(() => attentionPlotPoints.flatMap((point) => chartSeries
     .map((series) => point[series.key])
-    .filter((value): value is number => typeof value === 'number' && Number.isFinite(value))), [chartSeries, points])
+    .filter((value): value is number => typeof value === 'number' && Number.isFinite(value))), [attentionPlotPoints, chartSeries])
   const attentionBound = useMemo(
     () => symmetricBound(attentionValues, scaleMode === 'focus' ? 0.98 : 1, measure === 'political_share' ? 2 : 25),
     [attentionValues, measure, scaleMode],
@@ -310,7 +328,7 @@ export default function EventActivityView({
   const lagValues = lagPoints.flatMap((point) => chartSeries
     .map((series) => point[series.key])
     .filter((value): value is number => typeof value === 'number' && Number.isFinite(value)))
-  const lagBound = Math.min(1, symmetricBound(lagValues, 1, 0.05))
+  const lagBound = Math.min(1, symmetricBound(lagValues, 1, NEGLIGIBLE_CORRELATION))
   const lagDomain: [number, number] = [-lagBound, lagBound]
   const bestLag = chartSeries.map((series) => {
     const available = lagPoints.filter((point) => typeof point[series.key] === 'number')
@@ -319,6 +337,25 @@ export default function EventActivityView({
       point: available.sort((left, right) => Math.abs(Number(right[series.key])) - Math.abs(Number(left[series.key])))[0],
     }
   })
+  const strongestAssociation = bestLag.reduce<(typeof bestLag)[number] | null>((strongest, candidate) => {
+    if (!candidate.point) return strongest
+    if (!strongest?.point) return candidate
+    return Math.abs(Number(candidate.point[candidate.series.key])) > Math.abs(Number(strongest.point[strongest.series.key]))
+      ? candidate
+      : strongest
+  }, null)
+  const strongestCorrelation = strongestAssociation?.point
+    ? Math.abs(Number(strongestAssociation.point[strongestAssociation.series.key]))
+    : null
+  const associationLabel = strongestCorrelation == null
+    ? 'Insufficient variation'
+    : strongestCorrelation < NEGLIGIBLE_CORRELATION
+      ? 'No clear association'
+      : strongestCorrelation < 0.3
+        ? 'Weak association'
+        : strongestCorrelation < 0.5
+          ? 'Moderate association'
+          : 'Strong association'
 
   const addComparisonCountry = (country: string) => {
     if (!country || comparisonLocations.includes(country) || comparisonLocations.length >= MAX_COMPARISON_COUNTRIES) return
@@ -339,10 +376,11 @@ export default function EventActivityView({
           <label><span>Event alert tier</span><select value={cohort} onChange={(event) => setCohort(event.target.value as Cohort)}><option value="all">All tiers · Green, Orange, Red</option><option value="major">Major tiers · Orange and Red</option><option value="green">Green tier only</option></select></label>
           <label><span>Event type</span><select value={hazard} onChange={(event) => setHazard(event.target.value as Hazard)}><option value="all">Floods and wildfires</option><option value="flood">Floods</option><option value="wildfire">Wildfires</option></select></label>
           <label><span>Attention measure</span><select value={measure} onChange={(event) => setMeasure(event.target.value as Measure)}><option value="matched">All matching articles</option><option value="political">Political articles</option><option value="political_share">Political share</option></select></label>
+          <label><span>Attention view</span><select value={attentionDetail} onChange={(event) => setAttentionDetail(event.target.value as AttentionDetail)}><option value="average">7-day trailing average</option><option value="daily">Daily values</option></select><small>The average reduces day-to-day noise without filling provider gaps</small></label>
           <label><span>Attention scale</span><select value={scaleMode} onChange={(event) => setScaleMode(event.target.value as ScaleMode)}><option value="focus">Focus on typical range</option><option value="full">Show every extreme</option></select><small>{scaleMode === 'focus' ? 'Symmetric 98% range; extremes are flagged below the chart' : 'Symmetric range including every daily value'}</small></label>
           <label><span>Rolling event window</span><select value={rollingDays} onChange={(event) => setRollingDays(Number(event.target.value))}><option value={7}>7 days</option><option value={28}>28 days</option></select></label>
         </div>
-        <div className="analysis-definition"><Info size={15} /><p><strong>Country exposure.</strong> Multi-country events count once in every affected country. Comparison mode uses solid attention lines and dashed rolling-event lines, with a maximum of five countries.</p></div>
+        <div className="analysis-definition"><Info size={15} /><p><strong>Country exposure.</strong> Multi-country events count once in every affected country. Comparison mode separates rolling event load and attention into aligned panels for up to five countries.</p></div>
       </aside>
 
       <div className="activity-results">
@@ -350,47 +388,82 @@ export default function EventActivityView({
           <div className="activity-kpis">
             <article><small>{placeMode === 'compare' ? 'Event-country starts' : 'Events started'}</small><strong>{totalStarts.toLocaleString()}</strong><span>{placeMode === 'compare' ? 'Country exposures; a multi-country event may repeat' : cohort === 'major' ? 'Major tiers · Orange and Red' : cohort === 'green' ? 'Green tier only' : 'All tiers · Green, Orange, Red'}</span></article>
             <article><small>Peak rolling load</small><strong>{peakRolling.toLocaleString()}</strong><span>{placeMode === 'compare' ? `Highest selected country within ${rollingDays} days` : `Starts within ${rollingDays} days`}</span></article>
-            {bestLag.map(({ series, point }) => <article key={series.key}><small>{series.label} strongest lag</small><strong>{point ? `${Number(point.lag) > 0 ? '+' : ''}${point.lag}d` : '—'}</strong><span>{point ? `r = ${Number(point[series.key]).toFixed(2)}` : 'Insufficient variation'}</span></article>)}
+            <article className="association-kpi"><small>Association across −28 to +28 days</small><strong>{associationLabel}</strong><span>{strongestCorrelation == null ? 'No usable lag correlations' : `Largest |r| = ${strongestCorrelation.toFixed(2)} across ${chartSeries.length} plotted series`}</span></article>
           </div>
 
           <section className="activity-chart-card">
-            <div className="result-heading"><div><span className="eyebrow">Event activity and attention</span><h2>Do attention anomalies move with event load?</h2></div><small>{rollingDays}-day starts · preceding 28-day attention baseline</small></div>
-            <div className="activity-chart">
-              <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={points} margin={{ top: 12, right: 8, bottom: 0, left: 0 }}>
-                  <CartesianGrid stroke="#dce4df" strokeDasharray="3 5" vertical={false} />
-                  <XAxis dataKey="date" ticks={axisTicks} tickFormatter={(value) => formatAxisDate(String(value), multiYearAxis)} minTickGap={38} tick={{ fontSize: 8, fill: '#738179' }} />
-                  <YAxis yAxisId="attention" domain={attentionDomain} allowDataOverflow width={45} tickFormatter={(value) => `${value > 0 ? '+' : ''}${Math.round(value)}${measure === 'political_share' ? ' pp' : '%'}`} tick={{ fontSize: 8, fill: '#738179' }} />
-                  <YAxis yAxisId="events" domain={eventDomain} orientation="right" width={35} allowDecimals={false} tick={{ fontSize: 8, fill: '#a17b42' }} />
-                  <Tooltip labelFormatter={(value) => new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(String(value)))} formatter={(value, name) => String(name).includes('event starts') ? [Number(value).toFixed(0), name] : [formatAnomaly(value, measure), name]} />
-                  <Legend wrapperStyle={{ fontSize: 9 }} />
-                  <ReferenceLine yAxisId="attention" y={0} stroke="#9eaaa4" />
-                  {placeMode === 'single' && <Bar yAxisId="events" dataKey={eventKey(location)} name="Rolling event starts" fill="#d7b878" opacity={0.38} barSize={4} />}
-                  {start <= GDELT_OUTAGE.end && end >= GDELT_OUTAGE.start && <ReferenceArea yAxisId="attention" x1={GDELT_OUTAGE.start} x2={GDELT_OUTAGE.end} fill="#70879a" fillOpacity={0.13} stroke="#60798d" strokeOpacity={0.55} label={{ value: 'Provider gap · excluded', position: 'insideTop', fill: '#506879', fontSize: 8 }} />}
-                  {placeMode === 'compare' && chartSeries.map((series) => <Line key={`events-${series.location}`} yAxisId="events" type="monotone" dataKey={series.eventKey} name={`${series.label} · event starts`} legendType="none" stroke={series.color} strokeWidth={1} strokeDasharray="3 5" strokeOpacity={0.3} dot={false} connectNulls={false} />)}
-                  {chartSeries.map((series) => <Line key={series.key} yAxisId="attention" type="monotone" dataKey={series.key} name={series.label} stroke={series.color} strokeWidth={2.4} dot={false} connectNulls={false} />)}
-                </ComposedChart>
-              </ResponsiveContainer>
+            <div className="result-heading"><div><span className="eyebrow">Event activity and attention</span><h2>Event load and attention over time</h2></div><small>Aligned panels · no dual axis</small></div>
+            <div className="activity-series-legend" aria-label={placeMode === 'compare' ? 'Country series' : 'Attention topics'}>
+              {chartSeries.map((series) => <span key={series.key}><i style={{ background: series.color }} />{series.label}</span>)}
             </div>
-            {placeMode === 'compare' && <div className="chart-line-key"><span><i className="solid" />Attention anomaly</span><span><i className="dashed" />Rolling event starts</span></div>}
-            {scaleMode === 'focus' && <div className="chart-scale-note"><Info size={14} /><p><strong>Focused scale.</strong> The axis shows the symmetric 98% range ({formatAnomaly(-attentionBound, measure)} to {formatAnomaly(attentionBound, measure)}). {clippedAttentionValues ? `${clippedAttentionValues} extreme daily value${clippedAttentionValues === 1 ? ' is' : 's are'} outside the plot; choose “Show every extreme” to inspect ${clippedAttentionValues === 1 ? 'it' : 'them'}.` : 'No plotted values are clipped.'}</p></div>}
+            <div className="activity-chart-stack">
+              <div className="activity-chart-panel event-load-panel">
+                <div className="activity-panel-heading"><strong>{rollingDays}-day rolling event starts</strong><small>{placeMode === 'compare' ? 'One line per selected country' : 'Event load'}</small></div>
+                <div className="event-load-chart">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart data={points} margin={{ top: 6, right: 2, bottom: 0, left: 2 }}>
+                      <CartesianGrid stroke="#e1e7e3" strokeDasharray="3 5" vertical={false} />
+                      <XAxis dataKey="date" ticks={axisTicks} hide />
+                      <YAxis yAxisId="spacer" width={45} tick={false} axisLine={false} />
+                      <YAxis yAxisId="events" domain={eventDomain} orientation="right" width={45} allowDecimals={false} tick={{ fontSize: 8, fill: '#947542' }} />
+                      <Tooltip labelFormatter={(value) => new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(String(value)))} formatter={(value, name) => [Number(value).toFixed(0), name]} />
+                      {placeMode === 'single'
+                        ? <Area yAxisId="events" type="linear" dataKey={eventKey(location)} name={`${rollingDays}-day event starts`} stroke="#b78f4b" strokeWidth={1.5} fill="#d7b878" fillOpacity={0.34} dot={false} />
+                        : chartSeries.map((series) => <Line key={`events-${series.location}`} yAxisId="events" type="linear" dataKey={series.eventKey} name={series.label} stroke={series.color} strokeWidth={1.6} dot={false} connectNulls={false} />)}
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div className="activity-chart-panel attention-panel">
+                <div className="activity-panel-heading"><strong>Attention anomaly</strong><small>{attentionDetail === 'average' ? '7-day trailing average' : 'Daily values'} · compared with each day’s preceding 28-day baseline</small></div>
+                <div className="attention-anomaly-chart">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={attentionPlotPoints} margin={{ top: 6, right: 2, bottom: 0, left: 2 }}>
+                      <CartesianGrid stroke="#dce4df" strokeDasharray="3 5" vertical={false} />
+                      <XAxis dataKey="date" ticks={axisTicks} tickFormatter={(value) => formatAxisDate(String(value), multiYearAxis)} minTickGap={38} tick={{ fontSize: 8, fill: '#738179' }} />
+                      <YAxis domain={attentionDomain} allowDataOverflow width={45} tickFormatter={(value) => `${value > 0 ? '+' : ''}${Math.round(value)}${measure === 'political_share' ? ' pp' : '%'}`} tick={{ fontSize: 8, fill: '#738179' }} />
+                      <YAxis yAxisId="spacer" orientation="right" width={45} tick={false} axisLine={false} />
+                      <Tooltip labelFormatter={(value) => new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(String(value)))} formatter={(value, name) => [formatAnomaly(value, measure), name]} />
+                      <ReferenceLine y={0} stroke="#9eaaa4" />
+                      {start <= GDELT_OUTAGE.end && end >= GDELT_OUTAGE.start && <ReferenceArea x1={GDELT_OUTAGE.start} x2={GDELT_OUTAGE.end} fill="#70879a" fillOpacity={0.13} stroke="#60798d" strokeOpacity={0.55} label={{ value: 'Provider gap · excluded', position: 'insideTop', fill: '#506879', fontSize: 8 }} />}
+                      {chartSeries.map((series) => <Line key={series.key} type="linear" dataKey={series.key} name={series.label} stroke={series.color} strokeWidth={2.2} dot={false} connectNulls={false} />)}
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+            {scaleMode === 'focus' && <div className="chart-scale-note"><Info size={14} /><p><strong>Focused scale.</strong> The axis shows the symmetric 98% range of the plotted {attentionDetail === 'average' ? '7-day averages' : 'daily values'} ({formatAnomaly(-attentionBound, measure)} to {formatAnomaly(attentionBound, measure)}). {clippedAttentionValues ? `${clippedAttentionValues} extreme value${clippedAttentionValues === 1 ? ' is' : 's are'} outside the plot; choose “Show every extreme” to inspect ${clippedAttentionValues === 1 ? 'it' : 'them'}.` : 'No plotted values are clipped.'}</p></div>}
             {start <= GDELT_OUTAGE.end && end >= GDELT_OUTAGE.start && <div className="analysis-definition outage-note"><CircleAlert size={15} /><p><strong>Provider gap.</strong> GDELT infrastructure was unavailable from 14 June through 1 July 2025. Those dates are excluded—not treated as zero—and lines deliberately break across the gap.</p></div>}
           </section>
 
           <section className="lag-chart-card">
-            <div className="result-heading"><div><span className="eyebrow">Lead / lag exploration</span><h3>When is event activity most associated with attention?</h3></div><small>Positive lag means attention follows events</small></div>
-            <div className="lag-chart">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={lagPoints} margin={{ top: 10, right: 12, bottom: 0, left: 0 }}>
-                  <CartesianGrid stroke="#dce4df" strokeDasharray="3 5" vertical={false} />
-                  <XAxis dataKey="lag" tickFormatter={(value) => `${value > 0 ? '+' : ''}${value}d`} tick={{ fontSize: 8, fill: '#738179' }} />
-                  <YAxis domain={lagDomain} allowDataOverflow width={40} tickFormatter={(value) => Number(value).toFixed(lagBound <= 0.2 ? 2 : 1)} tick={{ fontSize: 8, fill: '#738179' }} />
-                  <Tooltip formatter={(value) => Number(value).toFixed(3)} labelFormatter={(value) => `${Number(value) > 0 ? '+' : ''}${value} day lag`} />
-                  <ReferenceLine x={0} stroke="#bd8b3b" strokeDasharray="4 4" />
-                  <ReferenceLine y={0} stroke="#9eaaa4" />
-                  {chartSeries.map((series) => <Line key={series.key} type="monotone" dataKey={series.key} name={series.label} stroke={series.color} strokeWidth={2} dot={false} connectNulls />)}
-                </LineChart>
-              </ResponsiveContainer>
+            <div className="result-heading"><div><span className="eyebrow">Lead / lag exploration</span><h3>Is the timing relationship consistent?</h3></div><small>Separate panels use the same Pearson r scale</small></div>
+            <div className="lag-band-key"><i />Shaded region: negligible descriptive association (|r| &lt; 0.10)</div>
+            <div className="lag-facet-grid">
+              {bestLag.map(({ series, point }) => {
+                const correlation = point ? Number(point[series.key]) : null
+                const lag = point ? Number(point.lag) : null
+                const negligible = correlation != null && Math.abs(correlation) < NEGLIGIBLE_CORRELATION
+                return <section className="lag-facet" key={series.key}>
+                  <div className="lag-facet-heading"><div><i style={{ background: series.color }} /><strong>{series.label}</strong></div><small>{correlation == null || lag == null ? 'Insufficient variation' : negligible ? `All lags negligible · max |r| ${Math.abs(correlation).toFixed(2)}` : `Strongest observed: ${lag > 0 ? '+' : ''}${lag}d · r ${correlation.toFixed(2)}`}</small></div>
+                  <div className="lag-facet-chart">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={lagPoints} margin={{ top: 6, right: 8, bottom: 0, left: 0 }}>
+                        <CartesianGrid stroke="#e0e6e2" strokeDasharray="3 5" vertical={false} />
+                        <XAxis dataKey="lag" ticks={[-28, -14, 0, 14, 28]} tickFormatter={(value) => value === 0 ? '0' : `${value > 0 ? '+' : ''}${value}d`} tick={{ fontSize: 8, fill: '#738179' }} />
+                        <YAxis domain={lagDomain} ticks={[-lagBound, 0, lagBound]} allowDataOverflow width={40} tickFormatter={(value) => Number(value).toFixed(lagBound <= 0.2 ? 2 : 1)} tick={{ fontSize: 8, fill: '#738179' }} />
+                        <Tooltip formatter={(value) => [Number(value).toFixed(3), 'Pearson r']} labelFormatter={(value) => `${Number(value) > 0 ? '+' : ''}${value} day lag`} />
+                        <ReferenceArea y1={-NEGLIGIBLE_CORRELATION} y2={NEGLIGIBLE_CORRELATION} fill="#dce4df" fillOpacity={0.5} />
+                        <ReferenceLine x={0} stroke="#bd8b3b" strokeDasharray="4 4" />
+                        <ReferenceLine y={0} stroke="#8f9d96" />
+                        <Line type="linear" dataKey={series.key} name={series.label} stroke={series.color} strokeWidth={2.2} dot={false} connectNulls />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="lag-direction-labels"><span>← Attention leads events</span><span>Attention follows events →</span></div>
+                </section>
+              })}
             </div>
             <div className="analysis-definition"><BarChart3 size={15} /><p><strong>Exploratory correlation.</strong> Pearson r compares rolling event starts with attention anomalies at each lag. Autocorrelation, seasonality and shared news cycles mean this is not a causal estimate.</p></div>
           </section>
