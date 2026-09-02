@@ -174,6 +174,38 @@ test('trackpad-style zoom stays inside the map and clusters resolve at source co
   expect(errors).toEqual([])
 })
 
+test('clusters that cannot separate at maximum zoom expose every event for selection', async ({ page }) => {
+  const errors = collectClientErrors(page)
+  await openExplorer(page)
+  const map = page.locator('.atlas-svg-map')
+  const svg = map.locator(':scope > svg')
+  const clusters = page.locator('.atlas-marker.cluster')
+  const counts = await clusters.evaluateAll((markers) => markers.map((marker) => Number(marker.getAttribute('data-count'))))
+  const densestIndex = counts.indexOf(Math.max(...counts))
+  const clusterPosition = await clusters.nth(densestIndex).getAttribute('transform')
+  expect(clusterPosition).toBeTruthy()
+
+  for (let click = 0; click < 4; click += 1) {
+    await page.locator('.atlas-marker.cluster').evaluateAll((markers, position) => {
+      const marker = markers.find((item) => item.getAttribute('transform') === position)
+      marker?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    }, clusterPosition)
+    if (await page.locator('.cluster-picker').isVisible()) break
+    await expect(map).toHaveAttribute('data-camera-animating', 'false')
+  }
+
+  await expect(svg).toHaveAttribute('data-zoom', '18.000')
+  const picker = page.locator('.cluster-picker')
+  await expect(picker).toBeVisible()
+  const remainingCount = Number((await picker.locator('header small').textContent())?.match(/^\d+/)?.[0])
+  expect(remainingCount).toBeGreaterThan(1)
+  await expect(picker.locator('.cluster-picker-list > button')).toHaveCount(remainingCount)
+  await picker.locator('.cluster-picker-list > button').first().click()
+  await expect(page.locator('.event-drawer')).toBeVisible()
+  await expect(picker).toHaveCount(0)
+  expect(errors).toEqual([])
+})
+
 test('event drawer keeps the corrected map-point label without a geography tab', async ({ page }) => {
   const errors = collectClientErrors(page)
   await page.goto('/?event=gdacs%3AFL%3A1103661', { waitUntil: 'domcontentloaded' })

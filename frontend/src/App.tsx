@@ -622,6 +622,7 @@ const MAX_MAP_ZOOM = 18
 function AtlasMap({ world, events, selectedId, onSelectEvent }: { world: WorldGeoJSON; events: EventFeature[]; selectedId: string | null; onSelectEvent: (id: string | null) => void }) {
   const [transform, setTransform] = useState<AtlasTransform>({ x: 0, y: 0, k: 1 })
   const [frozenClusterZoom, setFrozenClusterZoom] = useState<number | null>(null)
+  const [clusterChoices, setClusterChoices] = useState<EventFeature[] | null>(null)
   const [isCameraAnimating, setIsCameraAnimating] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const dragRef = useRef<{ pointerId: number; clientX: number; clientY: number; x: number; y: number } | null>(null)
@@ -678,6 +679,7 @@ function AtlasMap({ world, events, selectedId, onSelectEvent }: { world: WorldGe
   useEffect(() => {
     cancelCameraAnimation()
     setFrozenClusterZoom(null)
+    setClusterChoices(null)
   }, [events, cancelCameraAnimation])
 
   const countryPaths = useMemo(
@@ -728,6 +730,7 @@ function AtlasMap({ world, events, selectedId, onSelectEvent }: { world: WorldGe
   const zoomAt = useCallback((factor: number, anchorX = 500, anchorY = 275) => {
     cancelCameraAnimation()
     setFrozenClusterZoom(null)
+    setClusterChoices(null)
     setTransform((current) => {
       const nextK = Math.min(MAX_MAP_ZOOM, Math.max(1, current.k * factor))
       const worldX = (anchorX - current.x) / current.k
@@ -777,11 +780,21 @@ function AtlasMap({ world, events, selectedId, onSelectEvent }: { world: WorldGe
   const zoomToMarker = (marker: AtlasMarker) => {
     if (marker.events.length === 1) {
       cancelCameraAnimation()
+      setClusterChoices(null)
       onSelectEvent(marker.events[0].properties.id)
       return
     }
     const current = transformRef.current
-    const nextK = Math.min(12, Math.max(current.k * 2.35, 7 + Math.log10(marker.events.length)))
+    const nextK = Math.min(MAX_MAP_ZOOM, Math.max(current.k * 2.35, 7 + Math.log10(marker.events.length)))
+    // Very close (and sometimes identical) coordinates can remain clustered at
+    // the maximum useful map zoom. A further camera animation would be a no-op,
+    // so expose the events directly instead of leaving them unreachable.
+    if (nextK <= current.k + 0.01) {
+      cancelCameraAnimation()
+      setClusterChoices(marker.events)
+      return
+    }
+    setClusterChoices(null)
     setFrozenClusterZoom(current.k)
     animateCameraTo(
       { k: nextK, x: 500 - marker.x * nextK, y: 275 - marker.y * nextK },
@@ -792,6 +805,7 @@ function AtlasMap({ world, events, selectedId, onSelectEvent }: { world: WorldGe
   const onPointerDown = (event: ReactPointerEvent<SVGSVGElement>) => {
     cancelCameraAnimation()
     setFrozenClusterZoom(null)
+    setClusterChoices(null)
     event.currentTarget.setPointerCapture(event.pointerId)
     const current = transformRef.current
     dragRef.current = { pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, x: current.x, y: current.y }
@@ -851,7 +865,11 @@ function AtlasMap({ world, events, selectedId, onSelectEvent }: { world: WorldGe
                   aria-label={isCluster ? `${marker.events.length} events. Activate to zoom in and separate them.` : eventDisplayName(representative.properties)}
                   onPointerDown={(event) => event.stopPropagation()}
                   onClick={() => zoomToMarker(marker)}
-                  onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') zoomToMarker(marker) }}
+                  onKeyDown={(event) => {
+                    if (event.key !== 'Enter' && event.key !== ' ') return
+                    event.preventDefault()
+                    zoomToMarker(marker)
+                  }}
                 >
                   {selected && <circle className="selected-halo" r={(radius + 6) / transform.k} strokeWidth={3 / transform.k} />}
                   <circle
@@ -871,8 +889,25 @@ function AtlasMap({ world, events, selectedId, onSelectEvent }: { world: WorldGe
       <div className="svg-map-controls" aria-label="Map controls">
         <button onClick={() => zoomAt(1.35)} aria-label="Zoom in">+</button>
         <button onClick={() => zoomAt(0.74)} aria-label="Zoom out">−</button>
-        <button onClick={() => { cancelCameraAnimation(); setFrozenClusterZoom(null); transformRef.current = { x: 0, y: 0, k: 1 }; setTransform({ x: 0, y: 0, k: 1 }) }} aria-label="Reset world view"><Globe2 size={14} /></button>
+        <button onClick={() => { cancelCameraAnimation(); setFrozenClusterZoom(null); setClusterChoices(null); transformRef.current = { x: 0, y: 0, k: 1 }; setTransform({ x: 0, y: 0, k: 1 }) }} aria-label="Reset world view"><Globe2 size={14} /></button>
       </div>
+      {clusterChoices && <section className="cluster-picker" role="dialog" aria-label="Choose an event from this location">
+        <header>
+          <div><strong>Choose an event</strong><small>{clusterChoices.length} events remain too close to separate</small></div>
+          <button type="button" onClick={() => setClusterChoices(null)} aria-label="Close event chooser"><X size={15} /></button>
+        </header>
+        <div className="cluster-picker-list">
+          {clusterChoices.map((event) => {
+            const hazard = HAZARDS[event.properties.hazardType]
+            const HazardIcon = hazard.icon
+            return <button type="button" key={event.properties.id} onClick={() => { setClusterChoices(null); onSelectEvent(event.properties.id) }}>
+              <span className="cluster-picker-icon" style={{ color: hazard.color }}><HazardIcon size={15} /></span>
+              <span><strong>{eventDisplayName(event.properties)}</strong><small>{formatDate(event.properties.startAt)} · {event.properties.alertLevel} alert</small></span>
+              <ChevronRight size={14} />
+            </button>
+          })}
+        </div>
+      </section>}
       <span className="map-attribution">Made with Natural Earth</span>
     </div>
   )
