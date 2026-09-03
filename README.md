@@ -26,7 +26,9 @@ Red alerts remain the primary cohort; Green alerts and the complete catalogue ar
 available as sensitivity filters. A stable period control supports either year, the
 whole available 2025–2026 series, and a custom start/end range shared by every Lab
 tab. Timeline markers can use either GDACS alert tiers or wildfire burned-area
-bands; no comparable flood-size category is inferred from the current export.
+bands; no comparable flood-size category is inferred from the current export. The
+comparison view can also overlay start-date cumulative wildfire hectares against
+either attention topic on a separately labelled axis.
 
 Export the current Parquet datasets to compact browser assets, then run the app:
 

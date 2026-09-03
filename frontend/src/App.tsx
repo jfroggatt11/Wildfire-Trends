@@ -937,6 +937,9 @@ function EventDrawer({
   const hazard = HAZARDS[event.hazardType]
   const HazardIcon = hazard.icon
   const displayName = eventDisplayName(event)
+  const wildfireAreaHectares = event.hazardType === 'wildfire' && event.severityUnit?.toLowerCase() === 'ha'
+    ? event.severity
+    : null
   const [attentionMode, setAttentionMode] = useState<AttentionMode>('all')
   const remoteAttention = useRemoteAttention(event, scope, tab === 'coverage')
   const chartRows = isSupabaseEnabled() ? remoteAttention.rows : attention
@@ -962,7 +965,9 @@ function EventDrawer({
         </div>
         <div className="status-row">
           <span className={`alert-badge ${event.alertLevel.toLowerCase()}`}>{event.alertLevel} alert</span>
-          {event.severity != null && <span className="severity-badge">{formatCompact(event.severity)} {event.severityUnit ?? 'severity'}</span>}
+          {wildfireAreaHectares != null
+            ? <span className="severity-badge" title="Cumulative burned area reported by GDACS"><Flame size={12} /> Burned area: {wildfireAreaHectares.toLocaleString('en-GB')} ha</span>
+            : event.severity != null && <span className="severity-badge">Severity: {formatCompact(event.severity)} {event.severityUnit ?? ''}</span>}
           <span className="analysis-badge"><span /> Analysis pending</span>
         </div>
       </div>
@@ -1622,7 +1627,7 @@ function MethodsView({ manifest }: { manifest: Manifest | null }) {
             <header><span>05</span><div><small>Independent treatment</small><h2>Weather-event definitions</h2></div></header>
             <p className="protocol-lede">The event catalogue comes from GDACS, a UN–European Commission cooperation framework for major sudden-onset disasters. The MVP includes event-level wildfires and floods.</p>
             <div className="hazard-method-grid">
-              <article><Flame size={18} /><strong>Wildfire</strong><p>A named GDACS wildfire event. It is not an individual satellite hotspot and does not imply a burned-area estimate.</p></article>
+              <article><Flame size={18} /><strong>Wildfire</strong><p>A named GDACS wildfire event with a cumulative burned-area estimate in hectares. It is not an individual satellite hotspot or a daily perimeter observation.</p></article>
               <article><CloudRain size={18} /><strong>Flood</strong><p>A GDACS flood event assembled from authoritative institutions, media and scientific sources under provider impact rules.</p></article>
             </div>
             <div className="method-definition-grid three">
@@ -1697,7 +1702,7 @@ function MethodsView({ manifest }: { manifest: Manifest | null }) {
             <div className="method-definition-grid two">
               <article><small>Event activity panel</small><strong>Rolling event starts by affected geography</strong><p>Multi-country events count once in every affected country, while global and EU27 aggregates count each unique event once. Aligned panels separate event load from attention, which defaults to a strict 7-day trailing average. The chart offers 7- and 28-day event windows and can compare two to five countries for one selected attention topic. Its default symmetric focus scale covers 98% of plotted attention anomalies, flags clipped extremes and retains daily and full-range options.</p></article>
               <article><small>Lead / lag panel</small><strong>Pearson correlation across −28 to +28 days</strong><p>Attention is expressed relative to its preceding 28-day baseline. Positive lag means attention follows event activity. Series are shown in separate panels on a shared scale, with |r| below 0.10 identified as descriptively negligible. Autocorrelation and common shocks make this exploratory, not causal.</p></article>
-              <article><small>Attention timeline</small><strong>Configurable publishing trends with event onsets</strong><p>Observed counts can compare both topics within one geography or draw separate lines for up to eight publishing markets. Daily and 7-, 14- or 28-day rolling-average views are available. Dotted lines can mark consistent GDACS alert tiers or hazard-specific wildfire burned-area bands; missing provider days break every affected line and are never imputed or smoothed across.</p></article>
+              <article><small>Attention timeline</small><strong>Configurable publishing trends with event onsets</strong><p>Observed counts can compare both topics, overlay cumulative wildfire hectares on their event start dates, or draw separate attention lines for up to eight publishing markets. Daily and 7-, 14- or 28-day views are available; area uses trailing totals while attention uses trailing averages. Missing provider days break affected attention lines and are never imputed.</p></article>
             </div>
             <div className="method-callout caution"><CircleAlert size={17} /><p><strong>Interpretation.</strong> These are unadjusted temporal associations, not causal estimates or confidence intervals. News cycles are autocorrelated; seasonality, weekday patterns and concurrent stories can confound comparisons. A confirmatory release should pre-register outcomes and add matched dates, untreated markets or interrupted time-series controls.</p></div>
           </section>

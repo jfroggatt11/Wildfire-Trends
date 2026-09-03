@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { rollingAverageValues, wildfireSizeBand } from './AttentionTimeline'
+import { rollingAverageValues, rollingTotalValues, wildfireAreaHectares, wildfireSizeBand } from './AttentionTimeline'
 
 describe('rollingAverageValues', () => {
   it('keeps daily values unchanged', () => {
@@ -31,5 +31,23 @@ describe('wildfireSizeBand', () => {
   it('does not invent a comparable size for floods or missing units', () => {
     expect(wildfireSizeBand({ hazardType: 'flood', severity: 50_000, severityUnit: 'ha' })).toBeNull()
     expect(wildfireSizeBand({ hazardType: 'wildfire', severity: 50_000, severityUnit: null })).toBeNull()
+  })
+
+  it('recognises case-insensitive hectare units and rejects invalid totals', () => {
+    expect(wildfireAreaHectares({ hazardType: 'wildfire', severity: 12_500, severityUnit: 'HA' })).toBe(12_500)
+    expect(wildfireAreaHectares({ hazardType: 'wildfire', severity: -1, severityUnit: 'ha' })).toBeNull()
+    expect(wildfireAreaHectares({ hazardType: 'flood', severity: 12_500, severityUnit: 'ha' })).toBeNull()
+  })
+})
+
+describe('rollingTotalValues', () => {
+  it('keeps daily event-area totals unchanged', () => {
+    expect(rollingTotalValues([0, 5_000, 2_000], 1)).toEqual([0, 5_000, 2_000])
+  })
+
+  it('sums whole-event hectares over the selected trailing window', () => {
+    expect(rollingTotalValues([1_000, 0, 2_000, 3_000, 0, 0, 1_000], 7)).toEqual([
+      null, null, null, null, null, null, 7_000,
+    ])
   })
 })

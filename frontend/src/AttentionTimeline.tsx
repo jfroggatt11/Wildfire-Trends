@@ -21,7 +21,7 @@ type Measure = 'matched' | 'political'
 type PlaceScope = 'world' | 'eu27' | 'country' | 'group'
 type Hazard = 'all' | 'wildfire' | 'flood'
 type AlertTier = KeyEvent['alertLevel']
-type ComparisonMode = 'single' | 'topics' | 'countries'
+type ComparisonMode = 'single' | 'topics' | 'wildfire_area' | 'countries'
 type RollingWindow = 1 | 7 | 14 | 28
 type MarkerMode = 'alert' | 'wildfire_size'
 type WildfireSizeBand = 'under_5k' | '5k_10k' | '10k_50k' | '50k_plus'
@@ -70,6 +70,8 @@ const EU27 = new Set([
 
 const GDELT_OUTAGE = { start: '2025-06-14', end: '2025-07-01' }
 const MAX_GROUP_COUNTRIES = 8
+const WILDFIRE_AREA_KEY = 'wildfire_area_hectares'
+const WILDFIRE_AREA_COLOR = '#826ab4'
 const COUNTRY_COLORS = ['#286e59', '#6575b7', '#c56f42', '#8a6aa8', '#2f8791', '#a46b3d', '#596f9f', '#80954f']
 const ALERT_COLORS: Record<KeyEvent['alertLevel'], string> = {
   Green: '#789342',
@@ -88,11 +90,17 @@ const SIZE_BANDS: Record<WildfireSizeBand, { label: string; color: string; rank:
   '50k_plus': { label: '50,000+ ha', color: '#372466', rank: 3 },
 }
 
+export function wildfireAreaHectares(event: Pick<KeyEvent, 'hazardType' | 'severity' | 'severityUnit'>): number | null {
+  if (event.hazardType !== 'wildfire' || event.severity == null || event.severityUnit?.toLowerCase() !== 'ha') return null
+  return Number.isFinite(event.severity) && event.severity >= 0 ? event.severity : null
+}
+
 export function wildfireSizeBand(event: Pick<KeyEvent, 'hazardType' | 'severity' | 'severityUnit'>): WildfireSizeBand | null {
-  if (event.hazardType !== 'wildfire' || event.severity == null || event.severityUnit !== 'ha') return null
-  if (event.severity < 5_000) return 'under_5k'
-  if (event.severity < 10_000) return '5k_10k'
-  if (event.severity < 50_000) return '10k_50k'
+  const area = wildfireAreaHectares(event)
+  if (area == null) return null
+  if (area < 5_000) return 'under_5k'
+  if (area < 10_000) return '5k_10k'
+  if (area < 50_000) return '10k_50k'
   return '50k_plus'
 }
 
@@ -154,6 +162,13 @@ export function rollingAverageValues(values: (number | null)[], windowDays: Roll
   })
 }
 
+export function rollingTotalValues(values: number[], windowDays: RollingWindow) {
+  return values.map((_, index) => {
+    const window = values.slice(Math.max(0, index - windowDays + 1), index + 1)
+    return window.length === windowDays ? window.reduce((total, value) => total + value, 0) : null
+  })
+}
+
 function TimelineTooltip({
   active,
   payload,
@@ -162,6 +177,7 @@ function TimelineTooltip({
   series,
   rollingWindow,
   markerMode,
+  showWildfireArea,
 }: {
   active?: boolean
   payload?: TimelineTooltipEntry[]
@@ -170,6 +186,7 @@ function TimelineTooltip({
   series: TimelineSeries[]
   rollingWindow: RollingWindow
   markerMode: MarkerMode
+  showWildfireArea: boolean
 }) {
   const point = payload?.find((entry) => entry.payload)?.payload
   if (!active || !point) return null
@@ -183,6 +200,7 @@ function TimelineTooltip({
           if (value == null) return null
           return <span key={item.key}><i style={{ background: item.color }} /><span>{item.label}<small>{rollingWindow === 1 ? (measure === 'matched' ? 'Matching articles' : 'Political articles') : `${rollingWindow}-day average`}</small></span><b>{value.toLocaleString('en-GB', { maximumFractionDigits: rollingWindow === 1 ? 0 : 1 })}</b></span>
         })}
+        {showWildfireArea && point.values[WILDFIRE_AREA_KEY] != null && <span><i style={{ background: WILDFIRE_AREA_COLOR }} /><span>Wildfire burned area<small>{rollingWindow === 1 ? 'Whole-event area on start date' : `${rollingWindow}-day trailing total`}</small></span><b>{compactCount(Number(point.values[WILDFIRE_AREA_KEY]))} ha</b></span>}
       </div>
       {visibleEvents.length > 0 && <div className="timeline-tooltip-events">
         <small>{point.eventCount} event{point.eventCount === 1 ? '' : 's'} started</small>
@@ -229,6 +247,7 @@ export default function AttentionTimeline({
   const [attentionRows, setAttentionRows] = useState<(AttentionObservation | RegionAttentionObservation)[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const showWildfireArea = comparisonMode === 'wildfire_area'
 
   const activeLocations = useMemo(() => {
     if (comparisonMode === 'countries') return groupCountries
@@ -286,7 +305,7 @@ export default function AttentionTimeline({
     const eventDate = event.startAt.slice(0, 10)
     if (eventDate < coverageStart || eventDate > coverageEnd) return false
     if (!selectedAlerts.includes(event.alertLevel)) return false
-    if (hazard !== 'all' && event.hazardType !== hazard) return false
+    if ((showWildfireArea ? event.hazardType !== 'wildfire' : hazard !== 'all' && event.hazardType !== hazard)) return false
     if (markerMode === 'wildfire_size') {
       const eventSizeBand = wildfireSizeBand(event)
       if (!eventSizeBand || !selectedSizeBands.includes(eventSizeBand)) return false
@@ -294,7 +313,7 @@ export default function AttentionTimeline({
     if (comparisonMode !== 'countries' && placeScope === 'world') return true
     if (comparisonMode !== 'countries' && placeScope === 'eu27') return event.geographyIds.some((item) => EU27.has(item))
     return event.geographyIds.some((item) => activeLocations.includes(item))
-  }), [activeLocations, comparisonMode, coverageEnd, coverageStart, hazard, keyEvents, markerMode, placeScope, selectedAlerts, selectedSizeBands])
+  }), [activeLocations, comparisonMode, coverageEnd, coverageStart, hazard, keyEvents, markerMode, placeScope, selectedAlerts, selectedSizeBands, showWildfireArea])
 
   const eventDates = useMemo(() => {
     const grouped = new Map<string, KeyEvent[]>()
@@ -330,14 +349,27 @@ export default function AttentionTimeline({
       item.key,
       rollingAverageValues(rawPoints.map((point) => point.values[item.key]), rollingWindow),
     ]))
+    const areaByDate = new Map<string, number>()
+    if (showWildfireArea) {
+      for (const event of relevantEvents) {
+        const area = wildfireAreaHectares(event)
+        if (area == null) continue
+        const day = event.startAt.slice(0, 10)
+        areaByDate.set(day, (areaByDate.get(day) ?? 0) + area)
+      }
+    }
+    const areaValues = showWildfireArea
+      ? rollingTotalValues(rawPoints.map((point) => areaByDate.get(point.date) ?? 0), rollingWindow)
+      : []
     return rawPoints.map((point, index) => {
       const values: Record<string, number | null> = {}
       for (const item of series) {
         values[item.key] = smoothedValues.get(item.key)?.[index] ?? null
       }
+      if (showWildfireArea) values[WILDFIRE_AREA_KEY] = areaValues[index] ?? null
       return { ...point, values, ...values }
     })
-  }, [attentionRows, coverageEnd, coverageStart, measure, rollingWindow, series])
+  }, [attentionRows, coverageEnd, coverageStart, measure, relevantEvents, rollingWindow, series, showWildfireArea])
 
   const observedValues = plottedPoints.flatMap((point) => series.flatMap((item) => point.values[item.key] == null ? [] : [point.values[item.key] as number]))
   const plottedPeak = observedValues.length ? Math.max(...observedValues) : 0
@@ -378,8 +410,12 @@ export default function AttentionTimeline({
     ? `Topic comparison in ${placeLabel}`
     : comparisonMode === 'countries'
       ? `${TOPICS[topic].label} across ${groupCountries.length} countries`
+      : comparisonMode === 'wildfire_area'
+        ? `${TOPICS[topic].label} and wildfire area in ${placeLabel}`
       : `${TOPICS[topic].label} in ${placeLabel}`
-  const frequencyLabel = rollingWindow === 1 ? 'Daily attention' : `${rollingWindow}-day rolling average`
+  const frequencyLabel = rollingWindow === 1
+    ? showWildfireArea ? 'Daily comparison' : 'Daily attention'
+    : showWildfireArea ? `${rollingWindow}-day attention average + area total` : `${rollingWindow}-day rolling average`
   const axisTicks = useMemo(() => monthTicks(coverageStart, coverageEnd), [coverageEnd, coverageStart])
   const multiYearAxis = coverageStart.slice(0, 4) !== coverageEnd.slice(0, 4)
 
@@ -391,6 +427,11 @@ export default function AttentionTimeline({
   const updateMarkerMode = (mode: MarkerMode) => {
     setMarkerMode(mode)
     if (mode === 'wildfire_size') setHazard('wildfire')
+  }
+
+  const updateComparisonMode = (mode: ComparisonMode) => {
+    setComparisonMode(mode)
+    if (mode === 'wildfire_area') setHazard('wildfire')
   }
 
   const toggleAlert = (tier: AlertTier) => setSelectedAlerts((current) =>
@@ -418,7 +459,7 @@ export default function AttentionTimeline({
       <aside className="timeline-controls">
         <div className="lab-section-heading"><span>1</span><div><small>Observed publishing</small><h2>Configure timeline</h2></div></div>
         <div className="lab-form">
-          <label><span>Lines</span><select aria-label="Timeline lines" value={comparisonMode} onChange={(event) => setComparisonMode(event.target.value as ComparisonMode)}><option value="single">One topic</option><option value="topics">Compare climate and EVs</option><option value="countries">Compare countries</option></select></label>
+          <label><span>Lines</span><select aria-label="Timeline lines" value={comparisonMode} onChange={(event) => updateComparisonMode(event.target.value as ComparisonMode)}><option value="single">One topic</option><option value="topics">Compare climate and EVs</option><option value="wildfire_area">Attention + wildfire area</option><option value="countries">Compare countries</option></select></label>
           {comparisonMode !== 'countries' && <label><span>Geography</span><select value={placeScope} onChange={(event) => setPlaceScope(event.target.value as PlaceScope)}><option value="world">World</option><option value="eu27">EU27</option><option value="country">Single country</option><option value="group">Combined country group</option></select></label>}
           {comparisonMode !== 'countries' && placeScope === 'country' && <label><span>Country</span><select value={country} onChange={(event) => setCountry(event.target.value)}>{countryOptions.map((item) => <option key={item} value={item}>{geographyLabels[item] || item}</option>)}</select></label>}
           {(comparisonMode === 'countries' || placeScope === 'group') && <>
@@ -427,39 +468,41 @@ export default function AttentionTimeline({
           </>}
           {comparisonMode !== 'topics' && <label><span>Attention topic</span><select value={topic} onChange={(event) => setTopic(event.target.value as Topic)}>{Object.entries(TOPICS).map(([id, item]) => <option key={id} value={id}>{item.label}</option>)}</select></label>}
           <label><span>Attention measure</span><select value={measure} onChange={(event) => setMeasure(event.target.value as Measure)}><option value="matched">All matching articles</option><option value="political">Political articles</option></select></label>
-          <label><span>Time aggregation</span><select value={rollingWindow} onChange={(event) => setRollingWindow(Number(event.target.value) as RollingWindow)}><option value="1">Daily count</option><option value="7">7-day rolling average</option><option value="14">14-day rolling average</option><option value="28">28-day rolling average</option></select><small>Rolling averages remain daily lines and require a complete trailing window.</small></label>
+          <label><span>Time aggregation</span><select value={rollingWindow} onChange={(event) => setRollingWindow(Number(event.target.value) as RollingWindow)}><option value="1">Daily count</option><option value="7">7-day rolling average</option><option value="14">14-day rolling average</option><option value="28">28-day rolling average</option></select><small>Attention uses complete trailing averages; wildfire area uses trailing hectare totals.</small></label>
           <label><span>Event marker category</span><select value={markerMode} onChange={(event) => updateMarkerMode(event.target.value as MarkerMode)}><option value="alert">GDACS alert tier</option><option value="wildfire_size">Wildfire burned area</option></select><small>Burned-area categories use the provider’s hectares field. Comparable flood size is not available in the current export.</small></label>
           <MultiSelectDropdown label="Event alert tier" options={ALERT_OPTIONS} selected={selectedAlerts} onToggle={toggleAlert} help="Select any combination. Green is a lower humanitarian-impact tier, not an absence of an event." />
-          <label><span>Event type</span><select value={markerMode === 'wildfire_size' ? 'wildfire' : hazard} disabled={markerMode === 'wildfire_size'} onChange={(event) => setHazard(event.target.value as Hazard)}><option value="all">Floods and wildfires</option><option value="flood">Floods</option><option value="wildfire">Wildfires</option></select></label>
+          <label><span>Event type</span><select value={showWildfireArea || markerMode === 'wildfire_size' ? 'wildfire' : hazard} disabled={showWildfireArea || markerMode === 'wildfire_size'} onChange={(event) => setHazard(event.target.value as Hazard)}><option value="all">Floods and wildfires</option><option value="flood">Floods</option><option value="wildfire">Wildfires</option></select></label>
           {markerMode === 'wildfire_size' && <MultiSelectDropdown label="Wildfire size" options={Object.entries(SIZE_BANDS).map(([id, item]) => ({ id: id as WildfireSizeBand, label: item.label, color: item.color }))} selected={selectedSizeBands} onToggle={toggleSizeBand} />}
         </div>
-        <div className="analysis-definition"><Info size={15} /><p><strong>Comparable observed attention.</strong> Choose separate lines for topics or publishing markets. Rolling averages smooth weekday volatility but never bridge missing provider dates. {markerMode === 'alert' ? 'Event colours show GDACS impact tiers, whose rules differ by hazard.' : 'Event colours show wildfire burned-area bands; flood size is not inferred.'}</p></div>
+        <div className="analysis-definition"><Info size={15} /><p><strong>Comparable observed attention.</strong> Choose separate lines for topics or publishing markets. Rolling averages smooth weekday volatility but never bridge missing provider dates. {showWildfireArea ? `Wildfire hectares are whole-event cumulative values assigned to start dates${rollingWindow === 1 ? '.' : ` and summed over the trailing ${rollingWindow} days.`}` : markerMode === 'alert' ? 'Event colours show GDACS impact tiers, whose rules differ by hazard.' : 'Event colours show wildfire burned-area bands; flood size is not inferred.'}</p></div>
       </aside>
 
       <div className="timeline-results">
         {loading ? <div className="activity-state"><Activity size={20} /> Loading daily attention…</div> : error ? <div className="activity-state error"><CircleAlert size={20} /><strong>Attention timeline unavailable</strong><p>{error}</p></div> : <section className="timeline-chart-card">
-          <div className="result-heading"><div><span className="eyebrow">{frequencyLabel}</span><h2>{chartTitle}</h2></div><div className="timeline-total"><strong>{series.length === 1 ? compactCount(Math.round(plottedAverage)) : `${series.length} lines`}</strong><small>{series.length === 1 ? `average ${measure === 'matched' ? 'matching' : 'political'} articles/day · peak ${compactCount(plottedPeak)}` : `${frequencyLabel.toLowerCase()} · ${measure === 'matched' ? 'matching' : 'political'} articles`} · {relevantEvents.length} events</small></div></div>
+          <div className="result-heading"><div><span className="eyebrow">{frequencyLabel}</span><h2>{chartTitle}</h2></div><div className="timeline-total"><strong>{showWildfireArea ? '2 lines' : series.length === 1 ? compactCount(Math.round(plottedAverage)) : `${series.length} lines`}</strong><small>{showWildfireArea ? `${measure === 'matched' ? 'Matching' : 'Political'} articles and reported hectares` : series.length === 1 ? `average ${measure === 'matched' ? 'matching' : 'political'} articles/day · peak ${compactCount(plottedPeak)}` : `${frequencyLabel.toLowerCase()} · ${measure === 'matched' ? 'matching' : 'political'} articles`} · {relevantEvents.length} events</small></div></div>
           <div className="timeline-chart" role="img" aria-label={`${frequencyLabel} for ${chartTitle.toLowerCase()} with event markers`}>
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={chartPoints} margin={{ top: 20, right: 18, bottom: 2, left: 4 }}>
                 <CartesianGrid stroke="#dce4df" strokeDasharray="3 5" vertical={false} />
                 <XAxis dataKey="date" ticks={axisTicks} tickFormatter={(value) => formatAxisDate(String(value), multiYearAxis)} minTickGap={38} tick={{ fontSize: 9, fill: '#738179' }} />
-                <YAxis domain={[0, 'auto']} width={56} tickFormatter={(value) => compactCount(Number(value))} tick={{ fontSize: 9, fill: '#738179' }} />
-                <Tooltip content={<TimelineTooltip measure={measure} series={series} rollingWindow={rollingWindow} markerMode={markerMode} />} />
-                {coverageStart <= GDELT_OUTAGE.end && coverageEnd >= GDELT_OUTAGE.start && <ReferenceArea x1={GDELT_OUTAGE.start} x2={GDELT_OUTAGE.end} fill="#70879a" fillOpacity={0.13} stroke="#60798d" strokeOpacity={0.55} label={{ value: 'Provider gap', position: 'insideTop', fill: '#506879', fontSize: 8 }} />}
-                {[...eventDates.entries()].map(([date, events]) => <ReferenceLine key={date} x={date} stroke={eventMarkerColor(events)} strokeWidth={1} strokeDasharray="3 4" strokeOpacity={0.62} />)}
-                {series.map((item) => <Line key={item.key} type="monotone" dataKey={item.key} name={item.label} stroke={item.color} strokeWidth={2.3} dot={false} connectNulls={false} />)}
-                <Scatter dataKey="greenEvent" name="Events" legendType="none" fill="#789342" shape="diamond" />
-                <Scatter dataKey="orangeEvent" name="Events" legendType="none" fill="#bd8b3b" shape="diamond" />
-                <Scatter dataKey="redEvent" name="Events" legendType="none" fill="#b6523b" shape="diamond" />
-                <Scatter dataKey="sizeUnder5k" name="Events" legendType="none" fill={SIZE_BANDS.under_5k.color} shape="diamond" />
-                <Scatter dataKey="size5k10k" name="Events" legendType="none" fill={SIZE_BANDS['5k_10k'].color} shape="diamond" />
-                <Scatter dataKey="size10k50k" name="Events" legendType="none" fill={SIZE_BANDS['10k_50k'].color} shape="diamond" />
-                <Scatter dataKey="size50kPlus" name="Events" legendType="none" fill={SIZE_BANDS['50k_plus'].color} shape="diamond" />
+                <YAxis yAxisId="attention" domain={[0, 'auto']} width={56} tickFormatter={(value) => compactCount(Number(value))} tick={{ fontSize: 9, fill: '#738179' }} label={showWildfireArea ? { value: 'Articles', angle: -90, position: 'insideLeft', fill: '#738179', fontSize: 8 } : undefined} />
+                {showWildfireArea && <YAxis yAxisId="wildfireArea" orientation="right" domain={[0, 'auto']} width={60} tickFormatter={(value) => compactCount(Number(value))} tick={{ fontSize: 9, fill: WILDFIRE_AREA_COLOR }} label={{ value: 'Hectares', angle: 90, position: 'insideRight', fill: WILDFIRE_AREA_COLOR, fontSize: 8 }} />}
+                <Tooltip content={<TimelineTooltip measure={measure} series={series} rollingWindow={rollingWindow} markerMode={markerMode} showWildfireArea={showWildfireArea} />} />
+                {coverageStart <= GDELT_OUTAGE.end && coverageEnd >= GDELT_OUTAGE.start && <ReferenceArea yAxisId="attention" x1={GDELT_OUTAGE.start} x2={GDELT_OUTAGE.end} fill="#70879a" fillOpacity={0.13} stroke="#60798d" strokeOpacity={0.55} label={{ value: 'Provider gap', position: 'insideTop', fill: '#506879', fontSize: 8 }} />}
+                {[...eventDates.entries()].map(([date, events]) => <ReferenceLine key={date} yAxisId="attention" x={date} stroke={eventMarkerColor(events)} strokeWidth={1} strokeDasharray="3 4" strokeOpacity={0.62} />)}
+                {series.map((item) => <Line key={item.key} yAxisId="attention" type="monotone" dataKey={item.key} name={item.label} stroke={item.color} strokeWidth={2.3} dot={false} connectNulls={false} />)}
+                {showWildfireArea && <Line yAxisId="wildfireArea" type="linear" dataKey={WILDFIRE_AREA_KEY} name="Wildfire burned area" stroke={WILDFIRE_AREA_COLOR} strokeWidth={2} strokeDasharray="5 3" dot={false} connectNulls={false} />}
+                <Scatter yAxisId="attention" dataKey="greenEvent" name="Events" legendType="none" fill="#789342" shape="diamond" />
+                <Scatter yAxisId="attention" dataKey="orangeEvent" name="Events" legendType="none" fill="#bd8b3b" shape="diamond" />
+                <Scatter yAxisId="attention" dataKey="redEvent" name="Events" legendType="none" fill="#b6523b" shape="diamond" />
+                <Scatter yAxisId="attention" dataKey="sizeUnder5k" name="Events" legendType="none" fill={SIZE_BANDS.under_5k.color} shape="diamond" />
+                <Scatter yAxisId="attention" dataKey="size5k10k" name="Events" legendType="none" fill={SIZE_BANDS['5k_10k'].color} shape="diamond" />
+                <Scatter yAxisId="attention" dataKey="size10k50k" name="Events" legendType="none" fill={SIZE_BANDS['10k_50k'].color} shape="diamond" />
+                <Scatter yAxisId="attention" dataKey="size50kPlus" name="Events" legendType="none" fill={SIZE_BANDS['50k_plus'].color} shape="diamond" />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
-          <div className="timeline-series-key">{series.map((item) => <span key={item.key}><i style={{ borderColor: item.color }} />{item.label}</span>)}</div>
+          <div className="timeline-series-key">{series.map((item) => <span key={item.key}><i style={{ borderColor: item.color }} />{item.label}</span>)}{showWildfireArea && <span><i style={{ borderColor: WILDFIRE_AREA_COLOR }} />Wildfire burned area · ha · right axis</span>}</div>
           <div className="timeline-key">
             {markerMode === 'alert' ? ALERT_OPTIONS.filter((option) => selectedAlerts.includes(option.id)).map((option) => <span key={option.id}><i style={{ borderColor: option.color }} />{option.label}</span>) : Object.entries(SIZE_BANDS).filter(([id]) => selectedSizeBands.includes(id as WildfireSizeBand)).map(([, item]) => <span key={item.label}><i style={{ borderColor: item.color }} />{item.label}</span>)}
             {coverageStart <= GDELT_OUTAGE.end && coverageEnd >= GDELT_OUTAGE.start && <span className="provider-gap-key"><i />Provider gap</span>}

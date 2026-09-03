@@ -109,6 +109,11 @@ Event records are mutable upstream. A later collection with the same stable even
 and a newer provider modification timestamp replaces the canonical record instead of
 creating a duplicate.
 
+For GDACS wildfires, `severity` with `severity_unit = "ha"` is the cumulative
+reported burned area. The Attention Timeline assigns that whole-event value to the
+event start date, or sums start-date values in its trailing-window views. This is
+not a daily perimeter series or a measure of unique non-overlapping land burned.
+
 ## Article samples and derived counts
 
 `data/raw/` contains article metadata returned by optional GDELT article-list

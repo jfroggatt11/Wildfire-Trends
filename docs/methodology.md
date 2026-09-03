@@ -114,6 +114,12 @@ named wildfire event. Agricultural and prescribed burning may remain.
 GDACS records are used at event level. The canonical identity combines provider,
 hazard code, and event id; affected-country arrays support multi-country events.
 Start/end dates and severity can be revised, so `source_updated_at` controls upserts.
+For wildfires, GDACS severity in hectares is treated as the event's cumulative burned
+area. The Attention Timeline assigns that value to the event start date and supports
+daily, 7-day, 14-day and 28-day trailing sums. A multi-country event contributes its
+full value to each affected-country view, but only once to combined-country, EU27 and
+global totals; the result is therefore not unique land area if country series are
+manually summed.
 For display, the GDACS point is independently intersected with pinned Natural Earth
 Admin-0 and Admin-1 polygons to derive a map country and first-order region label.
 These point labels do not overwrite GDACS's affected-country array, and offshore or
