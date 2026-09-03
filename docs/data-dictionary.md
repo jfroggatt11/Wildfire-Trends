@@ -114,6 +114,31 @@ reported burned area. The Attention Timeline assigns that whole-event value to t
 event start date, or sums start-date values in its trailing-window views. This is
 not a daily perimeter series or a measure of unique non-overlapping land burned.
 
+## Satellite land-surface observations
+
+Canonical path: `data/satellite/source=<source>/metric=<metric>/observations.parquet`
+
+Each row is a compact zonal statistic, never a browser-facing raster:
+
+- `date`: MODIS composite start date for NDVI/EVI, or detected ordinal burn date for
+  MCD64 burned area.
+- `source`, `product`, `metric`: provider and versioned product identity. Supported
+  metrics are `ndvi`, `evi`, and `burned_area`.
+- `geography`, `country_iso3`: the stable country dimension used by the attention
+  timeline. `__global__` and `__eu27__` are derived regional rows.
+- `value`, `unit`: a vegetation index (`index`) or burned area (`ha`).
+- `period_days`: 16 for MOD13A2 vegetation composites and 1 for burn-date totals.
+- `valid_pixel_count`, `total_pixel_count`: retained pixel-count provenance when the
+  source output supplies it.
+- `anomaly`, `standardized_anomaly`: difference from, and optional standard-deviation
+  scaling against, the geography's same 16-day seasonal bin.
+- `baseline_start_year`, `baseline_end_year`: climatology bounds used for anomalies.
+- `land_cover_mask`: explicitly `all_land` in the first vegetation MVP; it must not
+  be described as a grassland-only measure.
+
+Browser path: `frontend/public/data/satellite-observations.json`. The export is
+bounded to the stored attention period and contains only aggregate fields.
+
 ## Article samples and derived counts
 
 `data/raw/` contains article metadata returned by optional GDELT article-list

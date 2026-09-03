@@ -28,7 +28,10 @@ whole available 2025–2026 series, and a custom start/end range shared by every
 tab. Timeline markers can use either GDACS alert tiers or wildfire burned-area
 bands; no comparable flood-size category is inferred from the current export. The
 comparison view can also overlay start-date cumulative wildfire hectares against
-either attention topic on a separately labelled axis.
+either attention topic on a separately labelled axis. Event onset lines and diamonds
+can be hidden independently without changing the events included in that area series.
+When MODIS aggregates have been imported, another option compares attention with
+same-season NDVI anomaly and adds a date-linked brown-to-green country map.
 
 Export the current Parquet datasets to compact browser assets, then run the app:
 
@@ -48,6 +51,64 @@ the point supplied by GDACS; they do not replace GDACS's affected-country list.
 The root `netlify.toml` builds and publishes the Vite app. Article-level Parquet is
 retained locally for validation, but the public interface is not an article finder
 and does not publish URLs or detailed article records.
+
+### MODIS satellite aggregates
+
+The satellite workflow keeps only country-period statistics. It does not mirror or
+publish the source rasters. NASA AppEEARS requires a free Earthdata Login for task
+submission; credentials are read only from `EARTHDATA_USERNAME` and
+`EARTHDATA_PASSWORD`.
+
+Prepare and run a one-year NDVI request, then import its small statistics file:
+
+```bash
+climate-attention prepare-modis-request \
+  --countries-config config/countries.world.yaml \
+  --start 2025-01-01 --end 2025-12-31 \
+  --metric ndvi \
+  --output data/satellite/requests/ndvi-2025.json \
+  --aid-map data/satellite/requests/ndvi-2025-aid-map.json
+
+EARTHDATA_USERNAME=your_username EARTHDATA_PASSWORD=your_password \
+  climate-attention run-appeears-task \
+  --request data/satellite/requests/ndvi-2025.json
+
+climate-attention import-modis-statistics \
+  --statistics data/satellite/appeears/TASK_ID/MOD13A2-061-Statistics.csv \
+  --aid-map data/satellite/requests/ndvi-2025-aid-map.json \
+  --metric ndvi
+```
+
+Use annual requests for the 2001–2020 climatology and current display period. The
+importer is idempotent and recomputes World/EU27 pixel-weighted rollups and
+same-season anomalies across everything stored. Large country sets can be split into
+stable batches with `--countries`.
+
+MCD64 burned area uses `Burn_Date` rasters because an average ordinal burn date
+cannot produce hectares. Install the optional raster reader, request the burned-area
+metric in native projection, and import the downloaded rasters:
+
+```bash
+python -m pip install -e '.[satellite]'
+climate-attention prepare-modis-request \
+  --countries-config config/countries.world.yaml \
+  --start 2025-01-01 --end 2025-12-31 \
+  --metric burned_area \
+  --output data/satellite/requests/burned-2025.json \
+  --aid-map data/satellite/requests/burned-2025-aid-map.json
+EARTHDATA_USERNAME=your_username EARTHDATA_PASSWORD=your_password \
+  climate-attention run-appeears-task \
+  --request data/satellite/requests/burned-2025.json \
+  --include-burn-date-rasters
+climate-attention import-modis-burned-area \
+  --rasters data/satellite/appeears/TASK_ID/MCD64A1.061_Burn_Date_*.tif \
+  --aid-map data/satellite/requests/burned-2025-aid-map.json
+```
+
+Finally rerun `scripts/export_frontend_data.py`. Its satellite JSON contains only
+the attention-window aggregates required by the browser. The current vegetation MVP
+covers all valid land pixels; a fixed grassland/cropland mask is a planned refinement
+rather than an implied property of these values.
 
 The frontend export also rebuilds the 2025 and 2026 major-event study assets. The
 Analysis Lab exposes a study-period selector plus a date-range control and bounds

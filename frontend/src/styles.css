@@ -601,6 +601,23 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
 .timeline-key i { width: 17px; height: 0; border-top: 1px dashed; }
 .timeline-key .provider-gap-key i { height: 7px; border: 1px solid #60798d; background: rgba(112,135,154,.18); }
 .timeline-key small { color: #89958f; }
+.satellite-date-control { width: min(240px, 100%); display: flex; flex-direction: column; gap: 5px; margin: 18px 0 9px; }
+.satellite-date-control > span { color: #56655e; font-size: 8.5px; font-weight: 750; }
+.satellite-date-control select { height: 36px; padding: 0 30px 0 10px; border: 1px solid #d4ddd7; border-radius: 7px; color: #2b3c35; background: white; font-size: 10px; font-weight: 650; }
+.satellite-map-panel { overflow: hidden; border: 1px solid #dbe3de; border-radius: 9px; background: #edf3f0; }
+.satellite-map-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 11px 13px; background: rgba(255,255,255,.88); }
+.satellite-map-heading > div:first-child { display: flex; flex-direction: column; gap: 2px; }
+.satellite-map-heading strong { color: #34483e; font-size: 9px; }
+.satellite-map-heading small { color: #7d8a83; font-size: 7px; }
+.satellite-map-scale { display: flex; align-items: center; gap: 6px; color: #75827b; font-size: 6.5px; }
+.satellite-map-scale i { width: 80px; height: 7px; border-radius: 4px; background: linear-gradient(90deg, hsl(28 48% 48%), #e2e7e3, hsl(145 38% 48%)); }
+.satellite-map-panel svg { width: 100%; height: auto; display: block; }
+.satellite-map-panel path { stroke: rgba(255,255,255,.7); stroke-width: .45px; }
+.satellite-method-note { display: block; margin-top: 7px; color: #89958f; font-size: 7px; line-height: 1.4; }
+.satellite-map-loading, .satellite-empty { min-height: 110px; display: grid; place-items: center; color: #6e7d75; background: #f1f5f2; font-size: 8px; }
+.satellite-empty { grid-template-columns: 18px minmax(0, 430px); gap: 8px; padding: 18px; place-content: center; }
+.satellite-empty strong { color: #40534a; font-size: 9px; }
+.satellite-empty p { margin: 3px 0 0; font-size: 7.5px; line-height: 1.45; }
 .lab-form select:disabled { color: #7f8b85; background: #f0f3f1; cursor: not-allowed; }
 
 .methods-hero { align-items: center; padding-bottom: 53px; }

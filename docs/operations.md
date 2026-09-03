@@ -151,6 +151,35 @@ all four topics. On 12 January, the estimates were 25.215 GB and 28.398 GB. The
 roughly 11–13% reduction is smaller than the topic-count reduction because political
 signal matching is unchanged.
 
+## MODIS backfill operations
+
+AppEEARS work should be split by calendar year and, if NASA's task-size estimate is
+large, by stable country batches. Keep each generated request beside its aid map;
+the aid map is required to turn AppEEARS feature ids back into the repository's
+geography ids. Never commit downloaded GeoTIFFs or credentials. The entire local
+`data/satellite/` working directory is ignored by Git.
+
+Import 2001–2020 before interpreting vegetation anomalies. An import with fewer than
+five observations for a geography/season leaves its anomaly null rather than using
+the current period as its own baseline. Rerunning an import is safe: country-date
+records are upserted and regional rollups and anomalies are rebuilt from all stored
+country observations.
+
+For MCD64, retain AppEEARS' native projection. The importer rejects geographic
+latitude/longitude rasters because degrees cannot be converted to hectares with one
+constant pixel area. The optional `satellite` dependency is required only for this
+raster-to-hectare step; vegetation statistics import uses the core environment.
+
+After any satellite import, run:
+
+```bash
+.venv/bin/python scripts/export_frontend_data.py
+cd frontend && npm test && npm run build
+```
+
+The browser asset is an aggregate export and may be deployed. Source AppEEARS files
+remain local working data.
+
 ## Verify completeness
 
 ```bash

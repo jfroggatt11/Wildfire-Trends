@@ -1,3 +1,5 @@
+import json
+from datetime import date
 from pathlib import Path
 import sys
 
@@ -7,10 +9,13 @@ sys.path.insert(0, str(ROOT))
 
 from climate_attention.config import load_country_config
 from climate_attention.geography import load_country_boundaries, load_region_boundaries
+from climate_attention.models import LandSurfaceObservation
+from climate_attention.storage import LocalParquetStorage
 from scripts.export_frontend_data import (
     FRONTEND_HAZARD_TYPES,
     FRONTEND_TOPIC_IDS,
     contiguous_date_ranges,
+    export_satellite_observations,
     requested_date_ranges,
 )
 
@@ -88,3 +93,50 @@ def test_cornwall_event_point_resolves_to_first_order_region() -> None:
     assert match is not None
     assert match.label == "Cornwall"
     assert match.country_iso3 == "GBR"
+
+
+def test_satellite_export_contains_only_compact_attention_window_rows(tmp_path, monkeypatch) -> None:
+    store = LocalParquetStorage(tmp_path / "data")
+    store.write_land_surface([
+        LandSurfaceObservation(
+            record_id="satellite:test",
+            date=date(2025, 1, 17),
+            source="nasa_modis",
+            product="MOD13A2.061",
+            metric="ndvi",
+            geography="italy",
+            country_iso3="ITA",
+            value=0.55,
+            unit="index",
+            period_days=16,
+            valid_pixel_count=100,
+            anomaly=0.03,
+            baseline_start_year=2001,
+            baseline_end_year=2020,
+        ),
+        LandSurfaceObservation(
+            record_id="satellite:outside",
+            date=date(2024, 12, 19),
+            source="nasa_modis",
+            product="MOD13A2.061",
+            metric="ndvi",
+            geography="italy",
+            country_iso3="ITA",
+            value=0.50,
+            unit="index",
+            period_days=16,
+            valid_pixel_count=100,
+            anomaly=0.01,
+        ),
+    ])
+    output = tmp_path / "public"
+    monkeypatch.setattr("scripts.export_frontend_data.ROOT", tmp_path)
+    monkeypatch.setattr("scripts.export_frontend_data.OUT", output)
+
+    summary = export_satellite_observations("2025-01-01", "2025-12-31")
+    payload = json.loads((output / "satellite-observations.json").read_text())
+
+    assert summary["observationCount"] == 1
+    assert payload["observations"][0]["geography"] == "italy"
+    assert payload["observations"][0]["anomaly"] == 0.03
+    assert "metadata" not in payload["observations"][0]

@@ -128,6 +128,27 @@ GDACS alert scores are oriented toward potential humanitarian consequences rathe
 than a uniform physical magnitude. Analyses should preserve both event type and
 source-specific severity semantics instead of pooling them naively.
 
+## Satellite vegetation and burned area
+
+The low-storage vegetation series uses NASA MOD13A2 version 6.1 NDVI: a 1 km,
+16-day composite requested as country polygons through AppEEARS. The canonical row
+stores AppEEARS' mean and valid-pixel count, not a raster. World and EU27 values are
+weighted by valid pixels so small and large countries are not averaged equally.
+
+Raw NDVI is strongly seasonal. For comparisons with attention, each country or
+region is therefore expressed as the difference from its own mean in the matching
+16-day seasonal bin. The default climatology is 2001–2020 and requires at least five
+baseline observations. A composite value is drawn only across its 16-day observation
+period; it is not presented as a new daily satellite measurement. The first MVP uses
+all valid land pixels and does not yet claim to isolate grassland or cropland.
+
+MCD64A1 version 6.1 `Burn_Date` is processed differently. For native-projection
+GeoTIFFs, pixels with an ordinal burn day are counted by day and multiplied by the
+affine pixel area in hectares. Country pixels are then summed for EU27 and World
+totals. This provides observed burned area through time and remains separate from
+GDACS' whole-event severity estimate. Boundary-edge pixels and product detection
+limits remain sources of measurement uncertainty.
+
 ## Unofficial Google Trends fallback
 
 The Google mode measures search interest rather than media output. Each configured

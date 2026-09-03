@@ -14,6 +14,7 @@ from climate_attention.config import load_country_config
 from climate_attention.event_study import build_event_study_files
 from climate_attention.geography import load_country_boundaries, load_region_boundaries
 from climate_attention.source_coverage import is_known_outage
+from climate_attention.storage import LocalParquetStorage
 from climate_attention.supabase_sync import dotenv_value
 
 
@@ -256,9 +257,58 @@ def summarize_articles() -> dict[str, Any]:
     }
 
 
+def export_satellite_observations(
+    coverage_start: str | None, coverage_end: str | None
+) -> dict[str, Any]:
+    """Publish only compact MODIS zonal statistics inside the attention window."""
+    storage = LocalParquetStorage(ROOT / "data")
+    observations = storage.read_land_surface(
+        source="nasa_modis",
+        metrics={"ndvi", "evi", "burned_area"},
+        start=date.fromisoformat(coverage_start) if coverage_start else None,
+        end=date.fromisoformat(coverage_end) if coverage_end else None,
+    )
+    payload = {
+        "schemaVersion": 1,
+        "generatedAt": datetime.now().astimezone().isoformat(),
+        "source": "NASA MODIS",
+        "products": sorted({item.product for item in observations}),
+        "observations": [
+            {
+                "date": item.date.isoformat(),
+                "geography": item.geography,
+                "countryIso3": item.country_iso3,
+                "metric": item.metric,
+                "value": item.value,
+                "unit": item.unit,
+                "periodDays": item.period_days,
+                "validPixelCount": item.valid_pixel_count,
+                "anomaly": item.anomaly,
+                "standardizedAnomaly": item.standardized_anomaly,
+                "baselineStartYear": item.baseline_start_year,
+                "baselineEndYear": item.baseline_end_year,
+                "landCoverMask": item.land_cover_mask,
+            }
+            for item in observations
+        ],
+    }
+    write_json("satellite-observations.json", payload)
+    observed_dates = sorted({item.date.isoformat() for item in observations})
+    return {
+        "observationCount": len(observations),
+        "dateMin": min((item.date.isoformat() for item in observations), default=None),
+        "dateMax": max((item.date.isoformat() for item in observations), default=None),
+        "observedDateCount": len(observed_dates),
+        "dateRanges": contiguous_date_ranges(observed_dates),
+        "metrics": sorted({item.metric for item in observations}),
+        "geographyCount": len({item.geography for item in observations}),
+    }
+
+
 def source_summaries(
     events: list[dict[str, Any]],
     attention_summary: dict[str, Any],
+    satellite_summary: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     event_starts = [feature["properties"]["startAt"] for feature in events]
     event_ends = [feature["properties"]["endAt"] for feature in events]
@@ -317,6 +367,25 @@ def source_summaries(
             }
         )
 
+    if satellite_summary and satellite_summary["observationCount"]:
+        summaries.append({
+            "id": "nasa_modis",
+            "name": "MODIS land-surface aggregates",
+            "provider": "NASA Land Processes DAAC",
+            "role": "Vegetation and burned area",
+            "dateMin": satellite_summary["dateMin"],
+            "dateMax": satellite_summary["dateMax"],
+            "dateRanges": satellite_summary["dateRanges"],
+            "observedDayCount": satellite_summary["observedDateCount"],
+            "coverageBasis": "stored composite or burn dates",
+            "recordCount": satellite_summary["observationCount"],
+            "recordLabel": "country-period observations",
+            "geographyCount": satellite_summary["geographyCount"],
+            "status": "explorer",
+            "description": "Country aggregates from MODIS NDVI composites and MCD64 burned pixels; source rasters are not shipped to the browser.",
+            "sourceUrl": "https://appeears.earthdatacloud.nasa.gov/",
+        })
+
     return summaries
 
 
@@ -337,9 +406,12 @@ def main() -> None:
     )
     attention_summary = summarize_attention()
     article_summary = summarize_articles()
+    satellite_summary = export_satellite_observations(
+        attention_summary["dateMin"], attention_summary["dateMax"]
+    )
     country_config = load_country_config(ROOT / "config/countries.world.yaml")
     geography_labels = {country.id: country.label for country in country_config.countries}
-    data_sources = source_summaries(events, attention_summary)
+    data_sources = source_summaries(events, attention_summary, satellite_summary)
     hazard_counts = Counter(feature["properties"]["hazardType"] for feature in events)
     alert_counts = Counter(feature["properties"]["alertLevel"] for feature in events)
     write_json(
@@ -348,6 +420,7 @@ def main() -> None:
             "generatedAt": datetime.now().astimezone().isoformat(),
             "events": {"count": len(events), "hazards": dict(hazard_counts), "alerts": dict(alert_counts)},
             "attention": attention_summary,
+            "satellite": satellite_summary,
             "articles": {"count": article_summary["count"]},
             "geographyLabels": geography_labels,
             "dataSources": data_sources,

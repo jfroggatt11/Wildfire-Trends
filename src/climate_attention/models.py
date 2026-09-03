@@ -414,6 +414,55 @@ class DailyHazard(StrictModel):
         return value.astimezone(timezone.utc)
 
 
+class LandSurfaceObservation(StrictModel):
+    """A compact zonal satellite measurement for one geography and period."""
+
+    record_id: str
+    date: date
+    source: str
+    product: str
+    metric: Literal["ndvi", "evi", "burned_area"]
+    geography: str
+    country_iso3: str | None = Field(default=None, pattern=r"^[A-Z]{3}$")
+    value: float
+    unit: Literal["index", "ha"]
+    period_days: int = Field(ge=1)
+    valid_pixel_count: int | None = Field(default=None, ge=0)
+    total_pixel_count: int | None = Field(default=None, ge=0)
+    anomaly: float | None = None
+    standardized_anomaly: float | None = None
+    baseline_start_year: int | None = None
+    baseline_end_year: int | None = None
+    land_cover_mask: str = "all_land"
+    collected_at: datetime = Field(default_factory=utc_now)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("collected_at")
+    @classmethod
+    def satellite_timestamp_must_be_aware(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("collection timestamp must include a timezone")
+        return value.astimezone(timezone.utc)
+
+    @model_validator(mode="after")
+    def satellite_units_and_counts_are_consistent(self) -> "LandSurfaceObservation":
+        expected_unit = "ha" if self.metric == "burned_area" else "index"
+        if self.unit != expected_unit:
+            raise ValueError(f"{self.metric} observations must use {expected_unit!r}")
+        if self.metric == "burned_area" and self.value < 0:
+            raise ValueError("burned area cannot be negative")
+        if (
+            self.valid_pixel_count is not None
+            and self.total_pixel_count is not None
+            and self.valid_pixel_count > self.total_pixel_count
+        ):
+            raise ValueError("valid pixel count cannot exceed total pixel count")
+        if self.baseline_start_year is not None and self.baseline_end_year is not None:
+            if self.baseline_start_year > self.baseline_end_year:
+                raise ValueError("satellite baseline start year cannot exceed end year")
+        return self
+
+
 class HazardEvent(StrictModel):
     """A named major event from an external disaster catalogue."""
 

@@ -20,6 +20,7 @@ from .models import (
     DailyHazard,
     DailyTrend,
     HazardEvent,
+    LandSurfaceObservation,
     PoliticalArticleSample,
 )
 
@@ -112,6 +113,30 @@ HAZARD_SCHEMA = pa.schema(
         ("high_confidence_count", pa.int64()),
         ("request_complete", pa.bool_()),
         ("boundary_supported", pa.bool_()),
+        ("collected_at", pa.timestamp("us", tz="UTC")),
+        ("metadata_json", pa.string()),
+    ]
+)
+
+LAND_SURFACE_SCHEMA = pa.schema(
+    [
+        ("record_id", pa.string()),
+        ("date", pa.date32()),
+        ("source", pa.string()),
+        ("product", pa.string()),
+        ("metric", pa.string()),
+        ("geography", pa.string()),
+        ("country_iso3", pa.string()),
+        ("value", pa.float64()),
+        ("unit", pa.string()),
+        ("period_days", pa.int32()),
+        ("valid_pixel_count", pa.int64()),
+        ("total_pixel_count", pa.int64()),
+        ("anomaly", pa.float64()),
+        ("standardized_anomaly", pa.float64()),
+        ("baseline_start_year", pa.int32()),
+        ("baseline_end_year", pa.int32()),
+        ("land_cover_mask", pa.string()),
         ("collected_at", pa.timestamp("us", tz="UTC")),
         ("metadata_json", pa.string()),
     ]
@@ -454,6 +479,57 @@ class LocalParquetStorage(AttentionStorage):
             key=lambda item: (item.date, item.hazard_type, item.geography),
         )
 
+    def write_land_surface(self, observations: list[LandSurfaceObservation]) -> int:
+        """Upsert compact satellite zonal statistics by stable observation id."""
+        groups: dict[tuple[str, str], list[LandSurfaceObservation]] = defaultdict(list)
+        for observation in observations:
+            groups[(observation.source, observation.metric)].append(observation)
+        added = 0
+        for (source, metric), incoming in groups.items():
+            path = self._land_surface_path(source, metric)
+            existing = self._read_land_surface_file(path) if path.exists() else []
+            by_id = {item.record_id: item for item in existing}
+            before = len(by_id)
+            by_id.update({item.record_id: item for item in incoming})
+            added += len(by_id) - before
+            rows = [_land_surface_to_row(item) for item in sorted(
+                by_id.values(), key=lambda item: (item.date, item.geography)
+            )]
+            _atomic_parquet_write(
+                path, pa.Table.from_pylist(rows, schema=LAND_SURFACE_SCHEMA)
+            )
+        return added
+
+    def read_land_surface(
+        self,
+        *,
+        source: str | None = None,
+        metrics: set[str] | None = None,
+        start: date | None = None,
+        end: date | None = None,
+        geographies: set[str] | None = None,
+    ) -> list[LandSurfaceObservation]:
+        base = self.root / "satellite"
+        paths = (
+            (base / f"source={source}").rglob("observations.parquet")
+            if source
+            else base.rglob("observations.parquet")
+        )
+        observations: list[LandSurfaceObservation] = []
+        for path in sorted(paths):
+            observations.extend(self._read_land_surface_file(path))
+        return sorted(
+            (
+                item
+                for item in observations
+                if (metrics is None or item.metric in metrics)
+                and (start is None or item.date >= start)
+                and (end is None or item.date <= end)
+                and (geographies is None or item.geography in geographies)
+            ),
+            key=lambda item: (item.date, item.metric, item.geography),
+        )
+
     def write_events(self, events: list[HazardEvent]) -> int:
         """Upsert named hazard events, preferring the latest provider version."""
         groups: dict[str, list[HazardEvent]] = defaultdict(list)
@@ -637,6 +713,15 @@ class LocalParquetStorage(AttentionStorage):
             / "daily.parquet"
         )
 
+    def _land_surface_path(self, source: str, metric: str) -> Path:
+        return (
+            self.root
+            / "satellite"
+            / f"source={source}"
+            / f"metric={metric}"
+            / "observations.parquet"
+        )
+
     def _coverage_by_date(
         self, source: str, geography: str | None, language: str | None
     ) -> dict[date, DailyCountryCoverage]:
@@ -715,6 +800,15 @@ class LocalParquetStorage(AttentionStorage):
         return observations
 
     @staticmethod
+    def _read_land_surface_file(path: Path) -> list[LandSurfaceObservation]:
+        rows = pq.read_table(path).to_pylist()
+        observations: list[LandSurfaceObservation] = []
+        for row in rows:
+            row["metadata"] = json.loads(row.pop("metadata_json"))
+            observations.append(LandSurfaceObservation.model_validate(row))
+        return observations
+
+    @staticmethod
     def _read_event_file(path: Path) -> list[HazardEvent]:
         rows = pq.read_table(path).to_pylist()
         events: list[HazardEvent] = []
@@ -757,6 +851,14 @@ def _country_coverage_to_row(coverage: DailyCountryCoverage) -> dict[str, Any]:
     row = coverage.model_dump(exclude={"metadata"})
     row["metadata_json"] = json.dumps(
         coverage.metadata, ensure_ascii=False, sort_keys=True, default=str
+    )
+    return row
+
+
+def _land_surface_to_row(observation: LandSurfaceObservation) -> dict[str, Any]:
+    row = observation.model_dump(exclude={"metadata"})
+    row["metadata_json"] = json.dumps(
+        observation.metadata, ensure_ascii=False, sort_keys=True, default=str
     )
     return row
 

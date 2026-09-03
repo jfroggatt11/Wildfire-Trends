@@ -116,6 +116,7 @@ type Manifest = {
     topics: Record<string, number>
   }
   articles: { count: number }
+  satellite?: { observationCount: number; dateMin: string | null; dateMax: string | null; observedDateCount: number; metrics: string[]; geographyCount: number }
   geographyLabels: Record<string, string>
   dataSources: DataSourceSummary[]
   analysisStatus: string
@@ -1493,6 +1494,20 @@ function MethodsView({ manifest }: { manifest: Manifest | null }) {
       note: 'Provider confirmation of multiple GDELT infrastructure outages during the observed June 2025 coverage collapse.',
       href: 'https://www.linkedin.com/posts/kalevleetaru_we-are-aware-of-multiple-gdelt-infrastructure-activity-7340435180601393154-_SDg',
     },
+    {
+      number: '09',
+      title: 'MODIS vegetation-index user guide',
+      organisation: 'NASA Land Processes DAAC',
+      note: 'NDVI/EVI definitions, 16-day compositing, scaling and quality metadata.',
+      href: 'https://lpdaac.usgs.gov/documents/103/MOD13_User_Guide_V6.pdf',
+    },
+    {
+      number: '10',
+      title: 'AppEEARS API documentation',
+      organisation: 'NASA Land Processes DAAC',
+      note: 'Area-sample tasks, versioned product layers and reproducible bundle downloads.',
+      href: 'https://appeears.earthdatacloud.nasa.gov/api/',
+    },
   ]
 
   return (
@@ -1702,7 +1717,7 @@ function MethodsView({ manifest }: { manifest: Manifest | null }) {
             <div className="method-definition-grid two">
               <article><small>Event activity panel</small><strong>Rolling event starts by affected geography</strong><p>Multi-country events count once in every affected country, while global and EU27 aggregates count each unique event once. Aligned panels separate event load from attention, which defaults to a strict 7-day trailing average. The chart offers 7- and 28-day event windows and can compare two to five countries for one selected attention topic. Its default symmetric focus scale covers 98% of plotted attention anomalies, flags clipped extremes and retains daily and full-range options.</p></article>
               <article><small>Lead / lag panel</small><strong>Pearson correlation across −28 to +28 days</strong><p>Attention is expressed relative to its preceding 28-day baseline. Positive lag means attention follows event activity. Series are shown in separate panels on a shared scale, with |r| below 0.10 identified as descriptively negligible. Autocorrelation and common shocks make this exploratory, not causal.</p></article>
-              <article><small>Attention timeline</small><strong>Configurable publishing trends with event onsets</strong><p>Observed counts can compare both topics, overlay cumulative wildfire hectares on their event start dates, or draw separate attention lines for up to eight publishing markets. Daily and 7-, 14- or 28-day views are available; area uses trailing totals while attention uses trailing averages. Missing provider days break affected attention lines and are never imputed.</p></article>
+              <article><small>Attention timeline</small><strong>Publishing, wildfire area and satellite greenness</strong><p>Observed counts can compare both topics, overlay cumulative wildfire hectares, compare same-season MODIS NDVI anomaly, or draw separate lines for up to eight publishing markets. Event onset lines and diamonds can be hidden independently. The NDVI map and timeline share a selected 16-day composite date; missing observations are never imputed.</p></article>
             </div>
             <div className="method-callout caution"><CircleAlert size={17} /><p><strong>Interpretation.</strong> These are unadjusted temporal associations, not causal estimates or confidence intervals. News cycles are autocorrelated; seasonality, weekday patterns and concurrent stories can confound comparisons. A confirmatory release should pre-register outcomes and add matched dates, untreated markets or interrupted time-series controls.</p></div>
           </section>
@@ -1731,6 +1746,7 @@ function MethodsView({ manifest }: { manifest: Manifest | null }) {
               <div><strong>Apply a minimum-event threshold to country rankings</strong><p>The default is three eligible events; users can choose 1, 2, 3, 5 or 10 and sort by activity or response.</p><span className="status-chip active">In use</span></div>
               <div><strong>Do not impute missing days</strong><p>Prevents provider gaps from becoming false evidence of low attention.</p><span className="status-chip active">In use</span></div>
               <div><strong>Exclude the confirmed June 2025 GDELT outage</strong><p>Coverage failure is provider unavailability, not a collapse in real news attention.</p><span className="status-chip active">In use</span></div>
+              <div><strong>Use seasonal MODIS anomalies</strong><p>Controls ordinary annual greening and browning before comparing physical conditions with attention.</p><span className="status-chip active">In use</span></div>
               <div><strong>Add normalized country shares</strong><p>Needed for stronger cross-market comparison when denominator coverage is validated.</p><span className="status-chip planned">Planned</span></div>
             </div>
           </section>

@@ -23,6 +23,7 @@ dependencies = [
 dev = ["pytest>=8,<9"]
 bigquery = ["google-cloud-bigquery>=3.38,<4"]
 supabase = ["psycopg[binary]>=3.2,<4"]
+satellite = ["rasterio>=1.4,<2"]
 
 [project.scripts]
 climate-attention = "climate_attention.cli:main"

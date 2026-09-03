@@ -251,7 +251,7 @@ test('data summary reports only MVP sources and their stored coverage dates', as
   await expect(page.locator('.source-card')).toHaveCount(2)
   await expect(page.locator('.source-timeline-row')).toHaveCount(2)
   await expect(page.locator('.source-card[data-source="gdacs"]')).toContainText('1 Jan 2025 — 26 Aug 2026')
-  await expect(page.locator('.source-card[data-source="gdelt_ngrams"]')).toContainText('31 Jul 2026')
+  await expect(page.locator('.source-card[data-source="gdelt_ngrams"]')).toContainText('27 Aug 2026')
   await expect(page.locator('.source-card[data-source="gdelt_ngrams"]')).toContainText('stored observation dates')
   await expect(page.locator('.source-card[data-source="gdelt_ngrams"] .source-coverage-ranges span')).toHaveCount(2)
   await expect(page.locator('.source-card[data-source="gdelt_articles"]')).toHaveCount(0)
@@ -358,6 +358,28 @@ test('analysis lab exposes the all-alert activity and lag views', async ({ page 
 test('analysis lab charts daily attention with selectable event markers', async ({ page }) => {
   test.setTimeout(120_000)
   const errors = collectClientErrors(page)
+  await page.route('**/data/satellite-observations.json', (route) => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify({
+      schemaVersion: 1,
+      source: 'NASA MODIS',
+      products: ['MOD13A2.061'],
+      observations: [
+        ['2025-01-01', '__global__', null, 0.02, 1000],
+        ['2025-01-17', '__global__', null, -0.03, 1000],
+        ['2025-01-01', 'france', 'FRA', 0.04, 100],
+        ['2025-01-01', 'germany', 'DEU', -0.02, 100],
+        ['2025-01-01', 'italy', 'ITA', 0.01, 100],
+        ['2025-01-17', 'france', 'FRA', -0.05, 100],
+        ['2025-01-17', 'germany', 'DEU', -0.01, 100],
+        ['2025-01-17', 'italy', 'ITA', 0.03, 100],
+      ].map(([date, geography, countryIso3, anomaly, validPixelCount]) => ({
+        date, geography, countryIso3, metric: 'ndvi', value: 0.5, unit: 'index',
+        periodDays: 16, validPixelCount, anomaly, standardizedAnomaly: null,
+        baselineStartYear: 2001, baselineEndYear: 2020, landCoverMask: 'all_land',
+      })),
+    }),
+  }))
   await openExplorer(page)
   await page.getByRole('button', { name: 'Analysis Lab', exact: true }).click()
   await page.getByLabel('Study period').selectOption('2025')
@@ -385,9 +407,24 @@ test('analysis lab charts daily attention with selectable event markers', async 
   await expect(page.locator('.timeline-series-key')).toContainText('Wildfire burned area · ha · right axis')
   await expect(page.getByLabel('Event type')).toBeDisabled()
   await expect(page.locator('.timeline-chart .recharts-yAxis')).toHaveCount(2)
+  const markerToggle = page.getByLabel('Show event markers')
+  await expect(markerToggle).toBeChecked()
+  await markerToggle.uncheck()
+  await expect(page.locator('.timeline-chart .recharts-reference-line-line')).toHaveCount(0)
+  await expect(page.locator('.timeline-chart path.recharts-symbols')).toHaveCount(0)
+  await expect(page.locator('.timeline-series-key')).toContainText('Wildfire burned area · ha · right axis')
+  await expect(page.locator('.timeline-key')).not.toContainText('Orange tier')
+  await markerToggle.check()
+  expect(await page.locator('.timeline-chart .recharts-reference-line-line').count()).toBeGreaterThan(0)
+  await page.getByLabel('Timeline lines').selectOption('vegetation')
+  await expect(page.getByRole('heading', { name: 'Climate change and vegetation greenness in World' })).toBeVisible()
+  await expect(page.locator('.timeline-series-key')).toContainText('MODIS NDVI anomaly · right axis')
+  await expect(page.locator('.timeline-chart .recharts-yAxis')).toHaveCount(2)
+  await expect(page.getByLabel('Satellite map composite')).toHaveValue('2025-01-17')
+  await expect(page.getByRole('img', { name: /Country map of MODIS NDVI anomaly/ })).toBeVisible()
   await page.getByLabel('Timeline lines').selectOption('single')
   await expect(page.locator('.activity-state')).toHaveCount(0, { timeout: 30_000 })
-  await expect(page.locator('.timeline-tooltip')).not.toContainText('NaN')
+  await expect(page.locator('.timeline-chart')).not.toContainText('NaN')
   await expect(page.locator('.timeline-total')).toContainText('average matching articles/day')
   await expect(page.locator('.timeline-key')).toContainText('Orange tier')
   await expect(page.locator('.timeline-key')).toContainText('Red tier')
@@ -485,7 +522,7 @@ test('methods page documents the current research protocol and definitions', asy
   await expect(page.locator('.window-diagram')).toContainText('Excluded')
   await expect(page.locator('.decision-table .status-chip.planned')).toHaveText('Planned')
   await expect(page.locator('#collection')).toContainText('Confirmed provider gap')
-  await expect(page.locator('.reference-list > a')).toHaveCount(8)
+  await expect(page.locator('.reference-list > a')).toHaveCount(10)
   await expect(page.locator('.reference-list > a').first()).toHaveAttribute('href', /gdeltproject\.org/)
   await expect(page.locator('.reference-list > a').first()).toHaveAttribute('target', '_blank')
 

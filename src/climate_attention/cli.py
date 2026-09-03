@@ -6,6 +6,7 @@ import argparse
 import csv
 import json
 import logging
+import os
 import sys
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -27,6 +28,23 @@ from .models import (
     DailyCountryCoverage,
     DailyTrend,
     PoliticalArticleSample,
+)
+from .satellite import (
+    AppEEARSClient,
+    MODIS_EVI_LAYER,
+    MODIS_BURNED_AREA_PRODUCT,
+    MODIS_BURN_DATE_LAYER,
+    MODIS_NDVI_LAYER,
+    MODIS_SOURCE,
+    MODIS_VEGETATION_PRODUCT,
+    add_region_rollups,
+    add_burned_area_region_rollups,
+    add_seasonal_anomalies,
+    build_appeears_area_task,
+    load_aid_map,
+    parse_appeears_vegetation_statistics,
+    parse_mcd64_burn_date_raster,
+    write_appeears_task,
 )
 from .run_state import CollectionRunState, RunStore
 from .source_coverage import remove_known_outage_rows
@@ -354,6 +372,63 @@ def build_parser() -> argparse.ArgumentParser:
     gdacs.add_argument("--data-dir", type=Path, default=Path("data"))
     _add_runtime_options(gdacs)
 
+    prepare_modis = subparsers.add_parser(
+        "prepare-modis-request",
+        help="prepare a low-resolution MODIS AppEEARS country-area request",
+    )
+    prepare_modis.add_argument("--countries-config", type=Path, required=True)
+    prepare_modis.add_argument("--countries", nargs="+")
+    prepare_modis.add_argument("--start", type=_iso_date, required=True)
+    prepare_modis.add_argument("--end", type=_iso_date, required=True)
+    prepare_modis.add_argument(
+        "--metric", choices=("ndvi", "evi", "burned_area"), default="ndvi"
+    )
+    prepare_modis.add_argument(
+        "--boundaries",
+        type=Path,
+        default=Path("data/reference/ne_50m_admin_0_countries.geojson"),
+    )
+    prepare_modis.add_argument(
+        "--output", type=Path, default=Path("data/satellite/requests/modis-request.json")
+    )
+    prepare_modis.add_argument(
+        "--aid-map", type=Path, default=Path("data/satellite/requests/modis-aid-map.json")
+    )
+
+    run_appeears = subparsers.add_parser(
+        "run-appeears-task",
+        help="submit a prepared AppEEARS task and download its compact support files",
+    )
+    run_appeears.add_argument("--request", type=Path, required=True)
+    run_appeears.add_argument(
+        "--output-dir", type=Path, default=Path("data/satellite/appeears")
+    )
+    run_appeears.add_argument("--poll-seconds", type=_positive_float, default=15.0)
+    run_appeears.add_argument(
+        "--include-burn-date-rasters",
+        action="store_true",
+        help="also download MCD64 Burn_Date GeoTIFFs for hectare aggregation",
+    )
+
+    import_modis = subparsers.add_parser(
+        "import-modis-statistics",
+        help="import compact AppEEARS MODIS country statistics into Parquet",
+    )
+    import_modis.add_argument("--statistics", type=Path, nargs="+", required=True)
+    import_modis.add_argument("--aid-map", type=Path, required=True)
+    import_modis.add_argument("--metric", choices=("ndvi", "evi"), default="ndvi")
+    import_modis.add_argument("--baseline-start-year", type=int, default=2001)
+    import_modis.add_argument("--baseline-end-year", type=int, default=2020)
+    import_modis.add_argument("--data-dir", type=Path, default=Path("data"))
+
+    import_burned = subparsers.add_parser(
+        "import-modis-burned-area",
+        help="convert native MCD64 Burn_Date GeoTIFFs into daily country hectares",
+    )
+    import_burned.add_argument("--rasters", type=Path, nargs="+", required=True)
+    import_burned.add_argument("--aid-map", type=Path, required=True)
+    import_burned.add_argument("--data-dir", type=Path, default=Path("data"))
+
     compare = subparsers.add_parser(
         "compare-sources", help="compare paired daily metrics from two sources"
     )
@@ -521,6 +596,14 @@ def main(argv: list[str] | None = None) -> int:
             return _collect_firms(args)
         if args.command == "collect-gdacs":
             return _collect_gdacs(args)
+        if args.command == "prepare-modis-request":
+            return _prepare_modis_request(args)
+        if args.command == "run-appeears-task":
+            return _run_appeears_task(args)
+        if args.command == "import-modis-statistics":
+            return _import_modis_statistics(args)
+        if args.command == "import-modis-burned-area":
+            return _import_modis_burned_area(args)
         if args.command == "compare-sources":
             return _compare_sources(args)
         if args.command == "export-articles":
@@ -565,6 +648,132 @@ def _validate_countries(path: Path) -> int:
     print(
         f"Valid country configuration: {len(config.countries)} country/countries, "
         f"{len(enabled)} enabled."
+    )
+    return 0
+
+
+def _prepare_modis_request(args: argparse.Namespace) -> int:
+    country_config = load_country_config(args.countries_config)
+    countries = country_config.enabled_countries(
+        set(args.countries) if args.countries else None
+    )
+    boundaries = load_country_boundaries(args.boundaries, countries)
+    if args.metric == "ndvi":
+        product, layer = MODIS_VEGETATION_PRODUCT, MODIS_NDVI_LAYER
+    elif args.metric == "evi":
+        product, layer = MODIS_VEGETATION_PRODUCT, MODIS_EVI_LAYER
+    else:
+        product, layer = MODIS_BURNED_AREA_PRODUCT, MODIS_BURN_DATE_LAYER
+    task, aid_map = build_appeears_area_task(
+        countries=countries,
+        boundaries=boundaries,
+        start=args.start,
+        end=args.end,
+        task_name=f"climate-attention-{args.metric}-{args.start}-{args.end}",
+        product=product,
+        layer=layer,
+    )
+    write_appeears_task(
+        task, aid_map, request_path=args.output, aid_map_path=args.aid_map
+    )
+    print(
+        f"Prepared {args.metric.upper()} AppEEARS request for {len(aid_map)} "
+        f"countries: {args.output} (mapping: {args.aid_map})."
+    )
+    return 0
+
+
+def _run_appeears_task(args: argparse.Namespace) -> int:
+    username = os.environ.get("EARTHDATA_USERNAME")
+    password = os.environ.get("EARTHDATA_PASSWORD")
+    if not username or not password:
+        raise ValueError(
+            "set EARTHDATA_USERNAME and EARTHDATA_PASSWORD before submitting AppEEARS tasks"
+        )
+    task = json.loads(args.request.read_text(encoding="utf-8"))
+    with AppEEARSClient(username, password) as client:
+        task_id = client.submit(task)
+        print(f"Submitted AppEEARS task {task_id}; waiting for completion.")
+        client.wait(task_id, poll_seconds=args.poll_seconds)
+        files = client.download_support_files(
+            task_id,
+            args.output_dir / task_id,
+            include_burn_date_rasters=args.include_burn_date_rasters,
+        )
+    print(f"Downloaded {len(files)} support file(s) to {args.output_dir / task_id}.")
+    return 0
+
+
+def _import_modis_statistics(args: argparse.Namespace) -> int:
+    aid_map = load_aid_map(args.aid_map)
+    incoming = []
+    for path in args.statistics:
+        incoming.extend(parse_appeears_vegetation_statistics(
+            path,
+            aid_map=aid_map,
+            metric=args.metric,
+            product=MODIS_VEGETATION_PRODUCT,
+            source=MODIS_SOURCE,
+        ))
+    storage = LocalParquetStorage(args.data_dir)
+    existing = [
+        item for item in storage.read_land_surface(
+            source=MODIS_SOURCE, metrics={args.metric}
+        )
+        if not item.geography.startswith("__")
+    ]
+    by_id = {item.record_id: item for item in existing}
+    by_id.update({item.record_id: item for item in incoming})
+    with_regions = add_region_rollups(by_id.values())
+    normalized = add_seasonal_anomalies(
+        with_regions,
+        baseline_start_year=args.baseline_start_year,
+        baseline_end_year=args.baseline_end_year,
+    )
+    added = storage.write_land_surface(normalized)
+    anomalies = sum(item.anomaly is not None for item in normalized)
+    print(
+        f"Stored {len(normalized)} {args.metric.upper()} observations "
+        f"({added} new; {anomalies} with seasonal anomalies)."
+    )
+    return 0
+
+
+def _import_modis_burned_area(args: argparse.Namespace) -> int:
+    aid_map = load_aid_map(args.aid_map)
+    incoming = []
+    for path in args.rasters:
+        incoming.extend(parse_mcd64_burn_date_raster(path, aid_map=aid_map))
+    storage = LocalParquetStorage(args.data_dir)
+    existing = [
+        item for item in storage.read_land_surface(
+            source=MODIS_SOURCE, metrics={"burned_area"}
+        )
+        if not item.geography.startswith("__")
+    ]
+    by_id = {item.record_id: item for item in existing}
+    # Several monthly rasters can contribute pixels to a daily country total.
+    for item in incoming:
+        previous = by_id.get(item.record_id)
+        if previous is None:
+            by_id[item.record_id] = item
+            continue
+        previous_pixels = int(previous.metadata.get("burned_pixel_count", 0))
+        incoming_pixels = int(item.metadata.get("burned_pixel_count", 0))
+        by_id[item.record_id] = item.model_copy(update={
+            "value": previous.value + item.value,
+            "metadata": {
+                **item.metadata,
+                "burned_pixel_count": previous_pixels + incoming_pixels,
+                "source_file": [
+                    previous.metadata.get("source_file"), item.metadata.get("source_file")
+                ],
+            },
+        })
+    normalized = add_burned_area_region_rollups(by_id.values())
+    added = storage.write_land_surface(normalized)
+    print(
+        f"Stored {len(normalized)} daily MCD64 burned-area observations ({added} new)."
     )
     return 0
 
