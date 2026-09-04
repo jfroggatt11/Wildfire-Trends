@@ -139,6 +139,10 @@ Each row is a compact zonal statistic, never a browser-facing raster:
 
 Browser path: `frontend/public/data/satellite-observations.json`. The export is
 bounded to the stored attention period and contains only aggregate fields.
+MCD64 imports include explicit zero-hectare rows for every day in each successfully
+processed monthly composite, so the timeline does not confuse observed zero burning
+with missing satellite coverage. These rows remain distinct from GDACS cumulative
+whole-event estimates.
 
 ## Article samples and derived counts
 

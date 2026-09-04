@@ -207,3 +207,21 @@ def test_burn_date_pixels_become_daily_hectares_and_region_totals():
         if item.geography == "__global__" and item.date.isoformat() == "2025-02-01"
     )
     assert world.value == 75
+
+
+def test_burned_area_month_coverage_includes_observed_zero_days():
+    observations = burned_area_observations_from_values(
+        [0, 32, 32, 33, -1],
+        year=2025,
+        pixel_area_hectares=25,
+        geography="italy",
+        country_iso3="ITA",
+        coverage_month=date(2025, 2, 1),
+        total_pixel_count=5,
+    )
+
+    assert len(observations) == 28
+    assert observations[0].date == date(2025, 2, 1)
+    assert observations[0].value == 50
+    assert observations[2].date == date(2025, 2, 3)
+    assert observations[2].value == 0

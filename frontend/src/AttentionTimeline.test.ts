@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { rollingAverageValues, rollingTotalValues, wildfireAreaHectares, wildfireSizeBand } from './AttentionTimeline'
+import { rollingAverageValues, rollingObservedTotalValues, rollingTotalValues, wildfireAreaHectares, wildfireSizeBand } from './AttentionTimeline'
 
 describe('rollingAverageValues', () => {
   it('keeps daily values unchanged', () => {
@@ -48,6 +48,15 @@ describe('rollingTotalValues', () => {
   it('sums whole-event hectares over the selected trailing window', () => {
     expect(rollingTotalValues([1_000, 0, 2_000, 3_000, 0, 0, 1_000], 7)).toEqual([
       null, null, null, null, null, null, 7_000,
+    ])
+  })
+})
+
+describe('rollingObservedTotalValues', () => {
+  it('preserves observed zero burn days and refuses to bridge missing coverage', () => {
+    expect(rollingObservedTotalValues([0, 25, 0], 1)).toEqual([0, 25, 0])
+    expect(rollingObservedTotalValues([0, null, 25, 0, 0, 0, 0], 7)).toEqual([
+      null, null, null, null, null, null, null,
     ])
   })
 })

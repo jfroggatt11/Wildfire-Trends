@@ -144,6 +144,20 @@ def test_satellite_export_contains_only_compact_attention_window_rows(tmp_path, 
             baseline_start_year=2001,
             baseline_end_year=2020,
         ),
+        LandSurfaceObservation(
+            record_id="satellite:burned-area",
+            date=date(2025, 1, 18),
+            source="nasa_modis",
+            product="MCD64A1.061",
+            metric="burned_area",
+            geography="italy",
+            country_iso3="ITA",
+            value=125.0,
+            unit="ha",
+            period_days=1,
+            valid_pixel_count=5,
+            land_cover_mask="burned_pixels",
+        ),
     ])
     output = tmp_path / "public"
     monkeypatch.setattr("scripts.export_frontend_data.ROOT", tmp_path)
@@ -152,8 +166,11 @@ def test_satellite_export_contains_only_compact_attention_window_rows(tmp_path, 
     summary = export_satellite_observations("2025-01-01", "2025-12-31")
     payload = json.loads((output / "satellite-observations.json").read_text())
 
-    assert summary["observationCount"] == 1
-    assert payload["observations"][0]["geography"] == "italy"
-    assert payload["observations"][0]["anomaly"] == 0.02
-    assert payload["products"] == ["MOD13C2.061"]
-    assert "metadata" not in payload["observations"][0]
+    assert summary["observationCount"] == 2
+    by_metric = {row["metric"]: row for row in payload["observations"]}
+    assert by_metric["ndvi"]["geography"] == "italy"
+    assert by_metric["ndvi"]["anomaly"] == 0.02
+    assert by_metric["burned_area"]["value"] == 125.0
+    assert by_metric["burned_area"]["unit"] == "ha"
+    assert payload["products"] == ["MCD64A1.061", "MOD13C2.061"]
+    assert all("metadata" not in row for row in payload["observations"])

@@ -147,9 +147,13 @@ intended for country-scale comparison, not local vegetation mapping.
 MCD64A1 version 6.1 `Burn_Date` is processed differently. For native-projection
 GeoTIFFs, pixels with an ordinal burn day are counted by day and multiplied by the
 affine pixel area in hectares. Country pixels are then summed for EU27 and World
-totals. This provides observed burned area through time and remains separate from
-GDACS' whole-event severity estimate. Boundary-edge pixels and product detection
-limits remain sources of measurement uncertainty.
+totals. Successfully processed composites also produce explicit zero-hectare days,
+preserving the difference between no detected burning and missing coverage. This
+provides observed burned area through time and remains separately selectable from
+GDACS' whole-event severity estimate; the timeline can overlay both for contrast.
+Boundary-edge pixels and product detection limits remain sources of measurement
+uncertainty. NDVI is labelled as surface greenness/browning and is never treated as
+a burned-area classification.
 
 ## Unofficial Google Trends fallback
 

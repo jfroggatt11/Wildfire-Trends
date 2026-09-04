@@ -25,6 +25,7 @@ type AlertTier = KeyEvent['alertLevel']
 type ComparisonMode = 'single' | 'topics' | 'wildfire_area' | 'vegetation' | 'countries'
 type RollingWindow = 1 | 7 | 14 | 28
 type MarkerMode = 'alert' | 'wildfire_size'
+type BurnAreaSource = 'reported' | 'satellite' | 'both'
 type WildfireSizeBand = 'under_5k' | '5k_10k' | '10k_50k' | '50k_plus'
 
 type KeyEvent = {
@@ -89,6 +90,8 @@ const GDELT_OUTAGE = { start: '2025-06-14', end: '2025-07-01' }
 const MAX_GROUP_COUNTRIES = 8
 const WILDFIRE_AREA_KEY = 'wildfire_area_hectares'
 const WILDFIRE_AREA_COLOR = '#826ab4'
+const SATELLITE_BURNED_AREA_KEY = 'satellite_burned_area_hectares'
+const SATELLITE_BURNED_AREA_COLOR = '#b45f35'
 const VEGETATION_KEY = 'vegetation_ndvi_anomaly'
 const VEGETATION_COLOR = '#72883d'
 const COUNTRY_COLORS = ['#286e59', '#6575b7', '#c56f42', '#8a6aa8', '#2f8791', '#a46b3d', '#596f9f', '#80954f']
@@ -188,6 +191,14 @@ export function rollingTotalValues(values: number[], windowDays: RollingWindow) 
   })
 }
 
+export function rollingObservedTotalValues(values: (number | null)[], windowDays: RollingWindow) {
+  return values.map((_, index) => {
+    const window = values.slice(Math.max(0, index - windowDays + 1), index + 1)
+    if (window.length !== windowDays || window.some((value) => value == null)) return null
+    return window.reduce<number>((total, value) => total + Number(value), 0)
+  })
+}
+
 function TimelineTooltip({
   active,
   payload,
@@ -196,7 +207,8 @@ function TimelineTooltip({
   series,
   rollingWindow,
   markerMode,
-  showWildfireArea,
+  showReportedArea,
+  showSatelliteArea,
   showEventMarkers,
   showVegetation,
 }: {
@@ -207,7 +219,8 @@ function TimelineTooltip({
   series: TimelineSeries[]
   rollingWindow: RollingWindow
   markerMode: MarkerMode
-  showWildfireArea: boolean
+  showReportedArea: boolean
+  showSatelliteArea: boolean
   showEventMarkers: boolean
   showVegetation: boolean
 }) {
@@ -223,8 +236,9 @@ function TimelineTooltip({
           if (value == null) return null
           return <span key={item.key}><i style={{ background: item.color }} /><span>{item.label}<small>{rollingWindow === 1 ? (measure === 'matched' ? 'Matching articles' : 'Political articles') : `${rollingWindow}-day average`}</small></span><b>{value.toLocaleString('en-GB', { maximumFractionDigits: rollingWindow === 1 ? 0 : 1 })}</b></span>
         })}
-        {showWildfireArea && point.values[WILDFIRE_AREA_KEY] != null && <span><i style={{ background: WILDFIRE_AREA_COLOR }} /><span>Wildfire burned area<small>{rollingWindow === 1 ? 'Whole-event area on start date' : `${rollingWindow}-day trailing total`}</small></span><b>{compactCount(Number(point.values[WILDFIRE_AREA_KEY]))} ha</b></span>}
-        {showVegetation && point.values[VEGETATION_KEY] != null && <span><i style={{ background: VEGETATION_COLOR }} /><span>Vegetation greenness<small>Monthly MODIS NDVI anomaly</small></span><b>{Number(point.values[VEGETATION_KEY]) >= 0 ? '+' : ''}{Number(point.values[VEGETATION_KEY]).toFixed(3)}</b></span>}
+        {showReportedArea && point.values[WILDFIRE_AREA_KEY] != null && <span><i style={{ background: WILDFIRE_AREA_COLOR }} /><span>GDACS reported event area<small>{rollingWindow === 1 ? 'Whole-event estimate on start date' : `${rollingWindow}-day trailing total`}</small></span><b>{compactCount(Number(point.values[WILDFIRE_AREA_KEY]))} ha</b></span>}
+        {showSatelliteArea && point.values[SATELLITE_BURNED_AREA_KEY] != null && <span><i style={{ background: SATELLITE_BURNED_AREA_COLOR }} /><span>MODIS observed burned area<small>{rollingWindow === 1 ? 'All detected burn-date pixels' : `${rollingWindow}-day trailing total`}</small></span><b>{compactCount(Number(point.values[SATELLITE_BURNED_AREA_KEY]))} ha</b></span>}
+        {showVegetation && point.values[VEGETATION_KEY] != null && <span><i style={{ background: VEGETATION_COLOR }} /><span>Surface greenness / browning<small>Monthly MODIS NDVI anomaly</small></span><b>{Number(point.values[VEGETATION_KEY]) >= 0 ? '+' : ''}{Number(point.values[VEGETATION_KEY]).toFixed(3)}</b></span>}
       </div>
       {showEventMarkers && visibleEvents.length > 0 && <div className="timeline-tooltip-events">
         <small>{point.eventCount} event{point.eventCount === 1 ? '' : 's'} started</small>
@@ -268,6 +282,7 @@ export default function AttentionTimeline({
   const [selectedAlerts, setSelectedAlerts] = useState<AlertTier[]>(['Orange', 'Red'])
   const [showEventMarkers, setShowEventMarkers] = useState(true)
   const [markerMode, setMarkerMode] = useState<MarkerMode>('alert')
+  const [burnAreaSource, setBurnAreaSource] = useState<BurnAreaSource>('reported')
   const [selectedSizeBands, setSelectedSizeBands] = useState<WildfireSizeBand[]>(() => Object.keys(SIZE_BANDS) as WildfireSizeBand[])
   const [attentionRows, setAttentionRows] = useState<(AttentionObservation | RegionAttentionObservation)[]>([])
   const [satelliteRows, setSatelliteRows] = useState<SatelliteObservation[]>([])
@@ -276,6 +291,8 @@ export default function AttentionTimeline({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const showWildfireArea = comparisonMode === 'wildfire_area'
+  const showReportedArea = showWildfireArea && burnAreaSource !== 'satellite'
+  const showSatelliteArea = showWildfireArea && burnAreaSource !== 'reported'
   const showVegetation = comparisonMode === 'vegetation'
 
   useEffect(() => {
@@ -399,7 +416,7 @@ export default function AttentionTimeline({
       rollingAverageValues(rawPoints.map((point) => point.values[item.key]), rollingWindow),
     ]))
     const areaByDate = new Map<string, number>()
-    if (showWildfireArea) {
+    if (showReportedArea) {
       for (const event of relevantEvents) {
         const area = wildfireAreaHectares(event)
         if (area == null) continue
@@ -407,8 +424,23 @@ export default function AttentionTimeline({
         areaByDate.set(day, (areaByDate.get(day) ?? 0) + area)
       }
     }
-    const areaValues = showWildfireArea
+    const areaValues = showReportedArea
       ? rollingTotalValues(rawPoints.map((point) => areaByDate.get(point.date) ?? 0), rollingWindow)
+      : []
+    const burnedAreaBySource = new Map<string, SatelliteObservation>()
+    if (showSatelliteArea) {
+      for (const row of satelliteRows) {
+        if (row.metric === 'burned_area' && row.date >= coverageStart && row.date <= coverageEnd) {
+          burnedAreaBySource.set(`${row.geography}:${row.date}`, row)
+        }
+      }
+    }
+    const satelliteAreaValues = showSatelliteArea
+      ? rollingObservedTotalValues(rawPoints.map((point) => {
+        const rows = activeLocations.map((location) => burnedAreaBySource.get(`${location}:${point.date}`))
+        if (!rows.length || rows.some((row) => !row)) return null
+        return rows.reduce((total, row) => total + Number(row?.value ?? 0), 0)
+      }), rollingWindow)
       : []
     const satelliteBySource = new Map<string, SatelliteObservation>()
     if (showVegetation) {
@@ -437,11 +469,12 @@ export default function AttentionTimeline({
       for (const item of series) {
         values[item.key] = smoothedValues.get(item.key)?.[index] ?? null
       }
-      if (showWildfireArea) values[WILDFIRE_AREA_KEY] = areaValues[index] ?? null
+      if (showReportedArea) values[WILDFIRE_AREA_KEY] = areaValues[index] ?? null
+      if (showSatelliteArea) values[SATELLITE_BURNED_AREA_KEY] = satelliteAreaValues[index] ?? null
       if (showVegetation) values[VEGETATION_KEY] = satelliteValue(point.date)
       return { ...point, values, ...values }
     })
-  }, [activeLocations, attentionRows, coverageEnd, coverageStart, measure, relevantEvents, rollingWindow, satelliteRows, series, showVegetation, showWildfireArea])
+  }, [activeLocations, attentionRows, coverageEnd, coverageStart, measure, relevantEvents, rollingWindow, satelliteRows, series, showReportedArea, showSatelliteArea, showVegetation])
 
   const observedValues = plottedPoints.flatMap((point) => series.flatMap((item) => point.values[item.key] == null ? [] : [point.values[item.key] as number]))
   const plottedPeak = observedValues.length ? Math.max(...observedValues) : 0
@@ -485,7 +518,7 @@ export default function AttentionTimeline({
       : comparisonMode === 'wildfire_area'
         ? `${TOPICS[topic].label} and wildfire area in ${placeLabel}`
       : comparisonMode === 'vegetation'
-        ? `${TOPICS[topic].label} and vegetation greenness in ${placeLabel}`
+        ? `${TOPICS[topic].label} and surface greenness/browning in ${placeLabel}`
       : `${TOPICS[topic].label} in ${placeLabel}`
   const frequencyLabel = rollingWindow === 1
     ? showWildfireArea ? 'Daily comparison' : 'Daily attention'
@@ -497,6 +530,7 @@ export default function AttentionTimeline({
     .map((row) => row.date))].sort(), [coverageEnd, coverageStart, satelliteRows])
   const effectiveSatelliteMapDate = satelliteDates.includes(satelliteMapDate) ? satelliteMapDate : satelliteDates.at(-1) ?? ''
   const satelliteMapRows = satelliteRows.filter((row) => row.metric === 'ndvi' && row.date === effectiveSatelliteMapDate && !row.geography.startsWith('__'))
+  const satelliteBurnAvailable = satelliteRows.some((row) => row.metric === 'burned_area' && row.date >= coverageStart && row.date <= coverageEnd && activeLocations.includes(row.geography))
 
   const addGroupCountry = (selected: string) => {
     if (!selected || groupCountries.includes(selected) || groupCountries.length >= MAX_GROUP_COUNTRIES) return
@@ -538,7 +572,8 @@ export default function AttentionTimeline({
       <aside className="timeline-controls">
         <div className="lab-section-heading"><span>1</span><div><small>Observed publishing</small><h2>Configure timeline</h2></div></div>
         <div className="lab-form">
-          <label><span>Lines</span><select aria-label="Timeline lines" value={comparisonMode} onChange={(event) => updateComparisonMode(event.target.value as ComparisonMode)}><option value="single">One topic</option><option value="topics">Compare climate and EVs</option><option value="wildfire_area">Attention + wildfire area</option><option value="vegetation">Attention + vegetation greenness</option><option value="countries">Compare countries</option></select></label>
+          <label><span>Lines</span><select aria-label="Timeline lines" value={comparisonMode} onChange={(event) => updateComparisonMode(event.target.value as ComparisonMode)}><option value="single">One topic</option><option value="topics">Compare climate and EVs</option><option value="wildfire_area">Attention + wildfire area</option><option value="vegetation">Attention + surface greenness/browning</option><option value="countries">Compare countries</option></select></label>
+          {showWildfireArea && <label><span>Burn-area source</span><select aria-label="Burn-area source" value={burnAreaSource} onChange={(event) => setBurnAreaSource(event.target.value as BurnAreaSource)}><option value="reported">GDACS reported event estimates</option><option value="satellite">MODIS satellite observations</option><option value="both">Compare both measures</option></select><small>These measures are stored and plotted separately; neither is substituted for the other.</small></label>}
           {comparisonMode !== 'countries' && <label><span>Geography</span><select value={placeScope} onChange={(event) => setPlaceScope(event.target.value as PlaceScope)}><option value="world">World</option><option value="eu27">EU27</option><option value="country">Single country</option><option value="group">Combined country group</option></select></label>}
           {comparisonMode !== 'countries' && placeScope === 'country' && <label><span>Country</span><select value={country} onChange={(event) => setCountry(event.target.value)}>{countryOptions.map((item) => <option key={item} value={item}>{geographyLabels[item] || item}</option>)}</select></label>}
           {(comparisonMode === 'countries' || placeScope === 'group') && <>
@@ -554,12 +589,12 @@ export default function AttentionTimeline({
           <label><span>Event type</span><select value={showWildfireArea || markerMode === 'wildfire_size' ? 'wildfire' : hazard} disabled={showWildfireArea || markerMode === 'wildfire_size'} onChange={(event) => setHazard(event.target.value as Hazard)}><option value="all">Floods and wildfires</option><option value="flood">Floods</option><option value="wildfire">Wildfires</option></select></label>
           {markerMode === 'wildfire_size' && <MultiSelectDropdown label="Wildfire size" options={Object.entries(SIZE_BANDS).map(([id, item]) => ({ id: id as WildfireSizeBand, label: item.label, color: item.color }))} selected={selectedSizeBands} onToggle={toggleSizeBand} />}
         </div>
-        <div className="analysis-definition"><Info size={15} /><p><strong>Comparable observed attention.</strong> Choose separate lines for topics or publishing markets. Rolling averages smooth weekday volatility but never bridge missing provider dates. {showWildfireArea ? `Wildfire hectares are whole-event cumulative values assigned to start dates${rollingWindow === 1 ? '.' : ` and summed over the trailing ${rollingWindow} days.`}` : showVegetation ? 'Greenness is each geography’s monthly MODIS NDVI difference from its own same-month 2001–2020 baseline; monthly composites are shown across their observation period.' : markerMode === 'alert' ? 'Event colours show GDACS impact tiers, whose rules differ by hazard.' : 'Event colours show wildfire burned-area bands; flood size is not inferred.'}</p></div>
+        <div className="analysis-definition"><Info size={15} /><p><strong>Comparable observed attention.</strong> Choose separate lines for topics or publishing markets. Rolling averages smooth weekday volatility but never bridge missing provider dates. {showWildfireArea ? 'GDACS is a reported whole-event wildfire estimate assigned to the event start date; MODIS independently observes all burned pixels, including agricultural or prescribed fires. Compare both without treating either as ground truth.' : showVegetation ? 'Surface greenness/browning is each geography’s monthly MODIS NDVI difference from its own same-month 2001–2020 baseline; it is not classified as burned land.' : markerMode === 'alert' ? 'Event colours show GDACS impact tiers, whose rules differ by hazard.' : 'Event colours show wildfire burned-area bands; flood size is not inferred.'}</p></div>
       </aside>
 
       <div className="timeline-results">
         {loading ? <div className="activity-state"><Activity size={20} /> Loading daily attention…</div> : error ? <div className="activity-state error"><CircleAlert size={20} /><strong>Attention timeline unavailable</strong><p>{error}</p></div> : <section className="timeline-chart-card">
-          <div className="result-heading"><div><span className="eyebrow">{frequencyLabel}</span><h2>{chartTitle}</h2></div><div className="timeline-total"><strong>{showWildfireArea || showVegetation ? '2 lines' : series.length === 1 ? compactCount(Math.round(plottedAverage)) : `${series.length} lines`}</strong><small>{showWildfireArea ? `${measure === 'matched' ? 'Matching' : 'Political'} articles and reported hectares` : showVegetation ? `${measure === 'matched' ? 'Matching' : 'Political'} articles and same-season NDVI anomaly` : series.length === 1 ? `average ${measure === 'matched' ? 'matching' : 'political'} articles/day · peak ${compactCount(plottedPeak)}` : `${frequencyLabel.toLowerCase()} · ${measure === 'matched' ? 'matching' : 'political'} articles`} · {relevantEvents.length} events</small></div></div>
+          <div className="result-heading"><div><span className="eyebrow">{frequencyLabel}</span><h2>{chartTitle}</h2></div><div className="timeline-total"><strong>{showWildfireArea ? `${series.length + Number(showReportedArea) + Number(showSatelliteArea)} lines` : showVegetation ? '2 lines' : series.length === 1 ? compactCount(Math.round(plottedAverage)) : `${series.length} lines`}</strong><small>{showWildfireArea ? `${measure === 'matched' ? 'Matching' : 'Political'} articles and separately sourced hectares` : showVegetation ? `${measure === 'matched' ? 'Matching' : 'Political'} articles and same-season NDVI anomaly` : series.length === 1 ? `average ${measure === 'matched' ? 'matching' : 'political'} articles/day · peak ${compactCount(plottedPeak)}` : `${frequencyLabel.toLowerCase()} · ${measure === 'matched' ? 'matching' : 'political'} articles`} · {relevantEvents.length} events</small></div></div>
           <div className="timeline-chart" role="img" aria-label={`${frequencyLabel} for ${chartTitle.toLowerCase()}${showEventMarkers ? ' with event markers' : ''}`}>
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={chartPoints} margin={{ top: 20, right: 18, bottom: 2, left: 4 }}>
@@ -568,12 +603,13 @@ export default function AttentionTimeline({
                 <YAxis yAxisId="attention" domain={[0, 'auto']} width={56} tickFormatter={(value) => compactCount(Number(value))} tick={{ fontSize: 9, fill: '#738179' }} label={showWildfireArea ? { value: 'Articles', angle: -90, position: 'insideLeft', fill: '#738179', fontSize: 8 } : undefined} />
                 {showWildfireArea && <YAxis yAxisId="wildfireArea" orientation="right" domain={[0, 'auto']} width={60} tickFormatter={(value) => compactCount(Number(value))} tick={{ fontSize: 9, fill: WILDFIRE_AREA_COLOR }} label={{ value: 'Hectares', angle: 90, position: 'insideRight', fill: WILDFIRE_AREA_COLOR, fontSize: 8 }} />}
                 {showVegetation && <YAxis yAxisId="vegetation" orientation="right" domain={['auto', 'auto']} width={60} tickFormatter={(value) => `${Number(value) > 0 ? '+' : ''}${Number(value).toFixed(2)}`} tick={{ fontSize: 9, fill: VEGETATION_COLOR }} label={{ value: 'NDVI anomaly', angle: 90, position: 'insideRight', fill: VEGETATION_COLOR, fontSize: 8 }} />}
-                <Tooltip content={<TimelineTooltip measure={measure} series={series} rollingWindow={rollingWindow} markerMode={markerMode} showWildfireArea={showWildfireArea} showEventMarkers={showEventMarkers} showVegetation={showVegetation} />} />
+                <Tooltip content={<TimelineTooltip measure={measure} series={series} rollingWindow={rollingWindow} markerMode={markerMode} showReportedArea={showReportedArea} showSatelliteArea={showSatelliteArea} showEventMarkers={showEventMarkers} showVegetation={showVegetation} />} />
                 {coverageStart <= GDELT_OUTAGE.end && coverageEnd >= GDELT_OUTAGE.start && <ReferenceArea yAxisId="attention" x1={GDELT_OUTAGE.start} x2={GDELT_OUTAGE.end} fill="#70879a" fillOpacity={0.13} stroke="#60798d" strokeOpacity={0.55} label={{ value: 'Provider gap', position: 'insideTop', fill: '#506879', fontSize: 8 }} />}
                 {showEventMarkers && [...eventDates.entries()].map(([date, events]) => <ReferenceLine key={date} yAxisId="attention" x={date} stroke={eventMarkerColor(events)} strokeWidth={1} strokeDasharray="3 4" strokeOpacity={0.62} />)}
                 {series.map((item) => <Line key={item.key} yAxisId="attention" type="monotone" dataKey={item.key} name={item.label} stroke={item.color} strokeWidth={2.3} dot={false} connectNulls={false} />)}
-                {showWildfireArea && <Line yAxisId="wildfireArea" type="linear" dataKey={WILDFIRE_AREA_KEY} name="Wildfire burned area" stroke={WILDFIRE_AREA_COLOR} strokeWidth={2} strokeDasharray="5 3" dot={false} connectNulls={false} />}
-                {showVegetation && <Line yAxisId="vegetation" type="stepAfter" dataKey={VEGETATION_KEY} name="Vegetation greenness" stroke={VEGETATION_COLOR} strokeWidth={2} dot={false} connectNulls={false} />}
+                {showReportedArea && <Line yAxisId="wildfireArea" type="linear" dataKey={WILDFIRE_AREA_KEY} name="GDACS reported event area" stroke={WILDFIRE_AREA_COLOR} strokeWidth={2} strokeDasharray="5 3" dot={false} connectNulls={false} />}
+                {showSatelliteArea && <Line yAxisId="wildfireArea" type="linear" dataKey={SATELLITE_BURNED_AREA_KEY} name="MODIS observed burned area" stroke={SATELLITE_BURNED_AREA_COLOR} strokeWidth={2} dot={false} connectNulls={false} />}
+                {showVegetation && <Line yAxisId="vegetation" type="stepAfter" dataKey={VEGETATION_KEY} name="Surface greenness / browning" stroke={VEGETATION_COLOR} strokeWidth={2} dot={false} connectNulls={false} />}
                 {showVegetation && effectiveSatelliteMapDate && <ReferenceLine yAxisId="attention" x={effectiveSatelliteMapDate} stroke={VEGETATION_COLOR} strokeDasharray="2 3" strokeOpacity={0.8} />}
                 {showEventMarkers && <>
                   <Scatter yAxisId="attention" dataKey="greenEvent" name="Events" legendType="none" fill="#789342" shape="diamond" />
@@ -587,7 +623,7 @@ export default function AttentionTimeline({
               </ComposedChart>
             </ResponsiveContainer>
           </div>
-          <div className="timeline-series-key">{series.map((item) => <span key={item.key}><i style={{ borderColor: item.color }} />{item.label}</span>)}{showWildfireArea && <span><i style={{ borderColor: WILDFIRE_AREA_COLOR }} />Wildfire burned area · ha · right axis</span>}{showVegetation && <span><i style={{ borderColor: VEGETATION_COLOR }} />MODIS NDVI anomaly · right axis</span>}</div>
+          <div className="timeline-series-key">{series.map((item) => <span key={item.key}><i style={{ borderColor: item.color }} />{item.label}</span>)}{showReportedArea && <span><i style={{ borderColor: WILDFIRE_AREA_COLOR }} />GDACS reported event area · ha</span>}{showSatelliteArea && <span><i style={{ borderColor: SATELLITE_BURNED_AREA_COLOR }} />MODIS observed burned area · ha</span>}{showVegetation && <span><i style={{ borderColor: VEGETATION_COLOR }} />MODIS surface greenness/browning · NDVI anomaly</span>}</div>
           <div className="timeline-key">
             {showEventMarkers && (markerMode === 'alert' ? ALERT_OPTIONS.filter((option) => selectedAlerts.includes(option.id)).map((option) => <span key={option.id}><i style={{ borderColor: option.color }} />{option.label}</span>) : Object.entries(SIZE_BANDS).filter(([id]) => selectedSizeBands.includes(id as WildfireSizeBand)).map(([, item]) => <span key={item.label}><i style={{ borderColor: item.color }} />{item.label}</span>))}
             {coverageStart <= GDELT_OUTAGE.end && coverageEnd >= GDELT_OUTAGE.start && <span className="provider-gap-key"><i />Provider gap</span>}
@@ -598,6 +634,7 @@ export default function AttentionTimeline({
             <SatelliteAnomalyMap date={effectiveSatelliteMapDate} observations={satelliteMapRows} />
             <small className="satellite-method-note">Current MVP aggregates cover all valid land pixels. A fixed grassland/cropland mask can be added without changing the browser data contract.</small>
           </> : <div className="satellite-empty"><Info size={16} /><div><strong>MODIS aggregates are ready to connect.</strong><p>{satelliteError || 'No NDVI anomaly observations overlap this attention period. Run the MOD13C2 vegetation collector and rebuild the frontend export.'}</p></div></div>)}
+          {showSatelliteArea && !satelliteBurnAvailable && <div className="satellite-empty"><Info size={16} /><div><strong>No MODIS burned-area observations are exported yet.</strong><p>{satelliteError || 'Import MCD64A1 Burn_Date rasters and rebuild the frontend export. GDACS reported estimates remain available as a separate source.'}</p></div></div>}
         </section>}
       </div>
     </section>

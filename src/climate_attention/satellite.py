@@ -547,16 +547,36 @@ def burned_area_observations_from_values(
     pixel_area_hectares: float,
     geography: str,
     country_iso3: str,
+    coverage_month: date | None = None,
     total_pixel_count: int | None = None,
     source_file: str | None = None,
 ) -> list[LandSurfaceObservation]:
-    """Convert MCD64 ordinal burn-day pixels into true daily hectare totals."""
+    """Convert MCD64 ordinal burn-day pixels into true daily hectare totals.
+
+    When the source composite month is known, explicit zero rows preserve the
+    distinction between an observed no-burn day and missing satellite coverage.
+    """
     if pixel_area_hectares <= 0:
         raise ValueError("burned-area pixel size must be positive")
     counts = Counter(int(value) for value in burn_dates if 1 <= int(value) <= 366)
+    if coverage_month is not None and coverage_month.year != year:
+        raise ValueError("burned-area coverage month must be in the requested year")
+    if coverage_month is None:
+        dated_counts = [
+            (date(year, 1, 1) + timedelta(days=ordinal_day - 1), burned_pixels)
+            for ordinal_day, burned_pixels in sorted(counts.items())
+        ]
+    else:
+        month_days = calendar.monthrange(year, coverage_month.month)[1]
+        dated_counts = [
+            (
+                date(year, coverage_month.month, day),
+                counts.get(date(year, coverage_month.month, day).timetuple().tm_yday, 0),
+            )
+            for day in range(1, month_days + 1)
+        ]
     observations = []
-    for ordinal_day, burned_pixels in sorted(counts.items()):
-        observed = date(year, 1, 1) + timedelta(days=ordinal_day - 1)
+    for observed, burned_pixels in dated_counts:
         if observed.year != year:
             continue
         observations.append(LandSurfaceObservation(
@@ -605,9 +625,11 @@ def parse_mcd64_burn_date_raster(
     date_match = re.search(r"_(\d{8})T?\d*[_.]aid", path.name)
     doy_match = re.search(r"_doy(\d{4})(\d{3})", path.name)
     if date_match:
-        year = int(date_match.group(1)[:4])
+        composite_date = datetime.strptime(date_match.group(1), "%Y%m%d").date()
+        year = composite_date.year
     elif doy_match:
         year = int(doy_match.group(1))
+        composite_date = date(year, 1, 1) + timedelta(days=int(doy_match.group(2)) - 1)
     else:
         raise ValueError(f"cannot determine MCD64 year from {path.name!r}")
     with rasterio.open(path) as dataset:
@@ -625,6 +647,7 @@ def parse_mcd64_burn_date_raster(
         pixel_area_hectares=pixel_area_hectares,
         geography=mapping["geography"],
         country_iso3=mapping["country_iso3"],
+        coverage_month=composite_date.replace(day=1),
         total_pixel_count=len(values),
         source_file=path.name,
     )

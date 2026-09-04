@@ -27,11 +27,12 @@ available as sensitivity filters. A stable period control supports either year, 
 whole available 2025–2026 series, and a custom start/end range shared by every Lab
 tab. Timeline markers can use either GDACS alert tiers or wildfire burned-area
 bands; no comparable flood-size category is inferred from the current export. The
-comparison view can also overlay start-date cumulative wildfire hectares against
-either attention topic on a separately labelled axis. Event onset lines and diamonds
-can be hidden independently without changing the events included in that area series.
-When MODIS aggregates have been imported, another option compares attention with
-same-season NDVI anomaly and adds a date-linked brown-to-green country map.
+comparison view can overlay GDACS start-date cumulative wildfire hectares, MODIS
+daily observed burned hectares, or both against either attention topic on a separately
+labelled axis. The two burn measures remain distinct, and event onset lines and
+diamonds can be hidden independently. When MODIS vegetation aggregates have been
+imported, another option compares attention with same-season surface
+greenness/browning (NDVI anomaly) and adds a date-linked brown-to-green country map.
 
 Export the current Parquet datasets to compact browser assets, then run the app:
 
