@@ -363,20 +363,20 @@ test('analysis lab charts daily attention with selectable event markers', async 
     body: JSON.stringify({
       schemaVersion: 1,
       source: 'NASA MODIS',
-      products: ['MOD13A2.061'],
+      products: ['MOD13C2.061'],
       observations: [
         ['2025-01-01', '__global__', null, 0.02, 1000],
-        ['2025-01-17', '__global__', null, -0.03, 1000],
+        ['2025-02-01', '__global__', null, -0.03, 1000],
         ['2025-01-01', 'france', 'FRA', 0.04, 100],
         ['2025-01-01', 'germany', 'DEU', -0.02, 100],
         ['2025-01-01', 'italy', 'ITA', 0.01, 100],
-        ['2025-01-17', 'france', 'FRA', -0.05, 100],
-        ['2025-01-17', 'germany', 'DEU', -0.01, 100],
-        ['2025-01-17', 'italy', 'ITA', 0.03, 100],
+        ['2025-02-01', 'france', 'FRA', -0.05, 100],
+        ['2025-02-01', 'germany', 'DEU', -0.01, 100],
+        ['2025-02-01', 'italy', 'ITA', 0.03, 100],
       ].map(([date, geography, countryIso3, anomaly, validPixelCount]) => ({
         date, geography, countryIso3, metric: 'ndvi', value: 0.5, unit: 'index',
-        periodDays: 16, validPixelCount, anomaly, standardizedAnomaly: null,
-        baselineStartYear: 2001, baselineEndYear: 2020, landCoverMask: 'all_land',
+        periodDays: String(date).endsWith('-01-01') ? 31 : 28, validPixelCount, anomaly, standardizedAnomaly: null,
+        baselineStartYear: 2001, baselineEndYear: 2020, landCoverMask: 'all_valid_cmg_cells',
       })),
     }),
   }))
@@ -420,7 +420,7 @@ test('analysis lab charts daily attention with selectable event markers', async 
   await expect(page.getByRole('heading', { name: 'Climate change and vegetation greenness in World' })).toBeVisible()
   await expect(page.locator('.timeline-series-key')).toContainText('MODIS NDVI anomaly · right axis')
   await expect(page.locator('.timeline-chart .recharts-yAxis')).toHaveCount(2)
-  await expect(page.getByLabel('Satellite map composite')).toHaveValue('2025-01-17')
+  await expect(page.getByLabel('Satellite map composite')).toHaveValue('2025-02-01')
   await expect(page.getByRole('img', { name: /Country map of MODIS NDVI anomaly/ })).toBeVisible()
   await page.getByLabel('Timeline lines').selectOption('single')
   await expect(page.locator('.activity-state')).toHaveCount(0, { timeout: 30_000 })
@@ -522,7 +522,7 @@ test('methods page documents the current research protocol and definitions', asy
   await expect(page.locator('.window-diagram')).toContainText('Excluded')
   await expect(page.locator('.decision-table .status-chip.planned')).toHaveText('Planned')
   await expect(page.locator('#collection')).toContainText('Confirmed provider gap')
-  await expect(page.locator('.reference-list > a')).toHaveCount(10)
+  await expect(page.locator('.reference-list > a')).toHaveCount(11)
   await expect(page.locator('.reference-list > a').first()).toHaveAttribute('href', /gdeltproject\.org/)
   await expect(page.locator('.reference-list > a').first()).toHaveAttribute('target', '_blank')
 

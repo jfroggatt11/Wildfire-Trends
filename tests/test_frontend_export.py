@@ -128,6 +128,22 @@ def test_satellite_export_contains_only_compact_attention_window_rows(tmp_path, 
             valid_pixel_count=100,
             anomaly=0.01,
         ),
+        LandSurfaceObservation(
+            record_id="satellite:canonical-cmg",
+            date=date(2025, 1, 1),
+            source="nasa_modis",
+            product="MOD13C2.061",
+            metric="ndvi",
+            geography="italy",
+            country_iso3="ITA",
+            value=0.52,
+            unit="index",
+            period_days=31,
+            valid_pixel_count=30,
+            anomaly=0.02,
+            baseline_start_year=2001,
+            baseline_end_year=2020,
+        ),
     ])
     output = tmp_path / "public"
     monkeypatch.setattr("scripts.export_frontend_data.ROOT", tmp_path)
@@ -138,5 +154,6 @@ def test_satellite_export_contains_only_compact_attention_window_rows(tmp_path, 
 
     assert summary["observationCount"] == 1
     assert payload["observations"][0]["geography"] == "italy"
-    assert payload["observations"][0]["anomaly"] == 0.03
+    assert payload["observations"][0]["anomaly"] == 0.02
+    assert payload["products"] == ["MOD13C2.061"]
     assert "metadata" not in payload["observations"][0]

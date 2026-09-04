@@ -12,6 +12,8 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
+import httpx
+
 from .aggregation import aggregate_daily
 from .config import (
     ConfigError,
@@ -34,6 +36,7 @@ from .satellite import (
     MODIS_EVI_LAYER,
     MODIS_BURNED_AREA_PRODUCT,
     MODIS_BURN_DATE_LAYER,
+    MODIS_CMG_PRODUCT,
     MODIS_NDVI_LAYER,
     MODIS_SOURCE,
     MODIS_VEGETATION_PRODUCT,
@@ -41,9 +44,14 @@ from .satellite import (
     add_burned_area_region_rollups,
     add_seasonal_anomalies,
     build_appeears_area_task,
+    discover_mod13c2_granules,
+    download_mod13c2_subset,
     load_aid_map,
+    mod13c2_country_observations,
     parse_appeears_vegetation_statistics,
+    parse_mod13c2_date,
     parse_mcd64_burn_date_raster,
+    read_mod13c2_subset,
     write_appeears_task,
 )
 from .run_state import CollectionRunState, RunStore
@@ -399,7 +407,12 @@ def build_parser() -> argparse.ArgumentParser:
         "run-appeears-task",
         help="submit a prepared AppEEARS task and download its compact support files",
     )
-    run_appeears.add_argument("--request", type=Path, required=True)
+    run_appeears.add_argument(
+        "--request", type=Path, help="prepared request to submit"
+    )
+    run_appeears.add_argument(
+        "--task-id", help="resume monitoring and downloading an already submitted task"
+    )
     run_appeears.add_argument(
         "--output-dir", type=Path, default=Path("data/satellite/appeears")
     )
@@ -428,6 +441,28 @@ def build_parser() -> argparse.ArgumentParser:
     import_burned.add_argument("--rasters", type=Path, nargs="+", required=True)
     import_burned.add_argument("--aid-map", type=Path, required=True)
     import_burned.add_argument("--data-dir", type=Path, default=Path("data"))
+
+    collect_cmg = subparsers.add_parser(
+        "collect-modis-vegetation",
+        help="download monthly global MOD13C2 NDVI/EVI subsets and aggregate countries",
+    )
+    collect_cmg.add_argument("--countries-config", type=Path, required=True)
+    collect_cmg.add_argument("--countries", nargs="+")
+    collect_cmg.add_argument("--start", type=_iso_date, required=True)
+    collect_cmg.add_argument("--end", type=_iso_date, required=True)
+    collect_cmg.add_argument("--metric", choices=("ndvi", "evi"), default="ndvi")
+    collect_cmg.add_argument(
+        "--boundaries",
+        type=Path,
+        default=Path("data/reference/ne_50m_admin_0_countries.geojson"),
+    )
+    collect_cmg.add_argument(
+        "--temporary-dir", type=Path, default=Path("data/satellite/mod13c2-tmp")
+    )
+    collect_cmg.add_argument("--keep-subsets", action="store_true")
+    collect_cmg.add_argument("--baseline-start-year", type=int, default=2001)
+    collect_cmg.add_argument("--baseline-end-year", type=int, default=2020)
+    collect_cmg.add_argument("--data-dir", type=Path, default=Path("data"))
 
     compare = subparsers.add_parser(
         "compare-sources", help="compare paired daily metrics from two sources"
@@ -604,6 +639,8 @@ def main(argv: list[str] | None = None) -> int:
             return _import_modis_statistics(args)
         if args.command == "import-modis-burned-area":
             return _import_modis_burned_area(args)
+        if args.command == "collect-modis-vegetation":
+            return _collect_modis_vegetation(args)
         if args.command == "compare-sources":
             return _compare_sources(args)
         if args.command == "export-articles":
@@ -622,7 +659,7 @@ def main(argv: list[str] | None = None) -> int:
             return _aggregate(args.data_dir)
         if args.command == "runs":
             return _runs(args)
-    except (ConfigError, ValueError, ProviderError) as exc:
+    except (ConfigError, ValueError, ProviderError, httpx.HTTPError) as exc:
         LOGGER.error("%s", exc)
         return 2
     parser.error(f"unknown command: {args.command}")
@@ -690,10 +727,16 @@ def _run_appeears_task(args: argparse.Namespace) -> int:
         raise ValueError(
             "set EARTHDATA_USERNAME and EARTHDATA_PASSWORD before submitting AppEEARS tasks"
         )
-    task = json.loads(args.request.read_text(encoding="utf-8"))
+    if bool(args.request) == bool(args.task_id):
+        raise ValueError("provide exactly one of --request or --task-id")
     with AppEEARSClient(username, password) as client:
-        task_id = client.submit(task)
-        print(f"Submitted AppEEARS task {task_id}; waiting for completion.")
+        if args.task_id:
+            task_id = args.task_id
+            print(f"Resuming AppEEARS task {task_id}; waiting for completion.")
+        else:
+            task = json.loads(args.request.read_text(encoding="utf-8"))
+            task_id = client.submit(task)
+            print(f"Submitted AppEEARS task {task_id}; waiting for completion.")
         client.wait(task_id, poll_seconds=args.poll_seconds)
         files = client.download_support_files(
             task_id,
@@ -774,6 +817,122 @@ def _import_modis_burned_area(args: argparse.Namespace) -> int:
     added = storage.write_land_surface(normalized)
     print(
         f"Stored {len(normalized)} daily MCD64 burned-area observations ({added} new)."
+    )
+    return 0
+
+
+def _collect_modis_vegetation(args: argparse.Namespace) -> int:
+    if not os.environ.get("EARTHDATA_TOKEN") and not (
+        os.environ.get("EARTHDATA_USERNAME")
+        and os.environ.get("EARTHDATA_PASSWORD")
+    ):
+        raise ValueError(
+            "set EARTHDATA_USERNAME and EARTHDATA_PASSWORD (or EARTHDATA_TOKEN) "
+            "before collecting MOD13C2"
+        )
+    try:
+        import earthaccess
+    except ImportError as exc:
+        raise ValueError("install the satellite extra before collecting MOD13C2") from exc
+
+    country_config = load_country_config(args.countries_config)
+    countries = country_config.enabled_countries(
+        set(args.countries) if args.countries else None
+    )
+    boundaries = load_country_boundaries(args.boundaries, countries)
+    requested_geographies = {
+        boundary.country_id for boundary in boundaries.boundaries
+    }
+    granules = discover_mod13c2_granules(args.start, args.end)
+    if not granules:
+        raise ValueError("NASA CMR returned no MOD13C2 granules for the requested dates")
+    try:
+        auth = earthaccess.login(strategy="environment")
+    except Exception as exc:
+        raise ValueError(f"NASA Earthdata login failed: {exc}") from exc
+    if not auth.authenticated:
+        raise ValueError("NASA Earthdata login did not authenticate")
+    session = auth.get_session()
+
+    storage = LocalParquetStorage(args.data_dir)
+    progress_path = args.data_dir / "satellite/mod13c2-progress.json"
+    try:
+        progress_payload = json.loads(progress_path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        progress_payload = {}
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"invalid MOD13C2 progress file {progress_path}: {exc}") from exc
+    completed = {
+        str(key): set(value)
+        for key, value in progress_payload.items()
+        if isinstance(value, list)
+    }
+
+    print(
+        f"Found {len(granules)} monthly MOD13C2 granules for "
+        f"{len(requested_geographies)} countries."
+    )
+    processed = 0
+    for position, granule_id in enumerate(granules, start=1):
+        observed = parse_mod13c2_date(granule_id)
+        progress_key = f"{args.metric}:{granule_id}"
+        if requested_geographies <= completed.get(progress_key, set()):
+            print(f"[{position}/{len(granules)}] {observed}: already stored; skipping.")
+            continue
+        target = args.temporary_dir / f"{granule_id}.{args.metric}.nc4"
+        print(
+            f"[{position}/{len(granules)}] {observed}: "
+            f"downloading {args.metric.upper()}-only subset."
+        )
+        download_mod13c2_subset(
+            session, granule_id, target, metric=args.metric
+        )
+        values = read_mod13c2_subset(target)
+        observations = mod13c2_country_observations(
+            values,
+            boundaries=boundaries,
+            observed=observed,
+            granule_id=granule_id,
+            metric=args.metric,
+        )
+        storage.write_land_surface(observations)
+        completed.setdefault(progress_key, set()).update(requested_geographies)
+        progress_path.parent.mkdir(parents=True, exist_ok=True)
+        temporary_progress = progress_path.with_suffix(".json.part")
+        temporary_progress.write_text(
+            json.dumps(
+                {key: sorted(value) for key, value in sorted(completed.items())},
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        temporary_progress.replace(progress_path)
+        processed += 1
+        print(f"[{position}/{len(granules)}] {observed}: stored {len(observations)} countries.")
+        if not args.keep_subsets:
+            target.unlink(missing_ok=True)
+
+    country_rows = [
+        item
+        for item in storage.read_land_surface(
+            source=MODIS_SOURCE, metrics={args.metric}
+        )
+        if item.product == MODIS_CMG_PRODUCT
+        and not item.geography.startswith("__")
+    ]
+    with_regions = add_region_rollups(country_rows)
+    normalized = add_seasonal_anomalies(
+        with_regions,
+        baseline_start_year=args.baseline_start_year,
+        baseline_end_year=args.baseline_end_year,
+    )
+    storage.write_land_surface(normalized)
+    anomalies = sum(item.anomaly is not None for item in normalized)
+    print(
+        f"MOD13C2 collection complete: processed {processed} new month(s); "
+        f"stored {len(normalized)} rows ({anomalies} with seasonal anomalies)."
     )
     return 0
 

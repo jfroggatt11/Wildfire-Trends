@@ -127,14 +127,15 @@ Each row is a compact zonal statistic, never a browser-facing raster:
 - `geography`, `country_iso3`: the stable country dimension used by the attention
   timeline. `__global__` and `__eu27__` are derived regional rows.
 - `value`, `unit`: a vegetation index (`index`) or burned area (`ha`).
-- `period_days`: 16 for MOD13A2 vegetation composites and 1 for burn-date totals.
+- `period_days`: the calendar-month length for canonical MOD13C2 vegetation
+  composites and 1 for burn-date totals.
 - `valid_pixel_count`, `total_pixel_count`: retained pixel-count provenance when the
   source output supplies it.
 - `anomaly`, `standardized_anomaly`: difference from, and optional standard-deviation
-  scaling against, the geography's same 16-day seasonal bin.
+  scaling against, the geography's same calendar month and product.
 - `baseline_start_year`, `baseline_end_year`: climatology bounds used for anomalies.
-- `land_cover_mask`: explicitly `all_land` in the first vegetation MVP; it must not
-  be described as a grassland-only measure.
+- `land_cover_mask`: `all_valid_cmg_cells` in the canonical vegetation MVP; it must
+  not be described as a grassland-only measure.
 
 Browser path: `frontend/public/data/satellite-observations.json`. The export is
 bounded to the stored attention period and contains only aggregate fields.

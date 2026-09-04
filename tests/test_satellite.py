@@ -6,13 +6,17 @@ from climate_attention.config import Country
 from climate_attention.geography import CountryBoundary, CountryBoundaryIndex
 from climate_attention.models import LandSurfaceObservation
 from climate_attention.satellite import (
+    MODIS_CMG_PRODUCT,
     MODIS_NDVI_LAYER,
     add_burned_area_region_rollups,
     add_region_rollups,
     add_seasonal_anomalies,
     build_appeears_area_task,
     burned_area_observations_from_values,
+    mod13c2_country_observations,
+    mod13c2_opendap_url,
     parse_appeears_vegetation_statistics,
+    parse_mod13c2_date,
 )
 from climate_attention.storage import LocalParquetStorage
 
@@ -101,6 +105,78 @@ def test_region_rollups_weight_by_valid_pixels_and_storage_round_trips(tmp_path)
     restored = store.read_land_surface(metrics={"ndvi"})
     assert len(restored) == 4
     assert restored[-1].metric == "ndvi"
+
+
+def test_mod13c2_date_url_and_country_aggregation():
+    np = pytest.importorskip("numpy")
+    transform = pytest.importorskip("rasterio.transform").from_origin(0, 2, 1, 1)
+    west = {
+        "type": "Polygon",
+        "coordinates": [[[0, 0], [1.9, 0], [1.9, 2], [0, 2], [0, 0]]],
+    }
+    east = {
+        "type": "Polygon",
+        "coordinates": [[[2.1, 0], [4, 0], [4, 2], [2.1, 2], [2.1, 0]]],
+    }
+    boundaries = CountryBoundaryIndex([
+        CountryBoundary("west", "WST", (0, 0, 1.9, 2), west),
+        CountryBoundary("east", "EST", (2.1, 0, 4, 2), east),
+    ])
+    granule = "MOD13C2.A2025032.061.2025060123456"
+
+    observations = mod13c2_country_observations(
+        np.array([[1000, 1000, 3000, 3000], [1000, 1000, 3000, -3000]]),
+        boundaries=boundaries,
+        observed=date(2025, 2, 1),
+        granule_id=granule,
+        transform=transform,
+    )
+
+    assert parse_mod13c2_date(granule) == date(2025, 2, 1)
+    assert mod13c2_opendap_url(granule).endswith(f"/{granule}.dap.nc4")
+    assert {item.geography: item.value for item in observations} == pytest.approx({
+        "west": 0.1,
+        "east": 0.3,
+    })
+    assert all(item.product == MODIS_CMG_PRODUCT for item in observations)
+    assert all(item.period_days == 28 for item in observations)
+    assert all(item.metadata["area_weight_sum"] > 0 for item in observations)
+
+
+def test_seasonal_anomalies_do_not_mix_modis_products():
+    legacy_baseline = [_observation(year, "italy", 0.4) for year in range(2001, 2006)]
+    monthly = _observation(2025, "italy", 0.8).model_copy(update={
+        "record_id": "cmg:2025:italy",
+        "date": date(2025, 7, 1),
+        "product": MODIS_CMG_PRODUCT,
+        "period_days": 31,
+    })
+
+    normalized = add_seasonal_anomalies([*legacy_baseline, monthly])
+
+    assert normalized[-1].anomaly is None
+
+
+def test_mod13c2_anomalies_use_calendar_months():
+    baseline = []
+    for year in range(2001, 2006):
+        for month, value in ((2, 0.2), (3, 0.6)):
+            baseline.append(_observation(year, "italy", value).model_copy(update={
+                "record_id": f"cmg:{year}:{month}",
+                "date": date(year, month, 1),
+                "product": MODIS_CMG_PRODUCT,
+                "period_days": 28 if month == 2 else 31,
+            }))
+    current = _observation(2025, "italy", 0.5).model_copy(update={
+        "record_id": "cmg:2025:2",
+        "date": date(2025, 2, 1),
+        "product": MODIS_CMG_PRODUCT,
+        "period_days": 28,
+    })
+
+    normalized = add_seasonal_anomalies([*baseline, current])
+
+    assert normalized[-1].anomaly == pytest.approx(0.3)
 
 
 def test_burn_date_pixels_become_daily_hectares_and_region_totals():

@@ -336,16 +336,32 @@ def build_event_study(
     }
 
 
-def load_event_study_inputs(data_dir: Path) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+def load_event_study_inputs(
+    data_dir: Path, *, study_year: int | None = None
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     event_path = data_dir / "events" / "source=gdacs" / "events.parquet"
     if not event_path.exists():
         raise ValueError(f"missing GDACS event dataset: {event_path}")
-    event_rows = pq.read_table(event_path).to_pylist()
+    event_columns = [
+        "record_id", "hazard_type", "name", "start_at", "end_at",
+        "geography_ids", "alert_level", "alert_score",
+    ]
+    event_rows = pq.read_table(event_path, columns=event_columns).to_pylist()
     attention_rows: list[dict[str, Any]] = []
     trend_root = data_dir / "trends" / "source=gdelt_ngrams"
+    attention_columns = [
+        "date", "source", "topic_id", "geography", "matched_count",
+        "political_count", "political_actor_count", "government_action_count",
+        "party_politics_count", "official_source_count",
+    ]
     for topic in STUDY_TOPICS:
         for path in sorted((trend_root / f"topic_id={topic}").rglob("daily.parquet")):
-            attention_rows.extend(pq.read_table(path).to_pylist())
+            parquet = pq.ParquetFile(path)
+            for batch in parquet.iter_batches(columns=attention_columns, batch_size=16_384):
+                rows = batch.to_pylist()
+                if study_year is not None:
+                    rows = [row for row in rows if _day(row["date"]).year == study_year]
+                attention_rows.extend(rows)
     if not attention_rows:
         raise ValueError(f"missing GDELT NGrams attention data under {trend_root}")
     return event_rows, attention_rows
@@ -472,7 +488,7 @@ def build_analysis_warehouse(
     *, data_dir: Path, study_year: int = 2025
 ) -> dict[str, Any]:
     """Build all-alert effect and daily activity tables for Supabase serving."""
-    events, attention = load_event_study_inputs(data_dir)
+    events, attention = load_event_study_inputs(data_dir, study_year=study_year)
     study = build_event_study(
         events,
         attention,
@@ -508,7 +524,7 @@ def build_event_study_files(
     study_year: int = 2025,
     parquet_path: Path | None = None,
 ) -> dict[str, Any]:
-    events, attention = load_event_study_inputs(data_dir)
+    events, attention = load_event_study_inputs(data_dir, study_year=study_year)
     payload = build_event_study(events, attention, study_year=study_year)
     write_event_study(
         payload,

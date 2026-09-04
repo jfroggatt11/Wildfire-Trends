@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gc
 import json
 from collections import Counter, defaultdict
 from datetime import date, datetime, timedelta
@@ -14,7 +15,6 @@ from climate_attention.config import load_country_config
 from climate_attention.event_study import build_event_study_files
 from climate_attention.geography import load_country_boundaries, load_region_boundaries
 from climate_attention.source_coverage import is_known_outage
-from climate_attention.storage import LocalParquetStorage
 from climate_attention.supabase_sync import dotenv_value
 
 
@@ -24,6 +24,7 @@ SUPABASE_CONFIG = ROOT / "frontend" / "src" / "supabase-config.json"
 FRONTEND_ATTENTION_SOURCES = {"gdelt_ngrams"}
 FRONTEND_TOPIC_IDS = {"climate_change", "electric_vehicles"}
 FRONTEND_HAZARD_TYPES = {"wildfire", "flood"}
+PARQUET_BATCH_SIZE = 16_384
 
 
 def clean(value: Any) -> Any:
@@ -38,6 +39,13 @@ def write_json(name: str, payload: Any) -> None:
         json.dumps(payload, ensure_ascii=False, separators=(",", ":")),
         encoding="utf-8",
     )
+
+
+def parquet_rows(path: Path, columns: list[str]):
+    """Yield projected Parquet rows without materializing an entire file."""
+    parquet = pq.ParquetFile(path)
+    for batch in parquet.iter_batches(columns=columns, batch_size=PARQUET_BATCH_SIZE):
+        yield from batch.to_pylist()
 
 
 def export_supabase_config() -> None:
@@ -203,7 +211,7 @@ def summarize_attention() -> dict[str, Any]:
     topic_counts: Counter[str] = Counter()
     dates: list[str] = []
     for path in sorted(source.rglob("*.parquet")):
-        for row in pq.read_table(path).to_pylist():
+        for row in parquet_rows(path, ["source", "topic_id", "date", "geography"]):
             if row["source"] not in FRONTEND_ATTENTION_SOURCES:
                 continue
             if row["topic_id"] not in FRONTEND_TOPIC_IDS:
@@ -244,7 +252,7 @@ def summarize_articles() -> dict[str, Any]:
     geographies: set[str] = set()
     if source.exists():
         for path in sorted(source.rglob("*.parquet")):
-            for row in pq.read_table(path).to_pylist():
+            for row in parquet_rows(path, ["topic_id", "date", "geography"]):
                 if row["topic_id"] not in FRONTEND_TOPIC_IDS:
                     continue
                 count += 1
@@ -261,47 +269,69 @@ def export_satellite_observations(
     coverage_start: str | None, coverage_end: str | None
 ) -> dict[str, Any]:
     """Publish only compact MODIS zonal statistics inside the attention window."""
-    storage = LocalParquetStorage(ROOT / "data")
-    observations = storage.read_land_surface(
-        source="nasa_modis",
-        metrics={"ndvi", "evi", "burned_area"},
-        start=date.fromisoformat(coverage_start) if coverage_start else None,
-        end=date.fromisoformat(coverage_end) if coverage_end else None,
-    )
+    start = date.fromisoformat(coverage_start) if coverage_start else None
+    end = date.fromisoformat(coverage_end) if coverage_end else None
+    columns = [
+        "date", "product", "metric", "geography", "country_iso3", "value",
+        "unit", "period_days", "valid_pixel_count", "anomaly",
+        "standardized_anomaly", "baseline_start_year", "baseline_end_year",
+        "land_cover_mask",
+    ]
+    observations: list[dict[str, Any]] = []
+    satellite_root = ROOT / "data" / "satellite" / "source=nasa_modis"
+    for path in sorted(satellite_root.rglob("observations.parquet")):
+        for row in parquet_rows(path, columns):
+            if row["metric"] not in {"ndvi", "evi", "burned_area"}:
+                continue
+            if start is not None and row["date"] < start:
+                continue
+            if end is not None and row["date"] > end:
+                continue
+            observations.append(row)
+    # MOD13C2 is the canonical scalable vegetation source. Do not mix legacy
+    # AppEEARS MOD13A2 rows into the same timeline if both have been imported.
+    cmg_metrics = {
+        item["metric"] for item in observations if item["product"] == "MOD13C2.061"
+    }
+    observations = [
+        item
+        for item in observations
+        if item["metric"] not in cmg_metrics or item["product"] == "MOD13C2.061"
+    ]
     payload = {
         "schemaVersion": 1,
         "generatedAt": datetime.now().astimezone().isoformat(),
         "source": "NASA MODIS",
-        "products": sorted({item.product for item in observations}),
+        "products": sorted({item["product"] for item in observations}),
         "observations": [
             {
-                "date": item.date.isoformat(),
-                "geography": item.geography,
-                "countryIso3": item.country_iso3,
-                "metric": item.metric,
-                "value": item.value,
-                "unit": item.unit,
-                "periodDays": item.period_days,
-                "validPixelCount": item.valid_pixel_count,
-                "anomaly": item.anomaly,
-                "standardizedAnomaly": item.standardized_anomaly,
-                "baselineStartYear": item.baseline_start_year,
-                "baselineEndYear": item.baseline_end_year,
-                "landCoverMask": item.land_cover_mask,
+                "date": item["date"].isoformat(),
+                "geography": item["geography"],
+                "countryIso3": item["country_iso3"],
+                "metric": item["metric"],
+                "value": item["value"],
+                "unit": item["unit"],
+                "periodDays": item["period_days"],
+                "validPixelCount": item["valid_pixel_count"],
+                "anomaly": item["anomaly"],
+                "standardizedAnomaly": item["standardized_anomaly"],
+                "baselineStartYear": item["baseline_start_year"],
+                "baselineEndYear": item["baseline_end_year"],
+                "landCoverMask": item["land_cover_mask"],
             }
             for item in observations
         ],
     }
     write_json("satellite-observations.json", payload)
-    observed_dates = sorted({item.date.isoformat() for item in observations})
+    observed_dates = sorted({item["date"].isoformat() for item in observations})
     return {
         "observationCount": len(observations),
-        "dateMin": min((item.date.isoformat() for item in observations), default=None),
-        "dateMax": max((item.date.isoformat() for item in observations), default=None),
+        "dateMin": min((item["date"].isoformat() for item in observations), default=None),
+        "dateMax": max((item["date"].isoformat() for item in observations), default=None),
         "observedDateCount": len(observed_dates),
         "dateRanges": contiguous_date_ranges(observed_dates),
-        "metrics": sorted({item.metric for item in observations}),
-        "geographyCount": len({item.geography for item in observations}),
+        "metrics": sorted({item["metric"] for item in observations}),
+        "geographyCount": len({item["geography"] for item in observations}),
     }
 
 
@@ -382,7 +412,7 @@ def source_summaries(
             "recordLabel": "country-period observations",
             "geographyCount": satellite_summary["geographyCount"],
             "status": "explorer",
-            "description": "Country aggregates from MODIS NDVI composites and MCD64 burned pixels; source rasters are not shipped to the browser.",
+            "description": "Country aggregates from monthly MODIS NDVI and MCD64 burned pixels; source rasters are not shipped to the browser.",
             "sourceUrl": "https://appeears.earthdatacloud.nasa.gov/",
         })
 
@@ -390,22 +420,34 @@ def source_summaries(
 
 
 def main() -> None:
+    print("Exporting configuration, map and events...", flush=True)
     export_supabase_config()
     export_world_map()
     events = export_events()
-    event_study_2025 = build_event_study_files(
+    event_study_count = 0
+    print("Building 2025 event study...", flush=True)
+    event_study = build_event_study_files(
         data_dir=ROOT / "data",
         json_path=OUT / "event-study.json",
         study_year=2025,
     )
-    event_study_2026 = build_event_study_files(
+    event_study_count += len(event_study["events"])
+    del event_study
+    gc.collect()
+    print("Building 2026 event study...", flush=True)
+    event_study = build_event_study_files(
         data_dir=ROOT / "data",
         json_path=OUT / "event-study-2026.json",
         parquet_path=ROOT / "data" / "analysis" / "event_effects_2026.parquet",
         study_year=2026,
     )
+    event_study_count += len(event_study["events"])
+    del event_study
+    gc.collect()
+    print("Summarizing attention and article coverage...", flush=True)
     attention_summary = summarize_attention()
     article_summary = summarize_articles()
+    print("Exporting satellite observations...", flush=True)
     satellite_summary = export_satellite_observations(
         attention_summary["dateMin"], attention_summary["dateMax"]
     )
@@ -437,7 +479,7 @@ def main() -> None:
         f"Exported {len(events)} events and a manifest covering "
         f"{attention_summary['rowCount']} attention rows and "
         f"{article_summary['count']} articles and "
-        f"{len(event_study_2025['events']) + len(event_study_2026['events'])} "
+        f"{event_study_count} "
         f"major-event study candidates across 2025 and 2026 to {OUT}. "
         "Aggregate attention is served by Supabase; article rows remain an offline validation archive."
     )

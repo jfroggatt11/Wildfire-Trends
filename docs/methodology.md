@@ -130,17 +130,19 @@ source-specific severity semantics instead of pooling them naively.
 
 ## Satellite vegetation and burned area
 
-The low-storage vegetation series uses NASA MOD13A2 version 6.1 NDVI: a 1 km,
-16-day composite requested as country polygons through AppEEARS. The canonical row
-stores AppEEARS' mean and valid-pixel count, not a raster. World and EU27 values are
-weighted by valid pixels so small and large countries are not averaged equally.
+The scalable vegetation series uses NASA MOD13C2 version 6.1 NDVI: a monthly global
+0.05-degree (about 5.6 km) Climate Modeling Grid product. The collector requests only
+the NDVI variable through Earthdata Cloud OPeNDAP, computes country statistics, and
+deletes each temporary NetCDF subset. Country means are weighted by latitude-derived
+cell area; World and EU27 means use the same retained area weights.
 
 Raw NDVI is strongly seasonal. For comparisons with attention, each country or
-region is therefore expressed as the difference from its own mean in the matching
-16-day seasonal bin. The default climatology is 2001–2020 and requires at least five
-baseline observations. A composite value is drawn only across its 16-day observation
-period; it is not presented as a new daily satellite measurement. The first MVP uses
-all valid land pixels and does not yet claim to isolate grassland or cropland.
+region is therefore expressed as the difference from its own mean for the matching
+calendar month. The default climatology is 2001–2020 and requires at least five
+baseline observations. A composite value is drawn only across its calendar month; it
+is not presented as a new daily satellite measurement. The first MVP uses all valid
+CMG cells and does not yet claim to isolate grassland or cropland. The coarser grid is
+intended for country-scale comparison, not local vegetation mapping.
 
 MCD64A1 version 6.1 `Burn_Date` is processed differently. For native-projection
 GeoTIFFs, pixels with an ordinal burn day are counted by day and multiplied by the

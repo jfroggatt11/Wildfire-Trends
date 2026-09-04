@@ -54,35 +54,34 @@ and does not publish URLs or detailed article records.
 
 ### MODIS satellite aggregates
 
-The satellite workflow keeps only country-period statistics. It does not mirror or
-publish the source rasters. NASA AppEEARS requires a free Earthdata Login for task
-submission; credentials are read only from `EARTHDATA_USERNAME` and
-`EARTHDATA_PASSWORD`.
-
-Prepare and run a one-year NDVI request, then import its small statistics file:
+The vegetation workflow streams only the NDVI or EVI band from NASA's monthly global
+MOD13C2 version 6.1 product through Earthdata Cloud OPeNDAP. Each roughly 8–10 MB
+NetCDF subset is aggregated to countries and deleted before the next month, so no
+source-raster archive is retained. Credentials are read only from
+`EARTHDATA_USERNAME` and `EARTHDATA_PASSWORD` (or `EARTHDATA_TOKEN`). Install the
+optional dependencies, load the credentials, and collect the baseline plus display
+period in one resumable command:
 
 ```bash
-climate-attention prepare-modis-request \
+python -m pip install -e '.[satellite]'
+set -a; source .env; set +a
+climate-attention collect-modis-vegetation \
   --countries-config config/countries.world.yaml \
-  --start 2025-01-01 --end 2025-12-31 \
-  --metric ndvi \
-  --output data/satellite/requests/ndvi-2025.json \
-  --aid-map data/satellite/requests/ndvi-2025-aid-map.json
-
-EARTHDATA_USERNAME=your_username EARTHDATA_PASSWORD=your_password \
-  climate-attention run-appeears-task \
-  --request data/satellite/requests/ndvi-2025.json
-
-climate-attention import-modis-statistics \
-  --statistics data/satellite/appeears/TASK_ID/MOD13A2-061-Statistics.csv \
-  --aid-map data/satellite/requests/ndvi-2025-aid-map.json \
+  --start 2001-01-01 --end 2020-12-31 \
+  --metric ndvi
+climate-attention collect-modis-vegetation \
+  --countries-config config/countries.world.yaml \
+  --start 2025-01-01 --end 2026-08-27 \
   --metric ndvi
 ```
 
-Use annual requests for the 2001–2020 climatology and current display period. The
-importer is idempotent and recomputes World/EU27 pixel-weighted rollups and
-same-season anomalies across everything stored. Large country sets can be split into
-stable batches with `--countries`.
+The collector writes every completed month immediately and records it in
+`data/satellite/mod13c2-progress.json`. If interrupted, rerun the same command;
+completed country-months are skipped. It computes latitude-area-weighted
+country, World, and EU27 means and same-month anomalies against the 2001–2020
+climatology. MOD13C2's 0.05-degree grid is appropriate to this country-level view but
+not to local land-surface analysis. The older MOD13A2 AppEEARS commands remain
+available for targeted high-resolution extracts, not the global baseline.
 
 MCD64 burned area uses `Burn_Date` rasters because an average ordinal burn date
 cannot produce hectares. Install the optional raster reader, request the burned-area

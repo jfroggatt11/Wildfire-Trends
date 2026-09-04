@@ -153,22 +153,22 @@ signal matching is unchanged.
 
 ## MODIS backfill operations
 
-AppEEARS work should be split by calendar year and, if NASA's task-size estimate is
-large, by stable country batches. Keep each generated request beside its aid map;
-the aid map is required to turn AppEEARS feature ids back into the repository's
-geography ids. Never commit downloaded GeoTIFFs or credentials. The entire local
-`data/satellite/` working directory is ignored by Git.
+Use `collect-modis-vegetation` for the global vegetation baseline. It discovers
+monthly MOD13C2 granules through CMR, downloads only the selected variable through
+OPeNDAP, stores country rows after each month, and removes the temporary NetCDF by
+default. Its local progress sidecar records even tiny islands with no valid CMG cell,
+so rerunning the same range skips completed country-months. Never commit
+credentials or `data/satellite/`; the entire working directory is ignored by Git.
 
-Import 2001–2020 before interpreting vegetation anomalies. An import with fewer than
-five observations for a geography/season leaves its anomaly null rather than using
-the current period as its own baseline. Rerunning an import is safe: country-date
-records are upserted and regional rollups and anomalies are rebuilt from all stored
-country observations.
+Collect 2001–2020 before interpreting vegetation anomalies. Fewer than five
+observations for a geography/calendar month leaves its anomaly null rather than using
+the display period as its own baseline. Regional rollups and anomalies are rebuilt
+from all stored MOD13C2 country observations at the end of each completed run.
 
 For MCD64, retain AppEEARS' native projection. The importer rejects geographic
 latitude/longitude rasters because degrees cannot be converted to hectares with one
-constant pixel area. The optional `satellite` dependency is required only for this
-raster-to-hectare step; vegetation statistics import uses the core environment.
+constant pixel area. The optional `satellite` dependency supports both OPeNDAP
+vegetation aggregation and the burned-area raster-to-hectare step.
 
 After any satellite import, run:
 
@@ -177,8 +177,8 @@ After any satellite import, run:
 cd frontend && npm test && npm run build
 ```
 
-The browser asset is an aggregate export and may be deployed. Source AppEEARS files
-remain local working data.
+The browser asset is an aggregate export and may be deployed. Temporary MOD13C2
+subsets and source AppEEARS files remain local working data.
 
 ## Verify completeness
 
