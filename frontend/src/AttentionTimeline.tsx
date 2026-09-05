@@ -73,6 +73,11 @@ type SatelliteObservation = {
   landCoverMask: string
 }
 
+type BurnedAreaCoverage = {
+  geography: string
+  dateRanges: { start: string; end: string }[]
+}
+
 const TOPICS: Record<Topic, { label: string; color: string }> = {
   climate_change: { label: 'Climate change', color: '#286e59' },
   electric_vehicles: { label: 'Electric vehicles', color: '#6575b7' },
@@ -286,6 +291,7 @@ export default function AttentionTimeline({
   const [selectedSizeBands, setSelectedSizeBands] = useState<WildfireSizeBand[]>(() => Object.keys(SIZE_BANDS) as WildfireSizeBand[])
   const [attentionRows, setAttentionRows] = useState<(AttentionObservation | RegionAttentionObservation)[]>([])
   const [satelliteRows, setSatelliteRows] = useState<SatelliteObservation[]>([])
+  const [burnedAreaCoverage, setBurnedAreaCoverage] = useState<BurnedAreaCoverage[]>([])
   const [satelliteError, setSatelliteError] = useState<string | null>(null)
   const [satelliteMapDate, setSatelliteMapDate] = useState('')
   const [loading, setLoading] = useState(true)
@@ -305,11 +311,13 @@ export default function AttentionTimeline({
       .then((payload) => {
         if (!active) return
         setSatelliteRows(Array.isArray(payload.observations) ? payload.observations : [])
+        setBurnedAreaCoverage(Array.isArray(payload.burnedAreaCoverage) ? payload.burnedAreaCoverage : [])
         setSatelliteError(null)
       })
       .catch(() => {
         if (!active) return
         setSatelliteRows([])
+        setBurnedAreaCoverage([])
         setSatelliteError('The MODIS aggregate export has not been generated yet.')
       })
     return () => { active = false }
@@ -428,6 +436,9 @@ export default function AttentionTimeline({
       ? rollingTotalValues(rawPoints.map((point) => areaByDate.get(point.date) ?? 0), rollingWindow)
       : []
     const burnedAreaBySource = new Map<string, SatelliteObservation>()
+    const burnedCoverageByGeography = new Map(
+      burnedAreaCoverage.map((item) => [item.geography, item.dateRanges]),
+    )
     if (showSatelliteArea) {
       for (const row of satelliteRows) {
         if (row.metric === 'burned_area' && row.date >= coverageStart && row.date <= coverageEnd) {
@@ -437,9 +448,15 @@ export default function AttentionTimeline({
     }
     const satelliteAreaValues = showSatelliteArea
       ? rollingObservedTotalValues(rawPoints.map((point) => {
-        const rows = activeLocations.map((location) => burnedAreaBySource.get(`${location}:${point.date}`))
-        if (!rows.length || rows.some((row) => !row)) return null
-        return rows.reduce((total, row) => total + Number(row?.value ?? 0), 0)
+        const values = activeLocations.map((location) => {
+          const covered = burnedCoverageByGeography.get(location)?.some(
+            (range) => range.start <= point.date && range.end >= point.date,
+          ) ?? false
+          if (!covered) return null
+          return burnedAreaBySource.get(`${location}:${point.date}`)?.value ?? 0
+        })
+        if (!values.length || values.some((value) => value == null)) return null
+        return values.reduce<number>((total, value) => total + Number(value), 0)
       }), rollingWindow)
       : []
     const satelliteBySource = new Map<string, SatelliteObservation>()
@@ -474,7 +491,7 @@ export default function AttentionTimeline({
       if (showVegetation) values[VEGETATION_KEY] = satelliteValue(point.date)
       return { ...point, values, ...values }
     })
-  }, [activeLocations, attentionRows, coverageEnd, coverageStart, measure, relevantEvents, rollingWindow, satelliteRows, series, showReportedArea, showSatelliteArea, showVegetation])
+  }, [activeLocations, attentionRows, burnedAreaCoverage, coverageEnd, coverageStart, measure, relevantEvents, rollingWindow, satelliteRows, series, showReportedArea, showSatelliteArea, showVegetation])
 
   const observedValues = plottedPoints.flatMap((point) => series.flatMap((item) => point.values[item.key] == null ? [] : [point.values[item.key] as number]))
   const plottedPeak = observedValues.length ? Math.max(...observedValues) : 0
@@ -530,7 +547,10 @@ export default function AttentionTimeline({
     .map((row) => row.date))].sort(), [coverageEnd, coverageStart, satelliteRows])
   const effectiveSatelliteMapDate = satelliteDates.includes(satelliteMapDate) ? satelliteMapDate : satelliteDates.at(-1) ?? ''
   const satelliteMapRows = satelliteRows.filter((row) => row.metric === 'ndvi' && row.date === effectiveSatelliteMapDate && !row.geography.startsWith('__'))
-  const satelliteBurnAvailable = satelliteRows.some((row) => row.metric === 'burned_area' && row.date >= coverageStart && row.date <= coverageEnd && activeLocations.includes(row.geography))
+  const satelliteBurnAvailable = burnedAreaCoverage.some((item) =>
+    activeLocations.includes(item.geography)
+    && item.dateRanges.some((range) => range.start <= coverageEnd && range.end >= coverageStart),
+  )
 
   const addGroupCountry = (selected: string) => {
     if (!selected || groupCountries.includes(selected) || groupCountries.length >= MAX_GROUP_COUNTRIES) return

@@ -298,11 +298,27 @@ def export_satellite_observations(
         for item in observations
         if item["metric"] not in cmg_metrics or item["product"] == "MOD13C2.061"
     ]
+    burned_area_dates: dict[str, list[str]] = defaultdict(list)
+    for item in observations:
+        if item["metric"] == "burned_area":
+            burned_area_dates[item["geography"]].append(item["date"].isoformat())
+    browser_observations = [
+        item
+        for item in observations
+        if item["metric"] != "burned_area" or item["value"] != 0
+    ]
     payload = {
-        "schemaVersion": 1,
+        "schemaVersion": 2,
         "generatedAt": datetime.now().astimezone().isoformat(),
         "source": "NASA MODIS",
         "products": sorted({item["product"] for item in observations}),
+        "burnedAreaCoverage": [
+            {
+                "geography": geography,
+                "dateRanges": contiguous_date_ranges(dates),
+            }
+            for geography, dates in sorted(burned_area_dates.items())
+        ],
         "observations": [
             {
                 "date": item["date"].isoformat(),
@@ -319,7 +335,7 @@ def export_satellite_observations(
                 "baselineEndYear": item["baseline_end_year"],
                 "landCoverMask": item["land_cover_mask"],
             }
-            for item in observations
+            for item in browser_observations
         ],
     }
     write_json("satellite-observations.json", payload)
