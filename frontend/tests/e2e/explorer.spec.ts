@@ -292,6 +292,14 @@ test('analysis lab runs the major-event study for climate and electric vehicles'
   await page.getByLabel('Sort countries by').selectOption('response')
   await expect(page.locator('.country-comparison h3')).toHaveText('Largest country responses')
 
+  await page.getByRole('tab', { name: 'Wildfire attention' }).click()
+  await expect(page.getByRole('heading', { name: 'Which fires broke through?' })).toBeVisible()
+  await expect(page.locator('.wildfire-ranking-table > button').first()).toBeVisible()
+  await expect(page.locator('.wildfire-scatter')).toBeVisible()
+  await page.getByLabel('Rank wildfires by').selectOption('excess')
+  await expect(page.getByRole('heading', { name: 'Most attention beyond the severity benchmark' })).toBeVisible()
+  await page.getByRole('tab', { name: 'Event study' }).click()
+
   await page.getByRole('button', { name: /H2 EV spillover/ }).click()
   await expect(page.locator('.pooled-result')).toContainText('Electric vehicles · Article attention')
 

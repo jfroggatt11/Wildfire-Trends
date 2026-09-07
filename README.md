@@ -33,6 +33,10 @@ labelled axis. The two burn measures remain distinct, and event onset lines and
 diamonds can be hidden independently. When MODIS vegetation aggregates have been
 imported, another option compares attention with same-season surface
 greenness/browning (NDVI anomaly) and adds a date-linked brown-to-green country map.
+The Analysis Lab also includes a wildfire-attention screen that ranks complete
+event responses, compares attention with GDACS-reported cumulative hectares, and
+shows a descriptive severity-only residual. The residual is an in-sample benchmark,
+not a forecast or causal estimate.
 
 Export the current Parquet datasets to compact browser assets, then run the app:
 

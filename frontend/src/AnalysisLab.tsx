@@ -13,6 +13,7 @@ import {
 } from 'recharts'
 import EventActivityView from './EventActivity'
 import AttentionTimeline from './AttentionTimeline'
+import WildfireAttention from './WildfireAttention'
 import { fetchEventEffects, isSupabaseEnabled } from './supabase'
 import type { EventEffectObservation } from './supabase'
 import { fromUtcDay, inclusiveDays, toUtcDay } from './analysisTime'
@@ -25,7 +26,7 @@ type TopicId = 'climate_change' | 'electric_vehicles'
 type AlertCohort = 'major' | 'green' | 'all'
 type CountryRankingSort = 'events' | 'response'
 
-type StudyEvent = {
+export type StudyEvent = {
   id: string
   name: string
   hazardType: HazardType
@@ -38,7 +39,7 @@ type StudyEvent = {
   severityUnit?: string | null
 }
 
-type StudyEffect = {
+export type StudyEffect = {
   eventId: string
   hazardType: HazardType
   alertLevel: 'Green' | 'Orange' | 'Red'
@@ -262,7 +263,7 @@ export default function AnalysisLab({
     : studies.find((item) => item.studyYear === Number(selectedPeriod)) ?? combinedStudy
   const [rangeStart, setRangeStart] = useState(() => combinedStudy?.coverage.start ?? '')
   const [rangeEnd, setRangeEnd] = useState(() => combinedStudy?.coverage.end ?? '')
-  const [mode, setMode] = useState<'study' | 'activity' | 'timeline'>('study')
+  const [mode, setMode] = useState<'study' | 'wildfire' | 'activity' | 'timeline'>('study')
   const [hypothesis, setHypothesis] = useState('attention')
   const [cohort, setCohort] = useState<AlertCohort>('major')
   const [hazard, setHazard] = useState<'all' | HazardType>('all')
@@ -336,7 +337,8 @@ export default function AnalysisLab({
     [cohort, rangeEnd, rangeStart, remoteEffects, study],
   )
   const eventMap = useMemo(() => {
-    const map = new Map(study?.events.map((event) => [event.id, event]) ?? [])
+    const map = new Map(catalogueEvents.map((event) => [event.id, event]))
+    for (const event of study?.events ?? []) map.set(event.id, { ...map.get(event.id), ...event })
     for (const effect of remoteEffects ?? []) {
       if (map.has(effect.eventId)) continue
       map.set(effect.eventId, {
@@ -351,7 +353,7 @@ export default function AnalysisLab({
       })
     }
     return map
-  }, [remoteEffects, study])
+  }, [catalogueEvents, remoteEffects, study])
   const candidateEvents = useMemo(
     () => {
       if (cohort === 'major') return study?.events.filter((event) => event.startAt.slice(0, 10) >= rangeStart && event.startAt.slice(0, 10) <= rangeEnd && (hazard === 'all' || event.hazardType === hazard)) ?? []
@@ -471,7 +473,7 @@ export default function AnalysisLab({
         </div>
       </section>
 
-      <div className="lab-mode-switch" role="tablist" aria-label="Analysis mode"><button role="tab" aria-selected={mode === 'study'} className={mode === 'study' ? 'active' : ''} onClick={() => setMode('study')}>Event study</button><button role="tab" aria-selected={mode === 'activity'} className={mode === 'activity' ? 'active' : ''} onClick={() => setMode('activity')}>Event activity</button><button role="tab" aria-selected={mode === 'timeline'} className={mode === 'timeline' ? 'active' : ''} onClick={() => setMode('timeline')}>Attention timeline</button></div>
+      <div className="lab-mode-switch" role="tablist" aria-label="Analysis mode"><button role="tab" aria-selected={mode === 'study'} className={mode === 'study' ? 'active' : ''} onClick={() => setMode('study')}>Event study</button><button role="tab" aria-selected={mode === 'wildfire'} className={mode === 'wildfire' ? 'active' : ''} onClick={() => { setMode('wildfire'); setHazard('wildfire'); setTiming('onset') }}>Wildfire attention</button><button role="tab" aria-selected={mode === 'activity'} className={mode === 'activity' ? 'active' : ''} onClick={() => setMode('activity')}>Event activity</button><button role="tab" aria-selected={mode === 'timeline'} className={mode === 'timeline' ? 'active' : ''} onClick={() => setMode('timeline')}>Attention timeline</button></div>
 
       {mode === 'study' ? <><section className="lab-hypothesis-strip" aria-label="Research hypotheses">
         {HYPOTHESES.map((item) => <button key={item.id} className={hypothesis === item.id ? 'active' : ''} onClick={() => selectHypothesis(item.id)}><span>{item.number}</span><div><strong>{item.title}</strong><small>{item.copy}</small></div>{hypothesis === item.id && <Check size={15} />}</button>)}
@@ -533,7 +535,27 @@ export default function AnalysisLab({
           </>}
         </div>
       </section>
-      </> : mode === 'activity' ? <EventActivityView coverageStart={effectiveRangeStart} coverageEnd={effectiveRangeEnd} geographyLabels={geographyLabels} eventGeographies={eventGeographies} /> : <AttentionTimeline coverageStart={effectiveRangeStart} coverageEnd={effectiveRangeEnd} geographyLabels={geographyLabels} keyEvents={catalogueEvents} />}
+      </> : mode === 'wildfire' ? <WildfireAttention
+        effects={sourceEffects}
+        eventMap={eventMap}
+        geographyLabels={geographyLabels}
+        windows={study.windows}
+        cohort={cohort}
+        onCohortChange={setCohort}
+        scope={scope}
+        onScopeChange={setScope}
+        windowDays={windowDays}
+        onWindowDaysChange={setWindowDays}
+        topic={topic}
+        onTopicChange={setTopic}
+        measure={measure}
+        onMeasureChange={setMeasure}
+        excludeOverlaps={excludeOverlaps}
+        onExcludeOverlapsChange={setExcludeOverlaps}
+        remoteLoading={remoteLoading}
+        remoteError={remoteError}
+        onOpenEvent={onOpenEvent}
+      /> : mode === 'activity' ? <EventActivityView coverageStart={effectiveRangeStart} coverageEnd={effectiveRangeEnd} geographyLabels={geographyLabels} eventGeographies={eventGeographies} /> : <AttentionTimeline coverageStart={effectiveRangeStart} coverageEnd={effectiveRangeEnd} geographyLabels={geographyLabels} keyEvents={catalogueEvents} />}
     </main>
   )
 }
