@@ -546,7 +546,6 @@ export default function AnalysisLab({
         onScopeChange={setScope}
         windowDays={windowDays}
         onWindowDaysChange={setWindowDays}
-        topic={topic}
         onTopicChange={setTopic}
         measure={measure}
         onMeasureChange={setMeasure}

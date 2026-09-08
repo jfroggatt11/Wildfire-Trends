@@ -36,7 +36,8 @@ greenness/browning (NDVI anomaly) and adds a date-linked brown-to-green country 
 The Analysis Lab also includes a wildfire-attention screen that ranks complete
 event responses, compares attention with GDACS-reported cumulative hectares, and
 shows a descriptive severity-only residual. The residual is an in-sample benchmark,
-not a forecast or causal estimate.
+not a forecast or causal estimate. Climate-change and electric-vehicle responses
+can share one plot, with topic-coloured points connected within each wildfire.
 
 Export the current Parquet datasets to compact browser assets, then run the app:
 

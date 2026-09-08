@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   addSeverityBenchmark,
   buildWildfireAttentionRows,
+  pairWildfireTopicRows,
   reportedWildfireHectares,
 } from './WildfireAttention'
 import type { WildfireAttentionEffect, WildfireAttentionEvent, WildfireAttentionRow } from './WildfireAttention'
@@ -84,5 +85,28 @@ describe('severity benchmark', () => {
     expect(reportedWildfireHectares(event({ severityUnit: 'people' }))).toBeNull()
     expect(reportedWildfireHectares(event({ severity: -1 }))).toBeNull()
     expect(reportedWildfireHectares(event({ hazardType: 'flood' }))).toBeNull()
+  })
+})
+
+describe('paired topic rows', () => {
+  it('joins climate and EV responses from the same wildfire', () => {
+    const shared = {
+      event: event(),
+      areaHectares: 10_000,
+      logArea: 4,
+      expectedFromSeverity: null,
+      excessFromSeverity: null,
+    }
+    const rows: WildfireAttentionRow[] = [
+      { ...shared, effect: effect({ topicId: 'climate_change' }), response: 12 },
+      { ...shared, effect: effect({ topicId: 'electric_vehicles' }), response: 4 },
+      { ...shared, event: event({ id: 'unpaired' }), effect: effect({ eventId: 'unpaired' }), response: 7 },
+    ]
+    expect(pairWildfireTopicRows(rows)).toEqual([{
+      eventId: 'fire-1',
+      logArea: 4,
+      climateChange: 12,
+      electricVehicles: 4,
+    }])
   })
 })

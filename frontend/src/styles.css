@@ -516,10 +516,16 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
 .wildfire-kpis strong { margin: 5px 0 2px; overflow: hidden; color: var(--green); font-family: Georgia, serif; font-size: 22px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
 .wildfire-kpis span { margin-top: auto; overflow: hidden; color: #8b9690; font-size: 6.5px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
 .wildfire-scatter { height: 335px; margin-top: 10px; }
+.wildfire-topic-legend { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 12px; margin-top: 9px; color: #5e6f66; font-size: 7.5px; font-weight: 700; }
+.wildfire-topic-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.wildfire-topic-legend span > i { width: 8px; height: 8px; border-radius: 50%; }
+.wildfire-topic-legend .connector-key > i { width: 18px; height: 1px; border-radius: 0; background: #9da9a3; }
 .wildfire-scatter-tooltip { min-width: 210px; padding: 11px; border: 1px solid #d8e0db; border-radius: 8px; color: #475a50; background: rgba(255,255,255,.97); box-shadow: 0 8px 20px rgba(18,49,40,.12); }
 .wildfire-scatter-tooltip > strong, .wildfire-scatter-tooltip > small { display: block; }
 .wildfire-scatter-tooltip > strong { font-size: 9px; }
 .wildfire-scatter-tooltip > small { margin-top: 2px; color: #87938c; font-size: 7px; }
+.wildfire-tooltip-topic { display: flex !important; align-items: center; gap: 4px; }
+.wildfire-tooltip-topic i, .wildfire-row-topic i { width: 7px; height: 7px; flex: 0 0 auto; border-radius: 50%; }
 .wildfire-scatter-tooltip dl { margin: 9px 0 0; display: grid; gap: 4px; }
 .wildfire-scatter-tooltip dl > div { display: flex; justify-content: space-between; gap: 14px; }
 .wildfire-scatter-tooltip dt { color: #7b8881; font-size: 7px; }
@@ -540,6 +546,7 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
 .wildfire-ranking-table > button > span:first-child { min-width: 0; display: flex; flex-direction: column; }
 .wildfire-ranking-table strong { overflow: hidden; color: #34463e; font-size: 8.5px; text-overflow: ellipsis; white-space: nowrap; }
 .wildfire-ranking-table small { color: #8b9690; font-size: 6.5px; }
+.wildfire-row-topic { display: flex; align-items: center; gap: 4px; margin-top: 2px; }
 .wildfire-ranking-table b { color: #35493f; font-family: Georgia, serif; font-size: 11px; font-weight: 500; }
 .wildfire-ranking-table b.positive { color: #2f7759; }
 .wildfire-ranking-table b.negative { color: #b0563d; }

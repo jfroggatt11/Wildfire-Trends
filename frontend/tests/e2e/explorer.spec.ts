@@ -294,8 +294,12 @@ test('analysis lab runs the major-event study for climate and electric vehicles'
 
   await page.getByRole('tab', { name: 'Wildfire attention' }).click()
   await expect(page.getByRole('heading', { name: 'Which fires broke through?' })).toBeVisible()
+  await expect(page.getByLabel('Wildfire attention topic')).toHaveValue('both')
   await expect(page.locator('.wildfire-ranking-table > button').first()).toBeVisible()
   await expect(page.locator('.wildfire-scatter')).toBeVisible()
+  await expect(page.locator('.wildfire-topic-legend')).toContainText('Climate change')
+  await expect(page.locator('.wildfire-topic-legend')).toContainText('Electric vehicles')
+  await expect(page.locator('.wildfire-topic-connector')).toHaveCount(4)
   await page.getByLabel('Rank wildfires by').selectOption('excess')
   await expect(page.getByRole('heading', { name: 'Most attention beyond the severity benchmark' })).toBeVisible()
   await page.getByRole('tab', { name: 'Event study' }).click()
