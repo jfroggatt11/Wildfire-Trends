@@ -1,5 +1,16 @@
 # Methodology
 
+> **Current MVP methodology (10 September 2026):** the public analysis uses
+> GDELT Web NGrams distinct-URL counts. DOC API shares described below are an
+> alternative collection/validation path. Explicitly unsupported country mappings
+> are unavailable, and affected-market estimates require every affected country.
+> Windows can cross calendar years. Overlap exclusion checks Orange/Red floods and
+> wildfires across all years, independently of the displayed cohort. Single-event
+> cards now report descriptive changes without statistical significance verdicts.
+> See [the first improvement batch](IMPROVEMENTS_PHASE1.md) for corrected results,
+> regression coverage and coordinated serving-data refresh instructions.
+
+
 ## GDELT unit of observation
 
 The canonical observation is one UTC day, conceptual topic, publishing outlet source

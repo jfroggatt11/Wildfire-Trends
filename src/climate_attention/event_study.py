@@ -12,7 +12,7 @@ from typing import Any, Iterable
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from .source_coverage import is_known_outage, known_outages
+from .source_coverage import country_mapping_supported, is_known_outage, known_outages
 
 
 STUDY_TOPICS = ("climate_change", "electric_vehicles")
@@ -113,6 +113,7 @@ def build_event_study(
     global_totals: dict[tuple[date, str], list[float]] = defaultdict(lambda: [0.0, 0.0, 0.0])
     eu_totals: dict[tuple[date, str], list[float]] = defaultdict(lambda: [0.0, 0.0, 0.0])
     geographies: set[str] = set()
+    unsupported_geographies: set[str] = set()
     coverage_dates: set[date] = set()
     for row in attention_rows:
         day = _day(row["date"])
@@ -123,15 +124,22 @@ def build_event_study(
             or is_known_outage("gdelt_ngrams", day)
             or topic not in STUDY_TOPICS
             or not geography
-            or day.year != study_year
-            or row.get("matched_count") is None
-            or row.get("political_count") is None
         ):
+            continue
+        if day.year == study_year:
+            coverage_dates.add(day)
+        if country_mapping_supported(row) is False:
+            unsupported_geographies.add(geography)
+            continue
+        geographies.add(geography)
+        if row.get("matched_count") is None or row.get("political_count") is None:
             continue
         key = (day, topic, geography)
         value = (float(row["matched_count"]), float(row["political_count"]))
-        if key in attention and attention[key] != value:
-            raise ValueError(f"conflicting event-study observation: {key}")
+        if key in attention:
+            if attention[key] != value:
+                raise ValueError(f"conflicting event-study observation: {key}")
+            continue
         attention[key] = value
         totals = global_totals[(day, topic)]
         totals[0] += value[0]
@@ -142,14 +150,17 @@ def build_event_study(
             eu[0] += value[0]
             eu[1] += value[1]
             eu[2] += 1
-        geographies.add(geography)
-        coverage_dates.add(day)
 
     selected_alerts = set(alerts or STUDY_ALERTS)
     unsupported_alerts = selected_alerts - ALL_ALERTS
     if unsupported_alerts:
         raise ValueError("unsupported event-study alert(s): " + ", ".join(sorted(unsupported_alerts)))
-    candidates = _study_events(event_rows, study_year, selected_alerts)
+    catalogue = list(event_rows)
+    candidates = _study_events(catalogue, study_year, selected_alerts)
+    # Contamination policy is independent of the displayed cohort and study year.
+    overlap_candidates = [row for row in catalogue
+                          if row["hazard_type"] in STUDY_HAZARDS
+                          and row["alert_level"] in STUDY_ALERTS]
     effects: list[dict[str, Any]] = []
     series: list[dict[str, Any]] = []
 
@@ -163,30 +174,39 @@ def build_event_study(
     def aggregate(
         day: date, topic: str, scope: str, affected: set[str]
     ) -> tuple[float, float] | None:
+        if scope == "affected":
+            # Never silently drop an unsupported affected country.
+            return sum_geographies(day, topic, affected)
+        if scope == "other_eu27":
+            selected = (geographies & EU27) - affected
+            if not selected:
+                return None
+            eu = eu_totals.get((day, topic))
+            if eu is None or int(eu[2]) != len(geographies & EU27):
+                return None
+            excluded = sum_geographies(day, topic, affected & geographies & EU27) or (0, 0)
+            return eu[0] - excluded[0], eu[1] - excluded[1]
         totals = global_totals.get((day, topic))
         if totals is None or int(totals[2]) != len(geographies):
             return None
-        affected_available = affected & geographies
         if scope == "global":
             return totals[0], totals[1]
-        if scope == "affected":
-            return sum_geographies(day, topic, affected_available)
-        eu = eu_totals.get((day, topic), [0.0, 0.0, 0.0])
-        affected_eu = sum_geographies(day, topic, affected_available & EU27) or (0.0, 0.0)
-        if scope == "other_eu27":
-            return eu[0] - affected_eu[0], eu[1] - affected_eu[1]
         if scope == "rest_world":
-            affected_rest = sum_geographies(day, topic, affected_available - EU27) or (0.0, 0.0)
-            return (
-                totals[0] - eu[0] - affected_rest[0],
-                totals[1] - eu[1] - affected_rest[1],
-            )
+            if not (geographies - EU27 - affected):
+                return None
+            eu = eu_totals.get((day, topic), [0, 0, 0])
+            excluded = sum_geographies(day, topic, (affected & geographies) - EU27) or (0, 0)
+            return totals[0] - eu[0] - excluded[0], totals[1] - eu[1] - excluded[1]
         raise ValueError(f"unsupported event-study scope: {scope}")
 
     for event in candidates:
         event_start = _day(event["start_at"])
         event_end = _day(event["end_at"])
         affected = set(event.get("geography_ids") or [])
+        overlap_by_window = {
+            (window, timing): _overlaps(event, overlap_candidates, window, timing)
+            for window in STUDY_WINDOWS for timing in STUDY_TIMINGS
+        }
         for scope in STUDY_SCOPES:
             for topic in STUDY_TOPICS:
                 if include_series:
@@ -230,7 +250,8 @@ def build_event_study(
                             "timing": timing,
                             "complete": complete,
                             "missingDays": sum(value is None for value in before + after),
-                            "overlap": _overlaps(event, candidates, window, timing),
+                            "overlap": overlap_by_window[(window, timing)],
+                            "unsupportedGeographyIds": sorted(affected - geographies) if scope == "affected" else [],
                             "matchedPreMean": None,
                             "matchedPostMean": None,
                             "matchedChange": None,
@@ -294,6 +315,7 @@ def build_event_study(
             "end": max(coverage_dates).isoformat() if coverage_dates else None,
             "observedDays": len(coverage_dates),
             "geographies": len(geographies),
+            "unsupportedGeographies": sorted(unsupported_geographies),
             "excludedPeriods": [
                 {
                     "start": outage.start.isoformat(),
@@ -326,12 +348,13 @@ def build_event_study(
         "effects": effects,
         "series": series,
         "method": {
-            "cohort": "GDACS Orange and Red wildfire and flood events starting in the study year",
+            "cohort": f"GDACS {', '.join(sorted(selected_alerts))} wildfire and flood events starting in the study year",
             "baseline": "Mean daily distinct matched URLs in the selected pre-event window",
             "onset": "Event start through the following N-1 days",
             "persistence": "N days beginning the day after the event ends",
             "politicalShare": "Political URLs divided by all matched topic URLs within each period",
-            "overlap": "Another major event affects at least one same country during the analysis window",
+            "overlap": "Another Orange/Red wildfire or flood affects a same country during the analysis window, across all years and regardless of displayed cohort",
+            "coverage": "Affected scopes require every affected market; regional/global scopes include supported mapped markets only. Windows may cross calendar years.",
         },
     }
 
@@ -352,15 +375,18 @@ def load_event_study_inputs(
     attention_columns = [
         "date", "source", "topic_id", "geography", "matched_count",
         "political_count", "political_actor_count", "government_action_count",
-        "party_politics_count", "official_source_count",
+        "party_politics_count", "official_source_count", "metadata_json",
     ]
     for topic in STUDY_TOPICS:
         for path in sorted((trend_root / f"topic_id={topic}").rglob("daily.parquet")):
             parquet = pq.ParquetFile(path)
             for batch in parquet.iter_batches(columns=attention_columns, batch_size=16_384):
                 rows = batch.to_pylist()
-                if study_year is not None:
-                    rows = [row for row in rows if _day(row["date"]).year == study_year]
+                for row in rows:
+                    row["country_mapping_supported"] = country_mapping_supported(row)
+                    row.pop("metadata_json", None)
+                # Year selects events, not observations: late events may persist
+                # into the next year and need their full post-event window.
                 attention_rows.extend(rows)
     if not attention_rows:
         raise ValueError(f"missing GDELT NGrams attention data under {trend_root}")
@@ -448,6 +474,13 @@ def build_daily_attention_regions(
         "partyPoliticsCount": "party_politics_count",
         "officialSourceCount": "official_source_count",
     }
+    attention_rows = list(attention_rows)
+    supported = {row["geography"] for row in attention_rows
+                 if row.get("source") == "gdelt_ngrams" and row.get("geography")
+                 and row.get("topic_id") in STUDY_TOPICS
+                 and country_mapping_supported(row) is not False}
+    observed: dict[tuple[date, str, str], set[str]] = defaultdict(set)
+    seen: dict[tuple[date, str, str], tuple] = {}
     for row in attention_rows:
         day = _day(row["date"])
         topic = row.get("topic_id")
@@ -458,12 +491,21 @@ def build_daily_attention_regions(
             or topic not in STUDY_TOPICS
             or not geography
             or day.year != study_year
+            or country_mapping_supported(row) is False
             or row.get("matched_count") is None
             or row.get("political_count") is None
         ):
             continue
+        key = (day, topic, geography)
+        signature = tuple(row.get(field) for field in ("matched_count", "political_count", *component_fields.values()))
+        if key in seen:
+            if seen[key] != signature:
+                raise ValueError(f"conflicting regional observation: {key}")
+            continue
+        seen[key] = signature
         regions = ["global"] + (["eu27"] if geography in EU27 else [])
         for region in regions:
+            observed[(day, region, topic)].add(geography)
             values = totals[(day, region, topic)]
             values["matchedCount"] += float(row["matched_count"])
             values["politicalCount"] += float(row["political_count"])
@@ -481,6 +523,7 @@ def build_daily_attention_regions(
             ),
         }
         for (day, region, topic), values in sorted(totals.items())
+        if observed[(day, region, topic)] == (supported if region == "global" else supported & EU27)
     ]
 
 
@@ -498,7 +541,7 @@ def build_analysis_warehouse(
     )
     activity = build_daily_event_activity(events, study_year=study_year)
     regions = build_daily_attention_regions(attention, study_year=study_year)
-    output = data_dir / "analysis"
+    output = data_dir / "analysis" / f"year={study_year}"
     output.mkdir(parents=True, exist_ok=True)
     effect_path = output / "event_effects_all.parquet"
     activity_path = output / "daily_event_activity.parquet"
@@ -528,7 +571,7 @@ def build_event_study_files(
     payload = build_event_study(events, attention, study_year=study_year)
     write_event_study(
         payload,
-        parquet_path=parquet_path or data_dir / "analysis" / "event_effects.parquet",
+        parquet_path=parquet_path or data_dir / "analysis" / f"event_effects_{study_year}.parquet",
         json_path=json_path,
     )
     return payload

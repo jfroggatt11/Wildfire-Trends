@@ -14,7 +14,7 @@ import {
 export type AttentionChartPoint = {
   date: string
   relativeDay: number
-  [topicId: string]: string | number
+  [topicId: string]: string | number | null
 }
 
 type TopicDefinition = { id: string; label: string; color: string }
@@ -89,6 +89,8 @@ export default function AttentionChart({
         <CartesianGrid stroke="#dce3df" strokeDasharray="3 4" vertical={false} />
         <XAxis
           dataKey="relativeDay"
+          type="number"
+          domain={['dataMin', 'dataMax']}
           tick={{ fontSize: 11 }}
           tickFormatter={(value) => (value === 0 ? 'Event' : `${value > 0 ? '+' : ''}${value}d`)}
         />
@@ -111,7 +113,7 @@ export default function AttentionChart({
         {topics.map((topic) => (
           <Line
             key={topic.id}
-            type="monotone"
+            type="linear"
             dataKey={topic.id}
             name={topic.label}
             stroke={topic.color}

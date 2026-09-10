@@ -14,7 +14,7 @@ import pyarrow.parquet as pq
 from climate_attention.config import load_country_config
 from climate_attention.event_study import build_event_study_files
 from climate_attention.geography import load_country_boundaries, load_region_boundaries
-from climate_attention.source_coverage import is_known_outage
+from climate_attention.source_coverage import country_mapping_supported, is_known_outage
 from climate_attention.supabase_sync import dotenv_value
 
 
@@ -208,10 +208,12 @@ def summarize_attention() -> dict[str, Any]:
     source_counts: Counter[str] = Counter()
     source_dates: dict[str, list[str]] = defaultdict(list)
     source_geographies: dict[str, set[str]] = defaultdict(set)
+    supported_geographies: dict[str, set[str]] = defaultdict(set)
+    unsupported_geographies: dict[str, set[str]] = defaultdict(set)
     topic_counts: Counter[str] = Counter()
     dates: list[str] = []
     for path in sorted(source.rglob("*.parquet")):
-        for row in parquet_rows(path, ["source", "topic_id", "date", "geography"]):
+        for row in parquet_rows(path, ["source", "topic_id", "date", "geography", "metadata_json"]):
             if row["source"] not in FRONTEND_ATTENTION_SOURCES:
                 continue
             if row["topic_id"] not in FRONTEND_TOPIC_IDS:
@@ -219,6 +221,8 @@ def summarize_attention() -> dict[str, Any]:
             day = clean(row["date"])
             if is_known_outage(row["source"], day):
                 continue
+            target = unsupported_geographies if country_mapping_supported(row) is False else supported_geographies
+            target[row["source"]].add(row["geography"])
             source_counts[row["source"]] += 1
             source_dates[row["source"]].append(day)
             source_geographies[row["source"]].add(row["geography"])
@@ -237,6 +241,8 @@ def summarize_attention() -> dict[str, Any]:
                 "observedDayCount": len(set(source_dates[source_id])),
                 "dateRanges": contiguous_date_ranges(source_dates[source_id]),
                 "geographyCount": len(source_geographies[source_id]),
+                "supportedGeographyCount": len(supported_geographies[source_id]),
+                "unsupportedGeographies": sorted(unsupported_geographies[source_id]),
             }
             for source_id, row_count in source_counts.items()
         },
@@ -410,6 +416,8 @@ def source_summaries(
                 "recordCount": coverage["rowCount"],
                 "recordLabel": "daily topic-market rows",
                 "geographyCount": coverage["geographyCount"],
+                "supportedGeographyCount": coverage.get("supportedGeographyCount"),
+                "unsupportedGeographies": coverage.get("unsupportedGeographies", []),
             }
         )
 
@@ -485,6 +493,8 @@ def main() -> None:
             "analysisStatus": "2025_2026_event_studies_ready",
             "notes": [
                 "Media geography is publishing-outlet country, not event location.",
+                "Configured markets include unsupported mappings; unsupported country observations are unavailable, never measured zeros.",
+                "Event windows cross year boundaries. Overlap exclusion always checks Orange/Red floods and wildfires across all years.",
                 "The Analysis Lab uses GDACS Orange and Red events with complete daily attention windows.",
                 "Coverage intervals use actual stored dates; gaps are never rendered as continuous coverage.",
                 "GDELT's confirmed 14 June–1 July 2025 infrastructure outage is excluded as missing data.",

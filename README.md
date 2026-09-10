@@ -1,5 +1,16 @@
 # Climate Attention
 
+> **Current MVP methodology (10 September 2026):** the public analysis uses
+> GDELT Web NGrams distinct-URL counts. DOC API shares described below are an
+> alternative collection/validation path. Explicitly unsupported country mappings
+> are unavailable, and affected-market estimates require every affected country.
+> Windows can cross calendar years. Overlap exclusion checks Orange/Red floods and
+> wildfires across all years, independently of the displayed cohort. Single-event
+> cards now report descriptive changes without statistical significance verdicts.
+> See [the first improvement batch](docs/IMPROVEMENTS_PHASE1.md) for corrected results,
+> regression coverage and coordinated serving-data refresh instructions.
+
+
 `climate-attention` is the initial data-collection layer for research on how major
 events affect media and search attention around climate change and clean transport.
 This version collects canonical daily GDELT media-attention trends, optional

@@ -106,7 +106,7 @@ const SCOPES: Record<LabScope, { label: string; description: string }> = {
   affected: { label: 'Affected countries', description: 'Publishing markets directly affected by each event' },
   other_eu27: { label: 'Other EU27', description: 'EU publishing markets excluding affected countries' },
   rest_world: { label: 'Rest of world', description: 'Non-EU markets excluding affected countries' },
-  global: { label: 'Global', description: 'All 197 mapped publishing markets' },
+  global: { label: 'Global', description: 'Supported mapped publishing markets' },
 }
 
 const MEASURES: Record<LabMeasure, { label: string; short: string; unit: string }> = {
@@ -490,7 +490,7 @@ export default function AnalysisLab({
             <label><span>Comparison window</span><select value={windowDays} onChange={(event) => setWindowDays(Number(event.target.value))}>{study.windows.map((window) => <option key={window} value={window}>{window} days before / after</option>)}</select></label>
             <label><span>Chart topic</span><select value={topic} onChange={(event) => setTopic(event.target.value as TopicId)}>{Object.entries(TOPICS).map(([id, item]) => <option key={id} value={id}>{item.label}</option>)}</select></label>
             <label><span>Chart measure</span><select value={measure} onChange={(event) => setMeasure(event.target.value as LabMeasure)}>{Object.entries(MEASURES).map(([id, item]) => <option key={id} value={id}>{item.label}</option>)}</select></label>
-            <label className="overlap-control"><input type="checkbox" checked={excludeOverlaps} onChange={(event) => setExcludeOverlaps(event.target.checked)} /><span>Exclude same-country overlapping events</span></label>
+            <label className="overlap-control"><input type="checkbox" checked={excludeOverlaps} onChange={(event) => setExcludeOverlaps(event.target.checked)} /><span>Exclude overlaps with Orange/Red events</span></label>
           </div>
           <div className="analysis-definition"><Info size={15} /><p><strong>Associational estimate.</strong> Every event is compared with its own pre-event baseline. Results describe indexed publishing activity, not a causal effect or public opinion.</p></div>
         </aside>

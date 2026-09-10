@@ -29,13 +29,14 @@ import {
 import type { AttentionChartPoint } from './AttentionChart'
 import type { EventStudyData } from './AnalysisLab'
 import InfoPage from './InfoPage'
+import { dailyEventPoints, eventDateRange } from './eventAttention'
 import {
   fetchAttentionWindow,
   fetchRegionAttention,
   isSupabaseEnabled,
 } from './supabase'
 import type { RegionAttentionObservation, WindowQuery } from './supabase'
-import { dateWithinRange, formatDate, permutationIncreaseTest } from './utils'
+import { dateWithinRange, formatDate, summarizeChange } from './utils'
 
 const AttentionChart = lazy(() => import('./AttentionChart'))
 const AnalysisLab = lazy(() => import('./AnalysisLab'))
@@ -101,6 +102,8 @@ type DataSourceSummary = {
   recordCount: number
   recordLabel: string
   geographyCount: number
+  supportedGeographyCount?: number
+  unsupportedGeographies?: string[]
   status: 'explorer'
   description: string
   sourceUrl: string
@@ -201,11 +204,7 @@ const formatCoordinates = ([longitude, latitude]: number[]) => {
 }
 
 function eventWindow(event: EventProperties, days = 28) {
-  const start = new Date(event.startAt)
-  const end = new Date(event.endAt)
-  start.setUTCDate(start.getUTCDate() - days)
-  end.setUTCDate(end.getUTCDate() + days)
-  return { start, end }
+  return eventDateRange(event.startAt, event.endAt, days)
 }
 
 function withinWindow(value: string, event: EventProperties, days = 28) {
@@ -979,7 +978,7 @@ function EventDrawer({
           {wildfireAreaHectares != null
             ? <span className="severity-badge" title="Cumulative burned area reported by GDACS"><Flame size={12} /> Burned area: {wildfireAreaHectares.toLocaleString('en-GB')} ha</span>
             : event.severity != null && <span className="severity-badge">Severity: {formatCompact(event.severity)} {event.severityUnit ?? ''}</span>}
-          <span className="analysis-badge"><span /> Analysis pending</span>
+          <span className="analysis-badge">Descriptive comparison</span>
         </div>
       </div>
 
@@ -1014,10 +1013,12 @@ function regionAttentionRow(row: RegionAttentionObservation, geography: string):
   }
 }
 
-function aggregateAttentionRows(rows: AttentionRow[]) {
+function aggregateAttentionRows(rows: AttentionRow[], markets: string[]) {
   const totals = new Map<string, AttentionRow>()
+  const marketsByDay = new Map<string, string[]>()
   for (const row of rows) {
     const key = `${row.date}:${row.topicId}`
+    marketsByDay.set(key, [...(marketsByDay.get(key) ?? []), row.geography])
     const current = totals.get(key) ?? {
       ...row,
       geography: '__aggregate__',
@@ -1029,9 +1030,15 @@ function aggregateAttentionRows(rows: AttentionRow[]) {
       officialSourceCount: 0,
     }
     for (const field of ['matchedCount', 'politicalCount', 'politicalActorCount', 'governmentActionCount', 'partyPoliticsCount', 'officialSourceCount'] as const) {
-      current[field] = Number(current[field] ?? 0) + Number(row[field] ?? 0)
+      current[field] = current[field] == null || row[field] == null ? null : Number(current[field]) + Number(row[field])
     }
     totals.set(key, current)
+  }
+  for (const [key, total] of totals) {
+    const observed = marketsByDay.get(key) ?? []
+    if (!markets.length || observed.length !== markets.length || markets.some((market) => !observed.includes(market))) {
+      for (const field of ['matchedCount', 'politicalCount', 'politicalActorCount', 'governmentActionCount', 'partyPoliticsCount', 'officialSourceCount'] as const) total[field] = null
+    }
   }
   return totals
 }
@@ -1055,12 +1062,14 @@ async function fetchAggregateAttention(event: EventProperties, scope: MediaScope
       topics: TOPICS.map((topic) => topic.id),
     }),
   ])
-  const affected = aggregateAttentionRows(affectedRows)
+  const affected = aggregateAttentionRows(affectedRows, event.geographyIds)
   return globalRows.map((row) => {
     const result = regionAttentionRow(row, '__international__')
     const excluded = affected.get(`${row.date}:${row.topicId}`)
     for (const field of ['matchedCount', 'politicalCount', 'politicalActorCount', 'governmentActionCount', 'partyPoliticsCount', 'officialSourceCount'] as const) {
-      result[field] = Math.max(0, Number(result[field] ?? 0) - Number(excluded?.[field] ?? 0))
+      const included = result[field]
+      const removed = excluded?.[field]
+      result[field] = included == null || removed == null || included < removed ? null : included - removed
     }
     return result
   })
@@ -1119,20 +1128,17 @@ function eventAttentionRows(event: EventProperties, attention: AttentionRow[], s
 
 function buildEventChart(event: EventProperties, attention: AttentionRow[], scope: MediaScope, mode: AttentionMode): ChartResult {
   const relevant = eventAttentionRows(event, attention, scope)
-  const daily = new Map<string, AttentionChartPoint>()
-  for (const row of relevant) {
-    const value = mode === 'political' ? row.politicalCount : row.matchedCount
-    if (value == null) continue
-    const point = daily.get(row.date) ?? { date: row.date, relativeDay: dayDifference(row.date, event.startAt) }
-    point[row.topicId] = Number(point[row.topicId] ?? 0) + value
-    daily.set(row.date, point)
-  }
-  const points = [...daily.values()].sort((a, b) => a.date.localeCompare(b.date))
+  const { start, end } = eventWindow(event)
+  const markets = scope === 'affected' ? event.geographyIds : [...new Set(relevant.map((row) => row.geography))]
+  const points = dailyEventPoints(relevant, markets, TOPICS.map((topic) => topic.id),
+    start.toISOString().slice(0, 10), end.toISOString().slice(0, 10), event.startAt,
+    mode === 'political' ? 'politicalCount' : 'matchedCount')
+  const observed = points.filter((point) => TOPICS.every((topic) => typeof point[topic.id] === 'number'))
   return {
     points,
-    coverageDays: points.length,
-    preDays: points.filter((point) => point.relativeDay < 0).length,
-    postDays: points.filter((point) => point.relativeDay > dayDifference(event.endAt, event.startAt)).length,
+    coverageDays: observed.length,
+    preDays: observed.filter((point) => point.relativeDay < 0).length,
+    postDays: observed.filter((point) => point.relativeDay > dayDifference(event.endAt, event.startAt)).length,
   }
 }
 
@@ -1161,7 +1167,7 @@ function AttentionTab({ event, chart, scope, onScopeChange, mode, onModeChange, 
         <div className="chart-wrap">
           {loading ? (
             <div className="chart-loading" role="status">Loading daily attention…</div>
-          ) : chart.points.length ? (
+          ) : chart.coverageDays ? (
             <Suspense fallback={<div className="chart-loading" role="status">Loading chart…</div>}>
               <AttentionChart
                 points={chart.points}
@@ -1214,7 +1220,7 @@ function BeforeAfterAnalysis({ event, chart, mode }: { event: EventProperties; c
         topic,
         before,
         after,
-        result: before.missing.length || after.missing.length ? null : permutationIncreaseTest(before.values, after.values),
+        result: before.missing.length || after.missing.length ? null : summarizeChange(before.values, after.values),
       }
     })
   }, [chart.points, event.endAt, event.startAt, windowDays])
@@ -1228,18 +1234,11 @@ function BeforeAfterAnalysis({ event, chart, mode }: { event: EventProperties; c
       <p className="muted-copy">Mean daily {mode === 'political' ? 'politically flagged ' : ''}matched URLs before and after the event, using complete days only.</p>
       <div className="before-after-grid">
         {evaluations.map(({ topic, before, after, result }) => {
-          const significantIncrease = Boolean(result && result.difference > 0 && result.pValue < 0.05)
-          const status = !result ? 'unavailable' : significantIncrease ? 'increase' : 'no-detectable-increase'
-          const verdict = !result
-            ? 'Not testable'
-            : significantIncrease
-              ? 'Evidence of increase'
-              : result.difference > 0
-                ? 'Increase not distinguishable'
-                : 'No increase observed'
-          const pValue = result ? (result.pValue < 0.001 ? '<0.001' : result.pValue.toFixed(3)) : null
+          const status = !result ? 'unavailable' : 'descriptive'
+          const verdict = !result ? 'Not testable' : result.difference > 0
+            ? 'Observed increase' : result.difference < 0 ? 'Observed decrease' : 'No observed change'
           return (
-            <article key={topic.id} className={significantIncrease ? 'before-after-card significant' : 'before-after-card'} data-topic={topic.id} data-test-status={status}>
+            <article key={topic.id} className="before-after-card" data-topic={topic.id} data-test-status={status}>
               <header><i style={{ background: topic.color }} /><strong>{topic.label}</strong><span>{verdict}</span></header>
               {!result ? (
                 <p className="before-after-unavailable"><CircleAlert size={14} /> Missing {before.missing.length} before and {after.missing.length} after day{after.missing.length === 1 ? '' : 's'}.</p>
@@ -1250,14 +1249,14 @@ function BeforeAfterAnalysis({ event, chart, mode }: { event: EventProperties; c
                     <span><small>After</small><b>{result.afterMean.toFixed(1)}</b><em>URLs/day</em></span>
                     <span className="change"><small>Change</small><b>{result.difference > 0 ? '+' : ''}{result.difference.toFixed(1)}</b><em>{result.percentChange == null ? 'zero baseline' : `${result.percentChange > 0 ? '+' : ''}${result.percentChange.toFixed(0)}%`}</em></span>
                   </div>
-                  <p className="before-after-test">One-sided p = {pValue} · {result.method === 'exact' ? 'exact' : `${result.permutations.toLocaleString()}-draw`} permutation test</p>
+                  <p className="before-after-test">Descriptive change · {windowDays} complete days in each period</p>
                 </>
               )}
             </article>
           )
         })}
       </div>
-      <div className="inline-note association-note"><Info size={15} /><span>This is an exploratory association test, not a causal estimate. “Not statistically distinguishable” is not evidence of no effect; stronger inference needs control dates or unaffected media markets and correction for multiple testing.</span></div>
+      <div className="inline-note association-note"><Info size={15} /><span>These are observed changes in publishing, not statistical or causal verdicts. Small baseline counts can produce large percentages. Inference requires a validated comparison design that accounts for time dependence, overlapping events and multiple testing.</span></div>
     </section>
   )
 }
@@ -1315,8 +1314,8 @@ function CoverageBreakdown({
 
   const totalMatches = selectedRows.reduce((total, row) => total + (row.matchedCount ?? 0), 0)
   const politicalMatches = selectedRows.reduce((total, row) => total + (row.politicalCount ?? 0), 0)
-  const observedDays = new Set(selectedRows.map((row) => row.date)).size
-  const marketCount = new Set(selectedRows.map((row) => row.geography)).size
+  const observedDays = new Set(selectedRows.filter((row) => row.matchedCount != null).map((row) => row.date)).size
+  const marketCount = new Set(selectedRows.filter((row) => row.matchedCount != null).map((row) => row.geography)).size
   const politicalShare = totalMatches ? (politicalMatches / totalMatches) * 100 : null
 
   const phaseStats = TOPICS.map((topic) => ({
@@ -1542,7 +1541,7 @@ function MethodsView({ manifest }: { manifest: Manifest | null }) {
       </section>
 
       <section className="method-principles" aria-label="Methodological principles">
-        <article><span><Layers3 size={18} /></span><div><small>Independent treatment</small><strong>Weather events are defined outside the news data.</strong></div></article>
+        <article><span><Layers3 size={18} /></span><div><small>Independent treatment</small><strong>Events come from an external catalogue; reporting bias can remain.</strong></div></article>
         <article><span><Globe2 size={18} /></span><div><small>Separate geographies</small><strong>Event location and outlet country are not interchangeable.</strong></div></article>
         <article><span><ShieldCheck size={18} /></span><div><small>Explicit missingness</small><strong>Missing dates are unavailable, never invented zeroes.</strong></div></article>
       </section>
@@ -1558,7 +1557,7 @@ function MethodsView({ manifest }: { manifest: Manifest | null }) {
             <a href="#events"><span>05</span> Weather events</a>
             <a href="#geography"><span>06</span> Geography &amp; scope</a>
             <a href="#measurement"><span>07</span> Attention measures</a>
-            <a href="#before-after"><span>08</span> Before / after test</a>
+            <a href="#before-after"><span>08</span> Before / after comparison</a>
             <a href="#coverage-breakdown-method"><span>09</span> Coverage breakdown</a>
             <a href="#decisions"><span>10</span> Decision register</a>
             <a href="#limitations"><span>11</span> Limits &amp; validation</a>
@@ -1709,12 +1708,12 @@ function MethodsView({ manifest }: { manifest: Manifest | null }) {
               <li>The current frontend export reports URL counts. Overall country-news denominators are unavailable, but political share is calculated transparently as political URLs divided by matched topic URLs.</li>
               <li>Counts measure indexed publishing output, not readership, public opinion, article prominence or sentiment.</li>
               <li>Raw levels are not directly comparable between countries because outlet mapping and GDELT coverage differ.</li>
-              <li>A successful observed zero is valid; an absent date fails completeness and is not replaced with zero.</li>
+              <li>A successful observed zero is valid; an absent date or explicitly unsupported mapping fails completeness and is not replaced with zero.</li>
             </ul>
           </section>
 
           <section className="protocol-section" id="before-after">
-            <header><span>08</span><div><small>Exploratory inference</small><h2>What the single- and multi-event studies estimate</h2></div></header>
+            <header><span>08</span><div><small>Descriptive comparison</small><h2>What the single- and multi-event studies estimate</h2></div></header>
             <p className="protocol-lede">Explore compares one selected event with its own pre-event period. Analysis Lab applies the same complete-day principle to a selected year, the whole available period or a custom date range, then summarises event-level changes without allowing large media markets to dominate the result. Orange and Red alerts are the primary cohort; Green and all-tier filters are sensitivity views.</p>
             <div className="window-diagram" aria-label="Before and after event window">
               <div className="window-before"><span>7, 14 or 28 days</span><strong>Before mean</strong><small>Days ending immediately before the start</small></div>
@@ -1725,11 +1724,11 @@ function MethodsView({ manifest }: { manifest: Manifest | null }) {
             <div className="test-output-grid">
               <article><small>Event effect</small><strong>Post mean relative to its own baseline</strong><p>All and political volume use percentage change. Political share uses percentage-point change.</p></article>
               <article><small>Lab aggregation</small><strong>Median event response</strong><p>The middle event is the headline result; the interquartile range shows the middle half of event estimates.</p></article>
-              <article><small>Single-event test</small><strong>One-sided permutation result</strong><p>Explore retains its complete-window permutation calculation as a drill-down, not as the pooled Lab estimator.</p></article>
+              <article><small>Single-event comparison</small><strong>Observed change in URLs/day</strong><p>Explore reports before/after means and absolute and percentage changes. Statistical verdicts are withheld until a time-aware inferential design is validated.</p></article>
             </div>
             <details className="technical-details">
-              <summary>Exact test, simulation and eligibility <ChevronRight size={14} /></summary>
-              <ul><li>Every day in both periods must be present; absent dates are never converted to zero.</li><li>The primary Lab cohort contains GDACS Orange and Red floods and wildfires in the selected year; Green and all-alert cohorts use the same estimator.</li><li>The default Lab result excludes another selected-cohort event affecting the same country during the analysis window; users may include overlaps as a sensitivity check.</li><li>Explore evaluates every label allocation when there are no more than 50,000 combinations and otherwise uses a deterministic 10,000-shuffle approximation.</li></ul>
+              <summary>Coverage and event eligibility <ChevronRight size={14} /></summary>
+              <ul><li>Every day in both periods must be present; absent dates are never converted to zero.</li><li>The primary Lab cohort contains GDACS Orange and Red floods and wildfires in the selected year; Green and all-alert cohorts use the same estimator.</li><li>The default Lab result excludes overlaps with any Orange/Red wildfire or flood affecting a same country, across all years. This rule stays fixed when the displayed cohort changes; Green-event overlap is not excluded.</li><li>Event-year selection does not truncate observation windows at 31 December. Affected-market estimates require every affected country; unsupported mappings are unavailable. Global and regional totals describe supported markets only.</li></ul>
             </details>
             <div className="method-definition-grid two">
               <article><small>Event activity panel</small><strong>Rolling event starts by affected geography</strong><p>Multi-country events count once in every affected country, while global and EU27 aggregates count each unique event once. Aligned panels separate event load from attention, which defaults to a strict 7-day trailing average. The chart offers 7- and 28-day event windows and can compare two to five countries for one selected attention topic. Its default symmetric focus scale covers 98% of plotted attention anomalies, flags clipped extremes and retains daily and full-range options.</p></article>
@@ -1752,7 +1751,7 @@ function MethodsView({ manifest }: { manifest: Manifest | null }) {
             <header><span>10</span><div><small>Audit trail</small><h2>Current decision register</h2></div></header>
             <div className="decision-table">
               <div><span>Decision</span><span>Reason</span><span>Status</span></div>
-              <div><strong>Use GDACS as the event treatment</strong><p>Keeps event selection independent of news attention.</p><span className="status-chip active">In use</span></div>
+              <div><strong>Use GDACS as the event treatment</strong><p>Defines events outside our GDELT outcome; upstream reporting and impact selection remain limitations.</p><span className="status-chip active">In use</span></div>
               <div><strong>Limit the MVP to two topics</strong><p>Prioritises interpretable, auditable concepts before taxonomy expansion.</p><span className="status-chip active">In use</span></div>
               <div><strong>Count distinct URLs</strong><p>Prevents repeated phrases and duplicate NGram rows from inflating attention.</p><span className="status-chip active">In use</span></div>
               <div><strong>Treat political as a union</strong><p>Avoids double counting overlapping actor, action, party and official-source signals.</p><span className="status-chip active">In use</span></div>
@@ -1830,7 +1829,7 @@ function DataSummary({ manifest }: { manifest: Manifest }) {
         <div>
           <span className="eyebrow">Data summary</span>
           <h1>What the Atlas currently covers.</h1>
-          <p>Every interval below is calculated from stored research data at export time. This page includes only datasets currently used by the MVP; experimental and unused comparison sources are omitted.</p>
+          <p>Intervals describe stored observation dates or the explicitly labelled event collection window at export time. This page includes only datasets currently used by the MVP; experimental and unused comparison sources are omitted.</p>
         </div>
         <div className="data-snapshot">
           <Database size={18} />
@@ -1874,8 +1873,10 @@ function DataSummary({ manifest }: { manifest: Manifest }) {
                   <div className="source-coverage-ranges"><dt>Intervals</dt><dd>{source.dateRanges.map((range) => <span key={`${range.start}-${range.end}`}>{formatCoverageRange(range)}</span>)}</dd></div>
                   <div><dt>Observed dates</dt><dd>{source.observedDayCount.toLocaleString()} · {source.coverageBasis}</dd></div>
                   <div><dt>Records</dt><dd>{source.recordCount.toLocaleString()} {source.recordLabel}</dd></div>
-                  <div><dt>Geographies</dt><dd>{source.geographyCount.toLocaleString()}</dd></div>
+                  <div><dt>Configured geographies</dt><dd>{source.geographyCount.toLocaleString()}</dd></div>
+                  {source.supportedGeographyCount != null && <div><dt>Mapping supported</dt><dd>{source.supportedGeographyCount.toLocaleString()}</dd></div>}
                 </dl>
+                {Boolean(source.unsupportedGeographies?.length) && <p>Unsupported mappings: {source.unsupportedGeographies!.map((id) => manifest.geographyLabels[id] || id).join(', ')}. Their counts are unavailable.</p>}
                 <a href={source.sourceUrl} target="_blank" rel="noreferrer">Open source documentation <ExternalLink size={13} /></a>
               </article>
             ))}

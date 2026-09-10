@@ -413,7 +413,7 @@ export default function AttentionTimeline({
       const values: Record<string, number | null> = {}
       for (const item of series) {
         const rows = item.locations.map((location) => bySeriesSource.get(`${location}:${item.topic}`)?.get(date))
-        values[item.key] = !item.locations.length || rows.some((row) => !row)
+        values[item.key] = !item.locations.length || rows.some((row) => !row || (measure === 'matched' ? row.matchedCount : row.politicalCount) == null)
           ? null
           : rows.reduce((total, row) => total + Number(measure === 'matched' ? row?.matchedCount ?? 0 : row?.politicalCount ?? 0), 0)
       }

@@ -85,3 +85,11 @@ describe('Supabase response mapping', () => {
     })).toMatchObject({ date: '2025-02-02', regionId: 'eu27', politicalShare: 25 })
   })
 })
+
+it('maps unsupported market zeros to missing values using serving quality metadata', () => {
+  const mapped = mapAttentionRow({ observation_date: '2025-01-01', geography: 'vietnam',
+    topic_id: 'climate_change', matched_count: 0, political_count: 0,
+    metadata: { country_mapping_supported: false } })
+  expect(mapped.matchedCount).toBeNull()
+  expect(mapped.politicalCount).toBeNull()
+})

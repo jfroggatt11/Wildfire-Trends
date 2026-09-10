@@ -229,3 +229,91 @@ def test_confirmed_gdelt_outage_is_missing_not_zero():
         row["observationDate"] in {"2025-06-14", "2025-07-01"}
         for row in build_daily_attention_regions(rows)
     )
+
+
+def _effect(payload, event_id, window=7, timing='onset', scope='affected'):
+    return next(row for row in payload['effects'] if row['eventId'] == event_id
+                and row['scope'] == scope and row['topicId'] == 'climate_change'
+                and row['windowDays'] == window and row['timing'] == timing)
+
+
+def test_windows_cross_year_boundaries_and_overlap_policy_is_fixed():
+    rows = _attention_rows()
+    events = [
+        _event('january', 'flood', 'Orange', date(2025, 1, 4), date(2025, 1, 4), ['italy']),
+        _event('previous', 'flood', 'Red', date(2024, 12, 30), date(2025, 1, 5), ['italy']),
+        _event('green', 'wildfire', 'Green', date(2025, 2, 1), date(2025, 2, 2), ['france']),
+        _event('major', 'flood', 'Orange', date(2025, 2, 1), date(2025, 2, 2), ['france']),
+    ]
+    major = build_event_study(iter(events), rows)
+    all_alerts = build_event_study(events, rows, alerts={'Green', 'Orange', 'Red'})
+    assert _effect(major, 'january')['complete'] is True
+    assert _effect(major, 'january')['overlap'] is True
+    assert _effect(major, 'major')['overlap'] is False  # Green is not contamination under this policy.
+    assert _effect(all_alerts, 'major') == _effect(major, 'major')
+    assert _effect(all_alerts, 'green')['overlap'] is True
+    assert major['coverage']['start'] == '2025-01-01'
+
+
+def test_unsupported_and_absent_affected_markets_are_incomplete_but_real_zeros_are_valid():
+    rows = _attention_rows()
+    for row in rows:
+        if row['geography'] == 'italy':
+            row['metadata_json'] = '{"country_mapping_supported": false}'
+            row['matched_count'] = row['political_count'] = 0
+        elif row['geography'] == 'france':
+            row['matched_count'] = row['political_count'] = 0
+    events = [_event(name, 'flood', 'Orange', date(2025, 2, 1), date(2025, 2, 2), countries)
+              for name, countries in [('mixed', ['italy', 'brazil']), ('absent', ['missing', 'brazil']), ('zero', ['france'])]]
+    study = build_event_study(events, rows)
+    assert _effect(study, 'mixed')['complete'] is False
+    assert _effect(study, 'absent')['complete'] is False
+    assert _effect(study, 'mixed')['unsupportedGeographyIds'] == ['italy']
+    assert _effect(study, 'zero')['complete'] is True
+    assert _effect(study, 'zero')['matchedPreMean'] == 0
+    assert _effect(study, 'mixed', scope='global')['complete'] is True
+    assert study['coverage']['geographies'] == 2
+    assert study['coverage']['unsupportedGeographies'] == ['italy']
+
+
+def test_partial_markets_and_duplicate_rows_do_not_create_complete_regional_totals():
+    rows = _attention_rows()
+    rows = [row for row in rows if not (row['geography'] == 'brazil' and row['date'] == date(2025, 2, 1))]
+    events = [_event('event', 'flood', 'Orange', date(2025, 2, 1), date(2025, 2, 2), ['italy'])]
+    study = build_event_study(events, rows + rows)
+    assert _effect(study, 'event')['complete'] is True
+    assert _effect(study, 'event', scope='global')['complete'] is False
+    regions = build_daily_attention_regions(rows + rows)
+    assert not any(row['regionId'] == 'global' and row['observationDate'] == '2025-02-01' for row in regions)
+    eu = next(row for row in regions if row['regionId'] == 'eu27' and row['observationDate'] == '2025-02-01' and row['topicId'] == 'climate_change')
+    assert eu['matchedCount'] == 40
+
+
+def test_loader_preserves_mapping_flags_and_full_post_event_window(tmp_path):
+    import pyarrow as pa
+    from climate_attention.event_study import load_event_study_inputs
+    path = tmp_path / 'events/source=gdacs/events.parquet'
+    path.parent.mkdir(parents=True)
+    events = [_event('event', 'flood', 'Orange', date(2025, 12, 25), date(2026, 2, 1), ['italy'])]
+    pq.write_table(pa.Table.from_pylist(events), path)
+    path = tmp_path / 'trends/source=gdelt_ngrams/topic_id=climate_change/geography=italy/language=all/daily.parquet'
+    path.parent.mkdir(parents=True)
+    rows = [{**_attention_rows()[0], 'date': date(2026, 2, 20),
+             'political_actor_count': 0, 'government_action_count': 0, 'party_politics_count': 0,
+             'official_source_count': 0, 'metadata_json': '{"country_mapping_supported": false}'}]
+    pq.write_table(pa.Table.from_pylist(rows), path)
+    _, loaded = load_event_study_inputs(tmp_path, study_year=2025)
+    assert loaded[0]['date'] == date(2026, 2, 20)
+    assert loaded[0]['country_mapping_supported'] is False
+    assert 'metadata_json' not in loaded[0]
+
+
+def test_warehouse_builds_do_not_overwrite_another_year(tmp_path, monkeypatch):
+    from climate_attention.event_study import build_analysis_warehouse
+    events = [_event('event', 'wildfire', 'Orange', date(2025, 2, 1), date(2025, 2, 2), ['italy'])]
+    monkeypatch.setattr('climate_attention.event_study.load_event_study_inputs', lambda *args, **kwargs: (events, _attention_rows()))
+    first = build_analysis_warehouse(data_dir=tmp_path, study_year=2025)
+    original = first['effectPath'].read_bytes()
+    second = build_analysis_warehouse(data_dir=tmp_path, study_year=2026)
+    assert first['effectPath'] != second['effectPath']
+    assert first['effectPath'].read_bytes() == original

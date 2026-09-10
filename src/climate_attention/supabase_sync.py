@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 from collections.abc import Iterable
 from datetime import date
@@ -10,7 +11,7 @@ from typing import Any
 
 import pyarrow.parquet as pq
 
-from .source_coverage import known_outages
+from .source_coverage import country_mapping_supported, known_outages
 
 
 MVP_TOPICS = {"climate_change", "electric_vehicles"}
@@ -31,6 +32,7 @@ ATTENTION_COLUMNS = (
     "party_politics_count",
     "official_source_count",
     "collected_at",
+    "metadata",
 )
 ATTENTION_SYNC_BATCH_SIZE = 50_000
 
@@ -86,7 +88,15 @@ def attention_rows(
         day = row["date"]
         if (start is not None and day < start) or (end is not None and day > end):
             continue
+        supported = country_mapping_supported(row)
+        if supported is False:
+            row = {**row, **{field: None for field in (
+                "matched_count", "country_attention_share", "attention_index",
+                "political_count", "political_actor_count", "government_action_count",
+                "party_politics_count", "official_source_count",
+            )}}
         yield {
+            "metadata": json.dumps({"country_mapping_supported": supported}),
             "record_id": row["record_id"],
             "observation_date": day,
             "source": row["source"],
@@ -224,7 +234,7 @@ def sync_analysis_warehouse(
             "Supabase sync requires: python -m pip install -e '.[supabase]'"
         ) from exc
 
-    analysis_dir = data_dir / "analysis"
+    analysis_dir = data_dir / "analysis" / f"year={study_year}"
     specifications = [
         (
             "event_effects",

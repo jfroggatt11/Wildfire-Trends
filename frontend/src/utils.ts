@@ -47,6 +47,14 @@ export function hasPoliticalSignal(article: PoliticalSignalInput) {
   return getPoliticalSignals(article).length > 0
 }
 
+export function summarizeChange(before: number[], after: number[]) {
+  if (!before.length || !after.length || [...before, ...after].some((value) => !Number.isFinite(value))) return null
+  const beforeMean = average(before)
+  const afterMean = average(after)
+  const difference = afterMean - beforeMean
+  return { beforeMean, afterMean, difference, percentChange: beforeMean ? difference / beforeMean * 100 : null }
+}
+
 export type IncreaseTestResult = {
   beforeMean: number
   afterMean: number

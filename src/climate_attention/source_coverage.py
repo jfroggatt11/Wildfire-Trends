@@ -2,12 +2,24 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 import pyarrow as pa
 import pyarrow.parquet as pq
+
+
+def country_mapping_supported(row: dict[str, Any]) -> bool | None:
+    """Preserve unknown legacy metadata; an explicit false is never a zero."""
+    if "country_mapping_supported" in row:
+        return row["country_mapping_supported"]
+    metadata = row.get("metadata_json") or row.get("metadata") or {}
+    if isinstance(metadata, str):
+        metadata = json.loads(metadata)
+    return metadata.get("country_mapping_supported")
 
 
 @dataclass(frozen=True)

@@ -128,6 +128,7 @@ const ATTENTION_SELECT = [
   'government_action_count',
   'party_politics_count',
   'official_source_count',
+  'metadata',
 ].join(',')
 
 export function isKnownAttentionOutage(value: string) {
@@ -350,19 +351,21 @@ export function mapEventEffect(row: Record<string, unknown>): EventEffectObserva
 }
 
 export function mapAttentionRow(row: Record<string, unknown>): AttentionObservation {
+  const metadata = row.metadata as { country_mapping_supported?: boolean } | undefined
+  const count = (value: unknown) => metadata?.country_mapping_supported === false ? null : numberOrNull(value)
   return {
     date: String(row.observation_date),
     source: String(row.source),
     topicId: String(row.topic_id),
     geography: String(row.geography),
-    matchedCount: numberOrNull(row.matched_count),
-    attentionShare: numberOrNull(row.country_attention_share),
-    attentionIndex: numberOrNull(row.attention_index),
-    politicalCount: numberOrNull(row.political_count),
-    politicalActorCount: numberOrNull(row.political_actor_count),
-    governmentActionCount: numberOrNull(row.government_action_count),
-    partyPoliticsCount: numberOrNull(row.party_politics_count),
-    officialSourceCount: numberOrNull(row.official_source_count),
+    matchedCount: count(row.matched_count),
+    attentionShare: count(row.country_attention_share),
+    attentionIndex: count(row.attention_index),
+    politicalCount: count(row.political_count),
+    politicalActorCount: count(row.political_actor_count),
+    governmentActionCount: count(row.government_action_count),
+    partyPoliticsCount: count(row.party_politics_count),
+    officialSourceCount: count(row.official_source_count),
   }
 }
 

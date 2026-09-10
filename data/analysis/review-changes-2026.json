@@ -1,0 +1,1090 @@
+[
+  {
+    "eventId": "gdacs:WF:1027016",
+    "scope": "affected",
+    "topicId": "climate_change",
+    "timing": "onset",
+    "windowDays": 28,
+    "before": {
+      "complete": false,
+      "overlap": false,
+      "matchedPercentChange": null
+    },
+    "after": {
+      "complete": true,
+      "overlap": false,
+      "matchedPercentChange": 31.830985915492967
+    }
+  },
+  {
+    "eventId": "gdacs:WF:1027016",
+    "scope": "affected",
+    "topicId": "climate_change",
+    "timing": "persistence",
+    "windowDays": 28,
+    "before": {
+      "complete": false,
+      "overlap": false,
+      "matchedPercentChange": null
+    },
+    "after": {
+      "complete": true,
+      "overlap": false,
+      "matchedPercentChange": 10.70422535211268
+    }
+  },
+  {
+    "eventId": "gdacs:WF:1027016",
+    "scope": "affected",
+    "topicId": "electric_vehicles",
+    "timing": "onset",
+    "windowDays": 28,
+    "before": {
+      "complete": false,
+      "overlap": false,
+      "matchedPercentChange": null
+    },
+    "after": {
+      "complete": true,
+      "overlap": false,
+      "matchedPercentChange": 11.764705882352937
+    }
+  },
+  {
+    "eventId": "gdacs:WF:1027016",
+    "scope": "affected",
+    "topicId": "electric_vehicles",
+    "timing": "persistence",
+    "windowDays": 28,
+    "before": {
+      "complete": false,
+      "overlap": false,
+      "matchedPercentChange": null
+    },
+    "after": {
+      "complete": true,
+      "overlap": false,
+      "matchedPercentChange": 17.64705882352941
+    }
+  },
+  {
+    "eventId": "gdacs:WF:1027016",
+    "scope": "other_eu27",
+    "topicId": "climate_change",
+    "timing": "onset",
+    "windowDays": 28,
+    "before": {
+      "complete": false,
+      "overlap": false,
+      "matchedPercentChange": null
+    },
+    "after": {
+      "complete": true,
+      "overlap": false,
+      "matchedPercentChange": 26.76697530864198
+    }
+  },
+  {
+    "eventId": "gdacs:WF:1027016",
+    "scope": "other_eu27",
+    "topicId": "climate_change",
+    "timing": "persistence",
+    "windowDays": 28,
+    "before": {
+      "complete": false,
+      "overlap": false,
+      "matchedPercentChange": null
+    },
+    "after": {
+      "complete": true,
+      "overlap": false,
+      "matchedPercentChange": 26.73611111111113
+    }
+  },
+  {
+    "eventId": "gdacs:WF:1027016",
+    "scope": "other_eu27",
+    "topicId": "electric_vehicles",
+    "timing": "onset",
+    "windowDays": 28,
+    "before": {
+      "complete": false,
+      "overlap": false,
+      "matchedPercentChange": null
+    },
+    "after": {
+      "complete": true,
+      "overlap": false,
+      "matchedPercentChange": 25.762595681480654
+    }
+  },
+  {
+    "eventId": "gdacs:WF:1027016",
+    "scope": "other_eu27",
+    "topicId": "electric_vehicles",
+    "timing": "persistence",
+    "windowDays": 28,
+    "before": {
+      "complete": false,
+      "overlap": false,
+      "matchedPercentChange": null
+    },
+    "after": {
+      "complete": true,
+      "overlap": false,
+      "matchedPercentChange": 21.147035302182122
+    }
+  },
+  {
+    "eventId": "gdacs:WF:1027016",
+    "scope": "rest_world",
+    "topicId": "climate_change",
+    "timing": "onset",
+    "windowDays": 28,
+    "before": {
+      "complete": false,
+      "overlap": false,
+      "matchedPercentChange": null
+    },
+    "after": {
+      "complete": true,
+      "overlap": false,
+      "matchedPercentChange": 18.39088746305242
+    }
+  },
+  {
+    "eventId": "gdacs:WF:1027016",
+    "scope": "rest_world",
+    "topicId": "climate_change",
+    "timing": "persistence",
+    "windowDays": 28,
+    "before": {
+      "complete": false,
+      "overlap": false,
+      "matchedPercentChange": null
+    },
+    "after": {
+      "complete": true,
+      "overlap": false,
+      "matchedPercentChange": 17.85499723644054
+    }
+  },
+  {
+    "eventId": "gdacs:WF:1027016",
+    "scope": "rest_world",
+    "topicId": "electric_vehicles",
+    "timing": "onset",
+    "windowDays": 28,
+    "before": {
+      "complete": false,
+      "overlap": false,
+      "matchedPercentChange": null
+    },
+    "after": {
+      "complete": true,
+      "overlap": false,
+      "matchedPercentChange": 23.41887777294475
+    }
+  },
+  {
+    "eventId": "gdacs:WF:1027016",
+    "scope": "rest_world",
+    "topicId": "electric_vehicles",
+    "timing": "persistence",
+    "windowDays": 28,
+    "before": {
+      "complete": false,
+      "overlap": false,
+      "matchedPercentChange": null
+    },
+    "after": {
+      "complete": true,
+      "overlap": false,
+      "matchedPercentChange": 11.393359431636933
+    }
+  },
+  {
+    "eventId": "gdacs:WF:1027016",
+    "scope": "global",
+    "topicId": "climate_change",
+    "timing": "onset",
+    "windowDays": 28,
+    "before": {
+      "complete": false,
+      "overlap": false,
+      "matchedPercentChange": null
+    },
+    "after": {
+      "complete": true,
+      "overlap": false,
+      "matchedPercentChange": 20.454048936789977
+    }
+  },
+  {
+    "eventId": "gdacs:WF:1027016",
+    "scope": "global",
+    "topicId": "climate_change",
+    "timing": "persistence",
+    "windowDays": 28,
+    "before": {
+      "complete": false,
+      "overlap": false,
+      "matchedPercentChange": null
+    },
+    "after": {
+      "complete": true,
+      "overlap": false,
+      "matchedPercentChange": 19.904238275560736
+    }
+  },
+  {
+    "eventId": "gdacs:WF:1027016",
+    "scope": "global",
+    "topicId": "electric_vehicles",
+    "timing": "onset",
+    "windowDays": 28,
+    "before": {
+      "complete": false,
+      "overlap": false,
+      "matchedPercentChange": null
+    },
+    "after": {
+      "complete": true,
+      "overlap": false,
+      "matchedPercentChange": 23.879045484996198
+    }
+  },
+  {
+    "eventId": "gdacs:WF:1027016",
+    "scope": "global",
+    "topicId": "electric_vehicles",
+    "timing": "persistence",
+    "windowDays": 28,
+    "before": {
+      "complete": false,
+      "overlap": false,
+      "matchedPercentChange": null
+    },
+    "after": {
+      "complete": true,
+      "overlap": false,
+      "matchedPercentChange": 13.372912287186123
+    }
+  },
+  {
+    "eventId": "gdacs:FL:1103735",
+    "scope": "affected",
+    "topicId": "climate_change",
+    "timing": "onset",
+    "windowDays": 7,
+    "before": {
+      "complete": true,
+      "overlap": false,
+      "matchedPercentChange": 23.36448598130841
+    },
+    "after": {
+      "complete": true,
+      "overlap": true,
+      "matchedPercentChange": 23.36448598130841
+    }
+  },
+  {
+    "eventId": "gdacs:FL:1103735",
+    "scope": "affected",
+    "topicId": "climate_change",
+    "timing": "persistence",
+    "windowDays": 7,
+    "before": {
+      "complete": true,
+      "overlap": false,
+      "matchedPercentChange": 17.757009345794387
+    },
+    "after": {
+      "complete": true,
+      "overlap": true,
+      "matchedPercentChange": 17.757009345794387
+    }
+  },
+  {
+    "eventId": "gdacs:FL:1103735",
+    "scope": "affected",
+    "topicId": "climate_change",
+    "timing": "onset",
+    "windowDays": 14,
+    "before": {
+      "complete": true,
+      "overlap": false,
+      "matchedPercentChange": 27.551020408163268
+    },
+    "after": {
+      "complete": true,
+      "overlap": true,
+      "matchedPercentChange": 27.551020408163268
+    }
+  },
+  {
+    "eventId": "gdacs:FL:1103735",
+    "scope": "affected",
+    "topicId": "climate_change",
+    "timing": "persistence",
+    "windowDays": 14,
+    "before": {
+      "complete": true,
+      "overlap": false,
+      "matchedPercentChange": 21.938775510204092
+    },
+    "after": {
+      "complete": true,
+      "overlap": true,
+      "matchedPercentChange": 21.938775510204092
+    }
+  },
+  {
+    "eventId": "gdacs:FL:1103735",
+    "scope": "affected",
+    "topicId": "climate_change",
+    "timing": "onset",
+    "windowDays": 28,
+    "before": {
+      "complete": false,
+      "overlap": false,
+      "matchedPercentChange": null
+    },
+    "after": {
+      "complete": true,
+      "overlap": true,
+      "matchedPercentChange": 44.72049689440993
+    }
+  },
+  {
+    "eventId": "gdacs:FL:1103735",
+    "scope": "affected",
+    "topicId": "climate_change",
+    "timing": "persistence",
+    "windowDays": 28,
+    "before": {
+      "complete": false,
+      "overlap": false,
+      "matchedPercentChange": null
+    },
+    "after": {
+      "complete": true,
+      "overlap": true,
+      "matchedPercentChange": 39.75155279503107
+    }
+  },
+  {
+    "eventId": "gdacs:FL:1103735",
+    "scope": "affected",
+    "topicId": "electric_vehicles",
+    "timing": "onset",
+    "windowDays": 7,
+    "before": {
+      "complete": true,
+      "overlap": false,
+      "matchedPercentChange": -5.55555555555557
+    },
+    "after": {
+      "complete": true,
+      "overlap": true,
+      "matchedPercentChange": -5.55555555555557
+    }
+  },
+  {
+    "eventId": "gdacs:FL:1103735",
+    "scope": "affected",
+    "topicId": "electric_vehicles",
+    "timing": "persistence",
+    "windowDays": 7,
+    "before": {
+      "complete": true,
+      "overlap": false,
+      "matchedPercentChange": -8.333333333333337
+    },
+    "after": {
+      "complete": true,
+      "overlap": true,
+      "matchedPercentChange": -8.333333333333337
+    }
+  },
+  {
+    "eventId": "gdacs:FL:1103735",
+    "scope": "affected",
+    "topicId": "electric_vehicles",
+    "timing": "onset",
+    "windowDays": 14,
+    "before": {
+      "complete": true,
+      "overlap": false,
+      "matchedPercentChange": -14.1025641025641
+    },
+    "after": {
+      "complete": true,
+      "overlap": true,
+      "matchedPercentChange": -14.1025641025641
+    }
+  },
+  {
+    "eventId": "gdacs:FL:1103735",
+    "scope": "affected",
+    "topicId": "electric_vehicles",
+    "timing": "persistence",
+    "windowDays": 14,
+    "before": {
+      "complete": true,
+      "overlap": false,
+      "matchedPercentChange": -6.410256410256404
+    },
+    "after": {
+      "complete": true,
+      "overlap": true,
+      "matchedPercentChange": -6.410256410256404
+    }
+  },
+  {
+    "eventId": "gdacs:FL:1103735",
+    "scope": "affected",
+    "topicId": "electric_vehicles",
+    "timing": "onset",
+    "windowDays": 28,
+    "before": {
+      "complete": false,
+      "overlap": false,
+      "matchedPercentChange": null
+    },
+    "after": {
+      "complete": true,
+      "overlap": true,
+      "matchedPercentChange": 93.0
+    }
+  },
+  {
+    "eventId": "gdacs:FL:1103735",
+    "scope": "affected",
+    "topicId": "electric_vehicles",
+    "timing": "persistence",
+    "windowDays": 28,
+    "before": {
+      "complete": false,
+      "overlap": false,
+      "matchedPercentChange": null
+    },
+    "after": {
+      "complete": true,
+      "overlap": true,
+      "matchedPercentChange": 93.0
+    }
+  },
+  {
+    "eventId": "gdacs:FL:1103735",
+    "scope": "other_eu27",
+    "topicId": "climate_change",
+    "timing": "onset",
+    "windowDays": 7,
+    "before": {
+      "complete": true,
+      "overlap": false,
+      "matchedPercentChange": 0.8186554204911848
+    },
+    "after": {
+      "complete": true,
+      "overlap": true,
+      "matchedPercentChange": 0.8186554204911848
+    }
+  },
+  {
+    "eventId": "gdacs:FL:1103735",
+    "scope": "other_eu27",
+    "topicId": "climate_change",
+    "timing": "persistence",
+    "windowDays": 7,
+    "before": {
+      "complete": true,
+      "overlap": false,
+      "matchedPercentChange": 3.969238402381529
+    },
+    "after": {
+      "complete": true,
+      "overlap": true,
+      "matchedPercentChange": 3.969238402381529
+    }
+  },
+  {
+    "eventId": "gdacs:FL:1103735",
+    "scope": "other_eu27",
+    "topicId": "climate_change",
+    "timing": "onset",
+    "windowDays": 14,
+    "before": {
+      "complete": true,
+      "overlap": false,
+      "matchedPercentChange": 11.60822249093109
+    },
+    "after": {
+      "complete": true,
+      "overlap": true,
+      "matchedPercentChange": 11.60822249093109
+    }
+  },
+  {
+    "eventId": "gdacs:FL:1103735",
+    "scope": "other_eu27",
+    "topicId": "climate_change",
+    "timing": "persistence",
+    "windowDays": 14,
+    "before": {
+      "complete": true,
+      "overlap": false,
+      "matchedPercentChange": 11.379819965067849
+    },
+    "after": {
+      "complete": true,
+      "overlap": true,
+      "matchedPercentChange": 11.379819965067849
+    }
+  },
+  {
+    "eventId": "gdacs:FL:1103735",
+    "scope": "other_eu27",
+    "topicId": "climate_change",
+    "timing": "onset",
+    "windowDays": 28,
+    "before": {
+      "complete": false,
+      "overlap": false,
+      "matchedPercentChange": null
+    },
+    "after": {
+      "complete": true,
+      "overlap": true,
+      "matchedPercentChange": 27.163812303202526
+    }
+  },
+  {
+    "eventId": "gdacs:FL:1103735",
+    "scope": "other_eu27",
+    "topicId": "climate_change",
+    "timing": "persistence",
+    "windowDays": 28,
+    "before": {
+      "complete": false,
+      "overlap": false,
+      "matchedPercentChange": null
+    },
+    "after": {
+      "complete": true,
+      "overlap": true,
+      "matchedPercentChange": 27.49404807618462
+    }
+  },
+  {
+    "eventId": "gdacs:FL:1103735",
+    "scope": "other_eu27",
+    "topicId": "electric_vehicles",
+    "timing": "onset",
+    "windowDays": 7,
+    "before": {
+      "complete": true,
+      "overlap": false,
+      "matchedPercentChange": -0.6092916984006223
+    },
+    "after": {
+      "complete": true,
+      "overlap": true,
+      "matchedPercentChange": -0.6092916984006223
+    }
+  },
+  {
+    "eventId": "gdacs:FL:1103735",
+    "scope": "other_eu27",
+    "topicId": "electric_vehicles",
+    "timing": "persistence",
+    "windowDays": 7,
+    "before": {
+      "complete": true,
+      "overlap": false,
+      "matchedPercentChange": -5.40746382330542
+    },
+    "after": {
+      "complete": true,
+      "overlap": true,
+      "matchedPercentChange": -5.40746382330542
+    }
+  },
+  {
+    "eventId": "gdacs:FL:1103735",
+    "scope": "other_eu27",
+    "topicId": "electric_vehicles",
+    "timing": "onset",
+    "windowDays": 14,
+    "before": {
+      "complete": true,
+      "overlap": false,
+      "matchedPercentChange": 12.096276486319688
+    },
+    "after": {
+      "complete": true,
+      "overlap": true,
+      "matchedPercentChange": 12.096276486319688
+    }
+  },
+  {
+    "eventId": "gdacs:FL:1103735",
+    "scope": "other_eu27",
+    "topicId": "electric_vehicles",
+    "timing": "persistence",
+    "windowDays": 14,
+    "before": {
+      "complete": true,
+      "overlap": false,
+      "matchedPercentChange": 12.50771446204485
+    },
+    "after": {
+      "complete": true,
+      "overlap": true,
+      "matchedPercentChange": 12.50771446204485
+    }
+  },
+  {
+    "eventId": "gdacs:FL:1103735",
+    "scope": "other_eu27",
+    "topicId": "electric_vehicles",
+    "timing": "onset",
+    "windowDays": 28,
+    "before": {
+      "complete": false,
+      "overlap": false,
+      "matchedPercentChange": null
+    },
+    "after": {
+      "complete": true,
+      "overlap": true,
+      "matchedPercentChange": 27.94033275960987
+    }
+  },
+  {
+    "eventId": "gdacs:FL:1103735",
+    "scope": "other_eu27",
+    "topicId": "electric_vehicles",
+    "timing": "persistence",
+    "windowDays": 28,
+    "before": {
+      "complete": false,
+      "overlap": false,
+      "matchedPercentChange": null
+    },
+    "after": {
+      "complete": true,
+      "overlap": true,
+      "matchedPercentChange": 26.48307515777396
+    }
+  },
+  {
+    "eventId": "gdacs:FL:1103735",
+    "scope": "rest_world",
+    "topicId": "climate_change",
+    "timing": "onset",
+    "windowDays": 7,
+    "before": {
+      "complete": true,
+      "overlap": false,
+      "matchedPercentChange": 0.9545199326221224
+    },
+    "after": {
+      "complete": true,
+      "overlap": true,
+      "matchedPercentChange": 0.9545199326221224
+    }
+  },
+  {
+    "eventId": "gdacs:FL:1103735",
+    "scope": "rest_world",
+    "topicId": "climate_change",
+    "timing": "persistence",
+    "windowDays": 7,
+    "before": {
+      "complete": true,
+      "overlap": false,
+      "matchedPercentChange": 0.20052939760969507
+    },
+    "after": {
+      "complete": true,
+      "overlap": true,
+      "matchedPercentChange": 0.20052939760969507
+    }
+  },
+  {
+    "eventId": "gdacs:FL:1103735",
+    "scope": "rest_world",
+    "topicId": "climate_change",
+    "timing": "onset",
+    "windowDays": 14,
+    "before": {
+      "complete": true,
+      "overlap": false,
+      "matchedPercentChange": 13.270265578892548
+    },
+    "after": {
+      "complete": true,
+      "overlap": true,
+      "matchedPercentChange": 13.270265578892548
+    }
+  },
+  {
+    "eventId": "gdacs:FL:1103735",
+    "scope": "rest_world",
+    "topicId": "climate_change",
+    "timing": "persistence",
+    "windowDays": 14,
+    "before": {
+      "complete": true,
+      "overlap": false,
+      "matchedPercentChange": 13.304981773997572
+    },
+    "after": {
+      "complete": true,
+      "overlap": true,
+      "matchedPercentChange": 13.304981773997572
+    }
+  },
+  {
+    "eventId": "gdacs:FL:1103735",
+    "scope": "rest_world",
+    "topicId": "climate_change",
+    "timing": "onset",
+    "windowDays": 28,
+    "before": {
+      "complete": false,
+      "overlap": false,
+      "matchedPercentChange": null
+    },
+    "after": {
+      "complete": true,
+      "overlap": true,
+      "matchedPercentChange": 19.175001196343977
+    }
+  },
+  {
+    "eventId": "gdacs:FL:1103735",
+    "scope": "rest_world",
+    "topicId": "climate_change",
+    "timing": "persistence",
+    "windowDays": 28,
+    "before": {
+      "complete": false,
+      "overlap": false,
+      "matchedPercentChange": null
+    },
+    "after": {
+      "complete": true,
+      "overlap": true,
+      "matchedPercentChange": 18.842417571900274
+    }
+  },
+  {
+    "eventId": "gdacs:FL:1103735",
+    "scope": "rest_world",
+    "topicId": "electric_vehicles",
+    "timing": "onset",
+    "windowDays": 7,
+    "before": {
+      "complete": true,
+      "overlap": false,
+      "matchedPercentChange": -4.379497981393725
+    },
+    "after": {
+      "complete": true,
+      "overlap": true,
+      "matchedPercentChange": -4.379497981393725
+    }
+  },
+  {
+    "eventId": "gdacs:FL:1103735",
+    "scope": "rest_world",
+    "topicId": "electric_vehicles",
+    "timing": "persistence",
+    "windowDays": 7,
+    "before": {
+      "complete": true,
+      "overlap": false,
+      "matchedPercentChange": -2.132701421800952
+    },
+    "after": {
+      "complete": true,
+      "overlap": true,
+      "matchedPercentChange": -2.132701421800952
+    }
+  },
+  {
+    "eventId": "gdacs:FL:1103735",
+    "scope": "rest_world",
+    "topicId": "electric_vehicles",
+    "timing": "onset",
+    "windowDays": 14,
+    "before": {
+      "complete": true,
+      "overlap": false,
+      "matchedPercentChange": 3.4440999806239057
+    },
+    "after": {
+      "complete": true,
+      "overlap": true,
+      "matchedPercentChange": 3.4440999806239057
+    }
+  },
+  {
+    "eventId": "gdacs:FL:1103735",
+    "scope": "rest_world",
+    "topicId": "electric_vehicles",
+    "timing": "persistence",
+    "windowDays": 14,
+    "before": {
+      "complete": true,
+      "overlap": false,
+      "matchedPercentChange": 4.093198992443312
+    },
+    "after": {
+      "complete": true,
+      "overlap": true,
+      "matchedPercentChange": 4.093198992443312
+    }
+  },
+  {
+    "eventId": "gdacs:FL:1103735",
+    "scope": "rest_world",
+    "topicId": "electric_vehicles",
+    "timing": "onset",
+    "windowDays": 28,
+    "before": {
+      "complete": false,
+      "overlap": false,
+      "matchedPercentChange": null
+    },
+    "after": {
+      "complete": true,
+      "overlap": true,
+      "matchedPercentChange": 19.61633839751446
+    }
+  },
+  {
+    "eventId": "gdacs:FL:1103735",
+    "scope": "rest_world",
+    "topicId": "electric_vehicles",
+    "timing": "persistence",
+    "windowDays": 28,
+    "before": {
+      "complete": false,
+      "overlap": false,
+      "matchedPercentChange": null
+    },
+    "after": {
+      "complete": true,
+      "overlap": true,
+      "matchedPercentChange": 17.786392269760285
+    }
+  },
+  {
+    "eventId": "gdacs:FL:1103735",
+    "scope": "global",
+    "topicId": "climate_change",
+    "timing": "onset",
+    "windowDays": 7,
+    "before": {
+      "complete": true,
+      "overlap": false,
+      "matchedPercentChange": 1.0659439927732584
+    },
+    "after": {
+      "complete": true,
+      "overlap": true,
+      "matchedPercentChange": 1.0659439927732584
+    }
+  },
+  {
+    "eventId": "gdacs:FL:1103735",
+    "scope": "global",
+    "topicId": "climate_change",
+    "timing": "persistence",
+    "windowDays": 7,
+    "before": {
+      "complete": true,
+      "overlap": false,
+      "matchedPercentChange": 1.2285456187895103
+    },
+    "after": {
+      "complete": true,
+      "overlap": true,
+      "matchedPercentChange": 1.2285456187895103
+    }
+  },
+  {
+    "eventId": "gdacs:FL:1103735",
+    "scope": "global",
+    "topicId": "climate_change",
+    "timing": "onset",
+    "windowDays": 14,
+    "before": {
+      "complete": true,
+      "overlap": false,
+      "matchedPercentChange": 12.958315679692337
+    },
+    "after": {
+      "complete": true,
+      "overlap": true,
+      "matchedPercentChange": 12.958315679692337
+    }
+  },
+  {
+    "eventId": "gdacs:FL:1103735",
+    "scope": "global",
+    "topicId": "climate_change",
+    "timing": "persistence",
+    "windowDays": 14,
+    "before": {
+      "complete": true,
+      "overlap": false,
+      "matchedPercentChange": 12.893133005247199
+    },
+    "after": {
+      "complete": true,
+      "overlap": true,
+      "matchedPercentChange": 12.893133005247199
+    }
+  },
+  {
+    "eventId": "gdacs:FL:1103735",
+    "scope": "global",
+    "topicId": "climate_change",
+    "timing": "onset",
+    "windowDays": 28,
+    "before": {
+      "complete": false,
+      "overlap": false,
+      "matchedPercentChange": null
+    },
+    "after": {
+      "complete": true,
+      "overlap": true,
+      "matchedPercentChange": 21.210802183651627
+    }
+  },
+  {
+    "eventId": "gdacs:FL:1103735",
+    "scope": "global",
+    "topicId": "climate_change",
+    "timing": "persistence",
+    "windowDays": 28,
+    "before": {
+      "complete": false,
+      "overlap": false,
+      "matchedPercentChange": null
+    },
+    "after": {
+      "complete": true,
+      "overlap": true,
+      "matchedPercentChange": 21.007671799336194
+    }
+  },
+  {
+    "eventId": "gdacs:FL:1103735",
+    "scope": "global",
+    "topicId": "electric_vehicles",
+    "timing": "onset",
+    "windowDays": 7,
+    "before": {
+      "complete": true,
+      "overlap": false,
+      "matchedPercentChange": -3.6781445645987496
+    },
+    "after": {
+      "complete": true,
+      "overlap": true,
+      "matchedPercentChange": -3.6781445645987496
+    }
+  },
+  {
+    "eventId": "gdacs:FL:1103735",
+    "scope": "global",
+    "topicId": "electric_vehicles",
+    "timing": "persistence",
+    "windowDays": 7,
+    "before": {
+      "complete": true,
+      "overlap": false,
+      "matchedPercentChange": -2.760387023335226
+    },
+    "after": {
+      "complete": true,
+      "overlap": true,
+      "matchedPercentChange": -2.760387023335226
+    }
+  },
+  {
+    "eventId": "gdacs:FL:1103735",
+    "scope": "global",
+    "topicId": "electric_vehicles",
+    "timing": "onset",
+    "windowDays": 14,
+    "before": {
+      "complete": true,
+      "overlap": false,
+      "matchedPercentChange": 5.034593284603057
+    },
+    "after": {
+      "complete": true,
+      "overlap": true,
+      "matchedPercentChange": 5.034593284603057
+    }
+  },
+  {
+    "eventId": "gdacs:FL:1103735",
+    "scope": "global",
+    "topicId": "electric_vehicles",
+    "timing": "persistence",
+    "windowDays": 14,
+    "before": {
+      "complete": true,
+      "overlap": false,
+      "matchedPercentChange": 5.660008599460574
+    },
+    "after": {
+      "complete": true,
+      "overlap": true,
+      "matchedPercentChange": 5.660008599460574
+    }
+  },
+  {
+    "eventId": "gdacs:FL:1103735",
+    "scope": "global",
+    "topicId": "electric_vehicles",
+    "timing": "onset",
+    "windowDays": 28,
+    "before": {
+      "complete": false,
+      "overlap": false,
+      "matchedPercentChange": null
+    },
+    "after": {
+      "complete": true,
+      "overlap": true,
+      "matchedPercentChange": 21.43605631236048
+    }
+  },
+  {
+    "eventId": "gdacs:FL:1103735",
+    "scope": "global",
+    "topicId": "electric_vehicles",
+    "timing": "persistence",
+    "windowDays": 28,
+    "before": {
+      "complete": false,
+      "overlap": false,
+      "matchedPercentChange": null
+    },
+    "after": {
+      "complete": true,
+      "overlap": true,
+      "matchedPercentChange": 19.684268075994353
+    }
+  }
+]

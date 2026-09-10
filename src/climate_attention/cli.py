@@ -2009,7 +2009,7 @@ def _build_event_study(args: argparse.Namespace) -> int:
     print(
         f"Event study complete: {len(payload['events']):,} major event(s), "
         f"{complete:,} complete event-topic-scope specification(s). "
-        f"Canonical effects: {args.data_dir / 'analysis' / 'event_effects.parquet'}. "
+        f"Canonical effects: {args.data_dir / 'analysis' / f'event_effects_{args.year}.parquet'}. "
         f"Frontend dataset: {args.frontend_output}."
     )
     return 0

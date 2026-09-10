@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timezone
+import json
 
 from climate_attention.models import DailyTrend
 from climate_attention.storage import LocalParquetStorage
@@ -56,7 +57,7 @@ def test_attention_rows_map_and_filter_canonical_parquet(tmp_path):
     assert selected[0]["observation_date"] == date(2025, 1, 2)
     assert selected[0]["matched_count"] == 2
     assert "query_expression" not in selected[0]
-    assert "metadata" not in selected[0]
+    assert json.loads(selected[0]["metadata"]) == {"country_mapping_supported": None}
 
 
 def test_supabase_scope_is_two_topic_mvp():
@@ -82,3 +83,18 @@ def test_analysis_rows_map_camel_case_parquet_to_database_columns(tmp_path):
             integer_columns={"events_started"},
         )
     ) == [{"activity_date": date(2025, 1, 1), "events_started": 2}]
+
+
+def test_unsupported_mapping_is_served_as_null_with_minimal_quality_metadata(tmp_path):
+    storage = LocalParquetStorage(tmp_path)
+    storage.write_trends([DailyTrend(
+        record_id="unsupported", date=date(2025, 1, 1), source="gdelt_ngrams",
+        topic_id="climate_change", query_id="topic_distinct_urls", query_expression="climate_change",
+        geography="vietnam", matched_count=0, political_count=0,
+        collected_at=datetime(2025, 2, 1, tzinfo=timezone.utc),
+        metadata={"country_mapping_supported": False, "unpublished_details": "not served"},
+    )])
+    row = next(iter(attention_rows(attention_files(tmp_path, {"climate_change"})[0])))
+    assert row["matched_count"] is None
+    assert row["political_count"] is None
+    assert json.loads(row["metadata"]) == {"country_mapping_supported": False}

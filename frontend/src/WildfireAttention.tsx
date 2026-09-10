@@ -72,7 +72,7 @@ const SCOPES: Record<WildfireAttentionScope, { label: string; description: strin
   affected: { label: 'Affected countries', description: 'Publishing markets directly affected by each fire' },
   other_eu27: { label: 'Other EU27', description: 'EU publishing markets excluding affected countries' },
   rest_world: { label: 'Rest of world', description: 'Non-EU markets excluding affected countries' },
-  global: { label: 'Global', description: 'All 197 mapped publishing markets' },
+  global: { label: 'Global', description: 'Supported mapped publishing markets' },
 }
 
 const MEASURES: Record<WildfireAttentionMeasure, string> = {
@@ -226,7 +226,7 @@ function ScatterTooltip({
       <div><dt>Reported area</dt><dd>{formatArea(row.areaHectares)}</dd></div>
       <div><dt>Attention response</dt><dd>{formatResponse(row.response, measure, scale)}</dd></div>
       <div><dt>Severity benchmark</dt><dd>{formatResponse(row.expectedFromSeverity, measure, scale)}</dd></div>
-      <div><dt>Excess attention</dt><dd>{formatResponse(row.excessFromSeverity, measure, scale)}</dd></div>
+      <div><dt>Residual from area-only fit</dt><dd>{formatResponse(row.excessFromSeverity, measure, scale)}</dd></div>
     </dl>
   </div>
 }
@@ -320,7 +320,7 @@ export default function WildfireAttention({
         <label><span>Attention topic</span><select aria-label="Wildfire attention topic" value={topicMode} onChange={(event) => changeTopicMode(event.target.value as WildfireAttentionTopicMode)}><option value="both">Climate change and EVs</option>{Object.entries(TOPICS).map(([id, item]) => <option key={id} value={id}>{item.label}</option>)}</select><small>Both topics share one response scale; paired points are connected by fire.</small></label>
         <label><span>Attention measure</span><select aria-label="Wildfire attention measure" value={measure} onChange={(event) => onMeasureChange(event.target.value as WildfireAttentionMeasure)}>{Object.entries(MEASURES).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
         <label><span>Change shown</span><select aria-label="Wildfire change shown" value={scale} disabled={measure === 'political_share'} onChange={(event) => setScale(event.target.value as WildfireAttentionScale)}><option value="absolute">Added articles per day</option><option value="relative">Percentage from baseline</option></select><small>{measure === 'political_share' ? 'Political share is always shown in percentage points.' : scale === 'absolute' ? 'Best for identifying the largest volume changes.' : 'Better for comparing differently sized media markets.'}</small></label>
-        <label className="overlap-control"><input aria-label="Exclude overlapping wildfires" type="checkbox" checked={excludeOverlaps} onChange={(event) => onExcludeOverlapsChange(event.target.checked)} /><span>Exclude same-country overlapping events</span></label>
+        <label className="overlap-control"><input aria-label="Exclude overlapping wildfires" type="checkbox" checked={excludeOverlaps} onChange={(event) => onExcludeOverlapsChange(event.target.checked)} /><span>Exclude overlaps with Orange/Red events</span></label>
       </div>
       <div className="analysis-definition"><Info size={15} /><p><strong>Observed response, not causal effect.</strong> Each fire is compared with its own pre-event baseline. GDACS area is cumulative and may be revised after onset.</p></div>
     </aside>
@@ -357,14 +357,14 @@ export default function WildfireAttention({
                 </ScatterChart>
               </ResponsiveContainer>
             </div>
-            <div className="wildfire-benchmark-note"><Info size={15} /><p><strong>Severity-only benchmark.</strong> “Excess attention” is the residual from a simple line relating the response to log reported hectares within this filtered cohort.{topicMode === 'both' ? ' The benchmark is fitted separately for each topic.' : ''} It is descriptive, not an out-of-sample prediction.</p></div>
+            <div className="wildfire-benchmark-note"><Info size={15} /><p><strong>Severity-only benchmark.</strong> “Residual from area-only fit” is the residual from a simple line relating the response to log reported hectares within this filtered cohort.{topicMode === 'both' ? ' The benchmark is fitted separately for each topic.' : ''} It is descriptive, not an out-of-sample prediction.</p></div>
           </> : <div className="wildfire-chart-empty"><CircleAlert size={18} /><p>At least two eligible fires with hectare estimates are required for the severity comparison.</p></div>}
         </section>
 
         <section className="wildfire-ranking-card">
-          <div className="result-heading"><div><span className="eyebrow">Fire ranking</span><h3>{ranking === 'response' ? 'Largest observed attention increases' : 'Most attention beyond the severity benchmark'}</h3></div><label className="wildfire-ranking-select"><span>Rank by</span><select aria-label="Rank wildfires by" value={ranking} onChange={(event) => setRanking(event.target.value as typeof ranking)}><option value="response">Observed response</option><option value="excess">Excess versus severity</option></select></label></div>
+          <div className="result-heading"><div><span className="eyebrow">Fire ranking</span><h3>{ranking === 'response' ? 'Largest observed attention increases' : 'Largest residuals from the area-only fit'}</h3></div><label className="wildfire-ranking-select"><span>Rank by</span><select aria-label="Rank wildfires by" value={ranking} onChange={(event) => setRanking(event.target.value as typeof ranking)}><option value="response">Observed response</option><option value="excess">Residual from area-only fit</option></select></label></div>
           <div className="wildfire-ranking-table" role="table" aria-label="Ranked wildfire attention responses">
-            <div role="row"><span role="columnheader">Fire</span><span role="columnheader">Reported area</span><span role="columnheader">Response</span><span role="columnheader">Severity benchmark</span><span role="columnheader">Excess attention</span></div>
+            <div role="row"><span role="columnheader">Fire</span><span role="columnheader">Reported area</span><span role="columnheader">Response</span><span role="columnheader">Severity benchmark</span><span role="columnheader">Residual from area-only fit</span></div>
             {rankedRows.map((row) => <button role="row" key={`${row.event.id}:${row.effect.topicId}`} onClick={() => onOpenEvent(row.event.id)}><span role="cell"><strong>{eventLabel(row.event, geographyLabels)}</strong><small className="wildfire-row-topic"><i style={{ background: TOPICS[row.effect.topicId].color }} />{TOPICS[row.effect.topicId].label} · {row.event.alertLevel} · {new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(new Date(row.event.startAt))}</small></span><span role="cell">{formatArea(row.areaHectares)}</span><span role="cell"><b>{formatResponse(row.response, measure, scale)}</b></span><span role="cell">{formatResponse(row.expectedFromSeverity, measure, scale)}</span><span role="cell"><b className={(row.excessFromSeverity ?? 0) >= 0 ? 'positive' : 'negative'}>{formatResponse(row.excessFromSeverity, measure, scale)}</b><ArrowRight size={13} /></span></button>)}
           </div>
         </section>
