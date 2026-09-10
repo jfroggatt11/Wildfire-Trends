@@ -1,6 +1,6 @@
 # First improvement batch — 10 September 2026
 
-This implements the first correctness batch from [the repository review](REVIEW_2026-09-10.md). Changes are local; the live Supabase tables and hosted frontend have not been changed.
+This implements the first correctness batch from [the repository review](REVIEW_2026-09-10.md). The user pushed the frontend changes, and the corrected Supabase serving tables were refreshed and verified on 10 September 2026. Hosted browser rendering has not been independently checked.
 
 ## Changes
 
@@ -48,7 +48,17 @@ Before publishing this frontend, sync the daily table and both derived years tog
 .venv/bin/climate-attention sync-analysis-supabase --data-dir data --year 2026 --skip-build
 ```
 
-These commands are documented here and have not been executed against the remote database.
+The corresponding sync functions were executed against the configured Supabase project on 10 September 2026. Verification completed at 19:17:54 UTC.
+
+| Refreshed table | 2025 rows | 2026 rows | Total |
+|---|---:|---:|---:|
+| Event effects | 194,400 | 234,816 | 429,216 |
+| Daily event activity | 9,791 | 7,940 | 17,731 |
+| Regional daily attention | 1,388 | 956 | 2,344 |
+
+Daily attention was also refreshed: 230,884 rows from 394 partitions. Every daily-attention serving column and every derived-table serving column was compared with the local Parquet data. All rows matched; binary reads were used for derived floating-point values to avoid PostgreSQL text-output rounding during verification.
+
+All 17,580 observations with unsupported country mappings have null matched and political counts, the 15 unsupported markets match the manifest, and the known June/July 2025 outage contains no daily rows. The Philippines/Vietnam incomplete-coverage correction and the January 2026 cross-year overlap correction were verified. Read-only frontend REST requests returned the corrected unsupported counts and overlap flag. No schema migration was required.
 
 ## Remaining work
 
