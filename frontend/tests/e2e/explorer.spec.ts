@@ -266,6 +266,27 @@ test('data summary reports only MVP sources and their stored coverage dates', as
   expect(errors).toEqual([])
 })
 
+test('info page explains the project, evidence, interface, and roadmap', async ({ page }) => {
+  const errors = collectClientErrors(page)
+  await openExplorer(page)
+  await page.getByRole('button', { name: 'Info', exact: true }).click()
+
+  await expect(page.getByRole('heading', { name: 'How extreme events move climate attention.' })).toBeVisible()
+  await expect(page.locator('.info-snapshot')).toContainText('197')
+  await expect(page.locator('.info-snapshot')).toContainText('63')
+  await expect(page.getByRole('heading', { name: 'Six ways into the evidence.' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Spain stands out, with an overlap caveat.' })).toBeVisible()
+  await expect(page.locator('.info-country-list')).toContainText('Spain')
+  await expect(page.locator('.info-country-list')).toContainText('5 of 9 events')
+  await expect(page.getByRole('heading', { name: 'From exploratory atlas to attention intelligence.' })).toBeVisible()
+  await expect(page.locator('.info-roadmap-grid')).toContainText('Google Trends')
+  await expect(page.locator('.info-roadmap-grid')).toContainText('Bluesky')
+
+  await page.getByRole('button', { name: /Open the Analysis Lab/ }).click()
+  await expect(page.getByRole('heading', { name: 'Compare attention and event activity.' })).toBeVisible()
+  expect(errors).toEqual([])
+})
+
 test('analysis lab runs the major-event study for climate and electric vehicles', async ({ page }) => {
   const errors = collectClientErrors(page)
   await openExplorer(page)

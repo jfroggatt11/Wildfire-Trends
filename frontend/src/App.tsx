@@ -28,6 +28,7 @@ import {
 } from 'lucide-react'
 import type { AttentionChartPoint } from './AttentionChart'
 import type { EventStudyData } from './AnalysisLab'
+import InfoPage from './InfoPage'
 import {
   fetchAttentionWindow,
   fetchRegionAttention,
@@ -42,7 +43,7 @@ const AnalysisLab = lazy(() => import('./AnalysisLab'))
 type HazardType = 'wildfire' | 'flood'
 type AlertLevel = 'Green' | 'Orange' | 'Red'
 type MediaScope = 'affected' | 'eu27' | 'international' | 'global'
-type View = 'explore' | 'lab' | 'data' | 'methods'
+type View = 'explore' | 'lab' | 'info' | 'data' | 'methods'
 type DetailTab = 'attention' | 'coverage'
 type AttentionMode = 'all' | 'political'
 
@@ -348,6 +349,9 @@ function App() {
           <button className={view === 'lab' ? 'active' : ''} onClick={() => { setView('lab'); setMobileMenuOpen(false) }}>
             <Microscope size={16} /> Analysis Lab
           </button>
+          <button className={view === 'info' ? 'active' : ''} onClick={() => { setView('info'); setMobileMenuOpen(false) }}>
+            <Info size={16} /> Info
+          </button>
           <button className={view === 'data' ? 'active' : ''} onClick={() => { setView('data'); setMobileMenuOpen(false) }}>
             <Database size={16} /> Data
           </button>
@@ -386,6 +390,12 @@ function App() {
             onOpenEvent={(id) => { selectEvent(id); setView('explore') }}
           />
         </Suspense>
+      ) : view === 'info' && manifest ? (
+        <InfoPage
+          manifest={manifest}
+          studies={eventStudies}
+          onNavigate={(destination) => { setView(destination); setMobileMenuOpen(false) }}
+        />
       ) : view === 'data' && manifest ? (
         <DataSummary manifest={manifest} />
       ) : view === 'methods' ? (

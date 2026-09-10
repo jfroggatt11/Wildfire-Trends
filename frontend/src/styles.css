@@ -885,6 +885,9 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
 @keyframes spin { to { transform: rotate(360deg); } }
 
 @media (max-width: 1050px) {
+  .topbar { gap: 18px; }
+  .primary-nav button { padding-right: 10px; padding-left: 10px; }
+  .primary-nav button.active::after { right: 10px; left: 10px; }
   .explore-view { grid-template-columns: 286px minmax(0, 1fr); }
   .filter-panel { padding-left: 16px; padding-right: 16px; }
   .event-drawer { width: min(480px, calc(100vw - 286px)); }
