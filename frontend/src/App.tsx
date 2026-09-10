@@ -1,4 +1,4 @@
-import { Component, Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Component, Suspense, lazy, useCallback, createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { ErrorInfo, PointerEvent as ReactPointerEvent, ReactNode } from 'react'
 import { geoNaturalEarth1, geoPath } from 'd3-geo'
 import type { Feature, FeatureCollection, Geometry, Point } from 'geojson'
@@ -29,6 +29,8 @@ import {
 import type { AttentionChartPoint } from './AttentionChart'
 import type { EventStudyData } from './AnalysisLab'
 import InfoPage from './InfoPage'
+import { readAnalysisSelection, selectionUrl, summarizeEventComparison, lowBaseline } from './analysisEvidence'
+import type { AnalysisSelection } from './analysisEvidence'
 import { dailyEventPoints, eventDateRange } from './eventAttention'
 import {
   fetchAttentionWindow,
@@ -36,17 +38,19 @@ import {
   isSupabaseEnabled,
 } from './supabase'
 import type { RegionAttentionObservation, WindowQuery } from './supabase'
-import { dateWithinRange, formatDate, summarizeChange } from './utils'
+import { dateWithinRange, formatDate } from './utils'
+
+const AnalysisContext = createContext<{ selection: AnalysisSelection; update: (patch: Partial<AnalysisSelection>) => void; supportedMarkets: string[] }>(null!)
 
 const AttentionChart = lazy(() => import('./AttentionChart'))
 const AnalysisLab = lazy(() => import('./AnalysisLab'))
 
 type HazardType = 'wildfire' | 'flood'
 type AlertLevel = 'Green' | 'Orange' | 'Red'
-type MediaScope = 'affected' | 'eu27' | 'international' | 'global'
+type MediaScope = AnalysisSelection['scope']
 type View = 'explore' | 'lab' | 'info' | 'data' | 'methods'
 type DetailTab = 'attention' | 'coverage'
-type AttentionMode = 'all' | 'political'
+type AttentionMode = 'all' | 'political' | 'political_share'
 
 type EventProperties = {
   id: string
@@ -172,6 +176,8 @@ const EU27 = new Set([
 
 const SCOPE_COPY: Record<MediaScope, { label: string; description: string }> = {
   affected: { label: 'Affected countries', description: 'Outlets based in the event countries' },
+  other_eu27: { label: 'Other EU27', description: 'Supported EU publishing markets excluding affected countries' },
+  rest_world: { label: 'Rest of world', description: 'Supported non-EU publishing markets excluding affected countries' },
   eu27: { label: 'EU-27', description: 'Combined response from EU media markets' },
   international: { label: 'International', description: 'Outlets outside affected countries' },
   global: { label: 'Global', description: 'All available publishing markets' },
@@ -215,6 +221,8 @@ function withinWindow(value: string, event: EventProperties, days = 28) {
 
 function scopeAllows(geography: string, event: EventProperties, scope: MediaScope) {
   if (scope === 'affected') return event.geographyIds.includes(geography)
+  if (scope === 'other_eu27') return EU27.has(geography) && !event.geographyIds.includes(geography)
+  if (scope === 'rest_world') return !EU27.has(geography) && !event.geographyIds.includes(geography)
   if (scope === 'eu27') return geography === '__eu27__' || EU27.has(geography)
   if (scope === 'international') return !event.geographyIds.includes(geography)
   return true
@@ -298,7 +306,17 @@ function App() {
     const id = new URLSearchParams(window.location.search).get('event')
     return id
   })
-  const [scope, setScope] = useState<MediaScope>('affected')
+  const [selection, setSelection] = useState(() => readAnalysisSelection(window.location.search))
+  const scope = selection.scope
+  const updateSelection = (patch: Partial<AnalysisSelection>) => setSelection((current) => ({ ...current, ...patch }))
+  const setScope = (scope: MediaScope) => updateSelection({ scope })
+  const supportedMarkets = useMemo(() => {
+    const unsupported = manifest?.dataSources.find((source) => source.id === 'gdelt_ngrams')?.unsupportedGeographies ?? []
+    return Object.keys(manifest?.geographyLabels ?? {}).filter((id) => !unsupported.includes(id))
+  }, [manifest])
+  useEffect(() => {
+    try { window.history.replaceState({}, '', selectionUrl(window.location.href, selectedId, selection)) } catch { /* Embedded previews may reject history updates. */ }
+  }, [selectedId, selection])
   const [detailTab, setDetailTab] = useState<DetailTab>('attention')
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
@@ -310,15 +328,6 @@ function App() {
   const selectEvent = (id: string | null) => {
     setSelectedId(id)
     setDetailTab('attention')
-    try {
-      const url = new URL(window.location.href)
-      if (id) url.searchParams.set('event', id)
-      else url.searchParams.delete('event')
-      window.history.replaceState({}, '', url)
-    } catch {
-      // Sandboxed and embedded previews can expose an opaque origin that rejects
-      // History API updates. Event selection must remain fully functional there.
-    }
   }
 
   if (error) {
@@ -332,6 +341,7 @@ function App() {
   }
 
   return (
+    <AnalysisContext.Provider value={{ selection, update: updateSelection, supportedMarkets }}>
     <div className="app-shell">
       <header className="topbar">
         <button className="brand" onClick={() => setView('explore')} aria-label="Open map explorer">
@@ -386,7 +396,7 @@ function App() {
             geographyLabels={manifest?.geographyLabels ?? {}}
             eventGeographies={[...new Set(events?.features.flatMap((event) => event.properties.geographyIds) ?? [])]}
             catalogueEvents={events?.features.map((event) => event.properties) ?? []}
-            onOpenEvent={(id) => { selectEvent(id); setView('explore') }}
+            onOpenEvent={(id, specification) => { updateSelection(specification); selectEvent(id); setView('explore') }}
           />
         </Suspense>
       ) : view === 'info' && manifest ? (
@@ -403,6 +413,7 @@ function App() {
         <LoadingView />
       )}
     </div>
+    </AnalysisContext.Provider>
   )
 }
 
@@ -950,10 +961,12 @@ function EventDrawer({
   const wildfireAreaHectares = event.hazardType === 'wildfire' && event.severityUnit?.toLowerCase() === 'ha'
     ? event.severity
     : null
-  const [attentionMode, setAttentionMode] = useState<AttentionMode>('all')
-  const remoteAttention = useRemoteAttention(event, scope, tab === 'coverage')
+  const { selection, update, supportedMarkets } = useContext(AnalysisContext)
+  const attentionMode: AttentionMode = selection.measure === 'matched' ? 'all' : selection.measure
+  const setAttentionMode = (mode: AttentionMode) => update({ measure: mode === 'all' ? 'matched' : mode })
+  const remoteAttention = useRemoteAttention(event, scope, tab === 'coverage', supportedMarkets)
   const chartRows = isSupabaseEnabled() ? remoteAttention.rows : attention
-  const chart = useMemo(() => buildEventChart(event, chartRows, scope, attentionMode), [event, chartRows, scope, attentionMode])
+  const chart = useMemo(() => buildEventChart(event, chartRows, scope, attentionMode, supportedMarkets, selection.topic), [event, chartRows, scope, attentionMode, supportedMarkets, selection.topic])
   const coverageRows = useMemo(() => eventAttentionRows(event, chartRows, scope), [event, chartRows, scope])
   const locationLabel = [event.mapRegionLabel, event.mapCountryLabel].filter(Boolean).join(', ') || 'Offshore or unavailable'
   const affectedLabels = event.geographyIds.map((id) => geographyLabel(id, geographyLabels))
@@ -1043,10 +1056,15 @@ function aggregateAttentionRows(rows: AttentionRow[], markets: string[]) {
   return totals
 }
 
-async function fetchAggregateAttention(event: EventProperties, scope: MediaScope) {
+async function fetchAggregateAttention(event: EventProperties, scope: MediaScope, supportedMarkets: string[]) {
   const { start, end } = eventWindow(event)
   const startDate = start.toISOString().slice(0, 10)
   const endDate = end.toISOString().slice(0, 10)
+  if (scope === 'other_eu27' || scope === 'rest_world') {
+    const geographies = supportedMarkets.filter((id) => scopeAllows(id, event, scope))
+    if (!geographies.length) return []
+    return fetchAttentionWindow({ ...remoteWindowQuery(event, scope), geographies })
+  }
   if (scope === 'affected') return fetchAttentionWindow(remoteWindowQuery(event, scope))
   if (scope === 'global' || scope === 'eu27') {
     const region = scope === 'global' ? 'global' : 'eu27'
@@ -1075,7 +1093,7 @@ async function fetchAggregateAttention(event: EventProperties, scope: MediaScope
   })
 }
 
-function useRemoteAttention(event: EventProperties, scope: MediaScope, detailed: boolean) {
+function useRemoteAttention(event: EventProperties, scope: MediaScope, detailed: boolean, supportedMarkets: string[]) {
   const [rows, setRows] = useState<AttentionRow[]>([])
   const [loading, setLoading] = useState(isSupabaseEnabled())
   const [error, setError] = useState<string | null>(null)
@@ -1086,8 +1104,8 @@ function useRemoteAttention(event: EventProperties, scope: MediaScope, detailed:
     setLoading(true)
     setError(null)
     const request = detailed
-      ? fetchAttentionWindow(remoteWindowQuery(event, scope))
-      : fetchAggregateAttention(event, scope)
+      ? fetchAttentionWindow({ ...remoteWindowQuery(event, scope), ...(['other_eu27', 'rest_world'].includes(scope) ? { geographies: supportedMarkets.filter((id) => scopeAllows(id, event, scope)) } : {}) })
+      : fetchAggregateAttention(event, scope, supportedMarkets)
     request
       .then((result) => {
         if (active) setRows(result)
@@ -1102,7 +1120,7 @@ function useRemoteAttention(event: EventProperties, scope: MediaScope, detailed:
         if (active) setLoading(false)
       })
     return () => { active = false }
-  }, [detailed, event, scope])
+  }, [detailed, event, scope, supportedMarkets])
 
   return { rows, loading, error }
 }
@@ -1126,14 +1144,26 @@ function eventAttentionRows(event: EventProperties, attention: AttentionRow[], s
   )
 }
 
-function buildEventChart(event: EventProperties, attention: AttentionRow[], scope: MediaScope, mode: AttentionMode): ChartResult {
+export function buildEventChart(event: EventProperties, attention: AttentionRow[], scope: MediaScope, mode: AttentionMode, supportedMarkets: string[], topic: AnalysisSelection['topic']): ChartResult {
   const relevant = eventAttentionRows(event, attention, scope)
   const { start, end } = eventWindow(event)
-  const markets = scope === 'affected' ? event.geographyIds : [...new Set(relevant.map((row) => row.geography))]
+  const markets = scope === 'affected' ? event.geographyIds : ['other_eu27', 'rest_world'].includes(scope) ? supportedMarkets.filter((id) => scopeAllows(id, event, scope)) : [...new Set(relevant.map((row) => row.geography))]
   const points = dailyEventPoints(relevant, markets, TOPICS.map((topic) => topic.id),
     start.toISOString().slice(0, 10), end.toISOString().slice(0, 10), event.startAt,
-    mode === 'political' ? 'politicalCount' : 'matchedCount')
-  const observed = points.filter((point) => TOPICS.every((topic) => typeof point[topic.id] === 'number'))
+    mode === 'all' ? 'matchedCount' : 'politicalCount')
+  const matched = dailyEventPoints(relevant, markets, TOPICS.map((topic) => topic.id), start.toISOString().slice(0, 10), end.toISOString().slice(0, 10), event.startAt, 'matchedCount')
+  points.forEach((point, index) => {
+    for (const topic of TOPICS) {
+      point[`${topic.id}_matched`] = matched[index][topic.id]
+      if (mode === 'political_share') {
+        point[`${topic.id}_political`] = point[topic.id]
+        const denominator = matched[index][topic.id]
+        const numerator = point[topic.id]
+        point[topic.id] = typeof numerator === 'number' && typeof denominator === 'number' && denominator > 0 ? numerator / denominator * 100 : null
+      }
+    }
+  })
+  const observed = points.filter((point) => typeof point[topic] === 'number')
   return {
     points,
     coverageDays: observed.length,
@@ -1147,12 +1177,13 @@ function AttentionModeToggle({ mode, onChange }: { mode: AttentionMode; onChange
     <div className="attention-mode-toggle" role="group" aria-label="Attention measure">
       <button className={mode === 'all' ? 'active' : ''} aria-pressed={mode === 'all'} onClick={() => onChange('all')}>All articles</button>
       <button className={mode === 'political' ? 'active' : ''} aria-pressed={mode === 'political'} onClick={() => onChange('political')}>Political only</button>
+      <button className={mode === 'political_share' ? 'active' : ''} aria-pressed={mode === 'political_share'} onClick={() => onChange('political_share')}>Political share</button>
     </div>
   )
 }
 
 function AttentionTab({ event, chart, scope, onScopeChange, mode, onModeChange, loading, error }: { event: EventProperties; chart: ChartResult; scope: MediaScope; onScopeChange: (scope: MediaScope) => void; mode: AttentionMode; onModeChange: (mode: AttentionMode) => void; loading: boolean; error: string | null }) {
-  const enoughData = chart.preDays >= 7 && chart.postDays >= 7
+  const { selection } = useContext(AnalysisContext)
   return (
     <>
       <div className="tab-toolbar">
@@ -1161,8 +1192,8 @@ function AttentionTab({ event, chart, scope, onScopeChange, mode, onModeChange, 
       </div>
       <section className="drawer-section chart-section">
         <span className="eyebrow">Article attention</span>
-        <h3>{mode === 'political' ? 'Political topic coverage' : 'Topic coverage'} around the event</h3>
-        <p className="muted-copy">{mode === 'political' ? 'Distinct matched URLs containing a political actor, government action, party-politics or official-source signal' : 'Distinct matched URLs'} published by outlets in {SCOPE_COPY[scope].label.toLowerCase()}.</p>
+        <h3>{mode === 'political_share' ? 'Political share of topic coverage' : mode === 'political' ? 'Political topic coverage' : 'Topic coverage'} around the event</h3>
+        <p className="muted-copy">{mode === 'political_share' ? 'Percentage of matched URLs with a political signal' : mode === 'political' ? 'Distinct matched URLs containing a political actor, government action, party-politics or official-source signal' : 'Distinct matched URLs'} published by outlets in {SCOPE_COPY[scope].label.toLowerCase()}.</p>
         <AttentionModeToggle mode={mode} onChange={onModeChange} />
         <div className="chart-wrap">
           {loading ? (
@@ -1174,7 +1205,8 @@ function AttentionTab({ event, chart, scope, onScopeChange, mode, onModeChange, 
                 eventDuration={Math.max(0, dayDifference(event.endAt, event.startAt))}
                 eventStartLabel={formatDate(event.startAt)}
                 eventEndLabel={formatDate(event.endAt)}
-                topics={TOPICS}
+                topics={TOPICS.filter((topic) => topic.id === selection.topic)}
+                unit={mode === 'political_share' ? '%' : 'URLs'}
               />
             </Suspense>
           ) : (
@@ -1182,81 +1214,57 @@ function AttentionTab({ event, chart, scope, onScopeChange, mode, onModeChange, 
           )}
         </div>
         {error && <div className="inline-note"><CircleAlert size={15} /><span>{error}</span></div>}
-        {!enoughData && (
-          <div className="inline-note"><Info size={15} /><span>Only {chart.coverageDays} day{chart.coverageDays === 1 ? '' : 's'} of this window are present. At least seven pre- and post-event days are required for an MVP estimate.</span></div>
-        )}
       </section>
       <BeforeAfterAnalysis event={event} chart={chart} mode={mode} />
     </>
   )
 }
 
-const shiftDate = (value: string, days: number) => {
-  const result = new Date(`${value.slice(0, 10)}T00:00:00Z`)
-  result.setUTCDate(result.getUTCDate() + days)
-  return result.toISOString().slice(0, 10)
-}
-
 function BeforeAfterAnalysis({ event, chart, mode }: { event: EventProperties; chart: ChartResult; mode: AttentionMode }) {
-  const [windowDays, setWindowDays] = useState(7)
+  const { selection, update } = useContext(AnalysisContext)
+  const { windowDays, timing } = selection
+  const setWindowDays = (windowDays: number) => update({ windowDays })
   const evaluations = useMemo(() => {
-    const byDate = new Map(chart.points.map((point) => [point.date, point]))
-    const beforeDates = Array.from({ length: windowDays }, (_, index) => shiftDate(event.startAt, index - windowDays))
-    const afterDates = Array.from({ length: windowDays }, (_, index) => shiftDate(event.endAt, index + 1))
-    const collect = (dates: string[], topicId: string) => {
-      const values: number[] = []
-      const missing: string[] = []
-      for (const date of dates) {
-        const value = byDate.get(date)?.[topicId]
-        if (typeof value === 'number') values.push(value)
-        else missing.push(date)
-      }
-      return { values, missing }
-    }
-    return TOPICS.map((topic) => {
-      const before = collect(beforeDates, topic.id)
-      const after = collect(afterDates, topic.id)
-      return {
-        topic,
-        before,
-        after,
-        result: before.missing.length || after.missing.length ? null : summarizeChange(before.values, after.values),
-      }
-    })
-  }, [chart.points, event.endAt, event.startAt, windowDays])
+    return TOPICS.filter((topic) => topic.id === selection.topic).map((topic) => ({
+      topic,
+      ...summarizeEventComparison(chart.points, event.startAt, event.endAt, selection),
+    }))
+  }, [chart.points, event.endAt, event.startAt, windowDays, timing, mode, selection.topic])
 
   return (
     <section className="drawer-section before-after-analysis" aria-live="polite">
       <div className="before-after-heading">
         <div><span className="eyebrow">Before / after</span><h3>Did attention increase?</h3></div>
+        <label><span>Topic</span><select value={selection.topic} onChange={(event) => update({ topic: event.target.value as AnalysisSelection['topic'] })}>{TOPICS.map((topic) => <option key={topic.id} value={topic.id}>{topic.label}</option>)}</select></label>
+        <label><span>Timing</span><select value={timing} onChange={(event) => update({ timing: event.target.value as AnalysisSelection['timing'] })}><option value="onset">From event onset</option><option value="persistence">After event end</option></select></label>
         <label><span>Comparison window</span><select value={windowDays} onChange={(event) => setWindowDays(Number(event.target.value))}><option value={7}>7 days</option><option value={14}>14 days</option><option value={28}>28 days</option></select></label>
       </div>
-      <p className="muted-copy">Mean daily {mode === 'political' ? 'politically flagged ' : ''}matched URLs before and after the event, using complete days only.</p>
+      <p className="muted-copy">{mode === 'political_share' ? 'Political URLs as a percentage of all matched URLs in each period' : `Mean daily ${mode === 'political' ? 'politically flagged ' : ''}matched URLs`}. Baseline: {windowDays} days before onset. Comparison: {windowDays} days {timing === 'onset' ? 'starting on the onset date (day 0 included)' : 'starting the day after event end'}. Complete windows required.</p>
       <div className="before-after-grid">
-        {evaluations.map(({ topic, before, after, result }) => {
+        {evaluations.map(({ topic, before, after, result, baselineTotal, comparisonTotal }) => {
           const status = !result ? 'unavailable' : 'descriptive'
-          const verdict = !result ? 'Not testable' : result.difference > 0
+          const verdict = !result ? 'Unavailable' : result.difference > 0
             ? 'Observed increase' : result.difference < 0 ? 'Observed decrease' : 'No observed change'
           return (
             <article key={topic.id} className="before-after-card" data-topic={topic.id} data-test-status={status}>
               <header><i style={{ background: topic.color }} /><strong>{topic.label}</strong><span>{verdict}</span></header>
               {!result ? (
-                <p className="before-after-unavailable"><CircleAlert size={14} /> Missing {before.missing.length} before and {after.missing.length} after day{after.missing.length === 1 ? '' : 's'}.</p>
+                <p className="before-after-unavailable"><CircleAlert size={14} /> {before.missing.length || after.missing.length ? `Missing ${before.missing.length} baseline and ${after.missing.length} comparison days.` : 'Share unavailable: missing or zero matched-URL denominator.'}</p>
               ) : (
                 <>
                   <div className="before-after-values">
-                    <span><small>Before</small><b>{result.beforeMean.toFixed(1)}</b><em>URLs/day</em></span>
-                    <span><small>After</small><b>{result.afterMean.toFixed(1)}</b><em>URLs/day</em></span>
-                    <span className="change"><small>Change</small><b>{result.difference > 0 ? '+' : ''}{result.difference.toFixed(1)}</b><em>{result.percentChange == null ? 'zero baseline' : `${result.percentChange > 0 ? '+' : ''}${result.percentChange.toFixed(0)}%`}</em></span>
+                    <span><small>Before</small><b>{result.beforeMean.toFixed(mode === 'political_share' ? 1 : 2)}</b><em>{mode === 'political_share' ? '%' : 'URLs/day'}</em></span>
+                    <span><small>After</small><b>{result.afterMean.toFixed(mode === 'political_share' ? 1 : 2)}</b><em>{mode === 'political_share' ? '%' : 'URLs/day'}</em></span>
+                    <span className="change"><small>Change</small><b>{result.difference > 0 ? '+' : ''}{result.difference.toFixed(mode === 'political_share' ? 1 : 2)}</b><em>{mode === 'political_share' ? 'percentage points' : result.percentChange == null ? 'zero baseline' : `${result.percentChange > 0 ? '+' : ''}${result.percentChange.toFixed(0)}%`}</em></span>
                   </div>
-                  <p className="before-after-test">Descriptive change · {windowDays} complete days in each period</p>
+                  <p className="before-after-test">Descriptive change · {windowDays} complete days in each period · {baselineTotal.toFixed(0)} baseline → {comparisonTotal.toFixed(0)} comparison {mode === 'political_share' ? 'matched ' : ''}URLs{lowBaseline(baselineTotal) ? ' · Low baseline (<20 URLs)' : ''}</p>
                 </>
               )}
             </article>
           )
         })}
       </div>
-      <div className="inline-note association-note"><Info size={15} /><span>These are observed changes in publishing, not statistical or causal verdicts. Small baseline counts can produce large percentages. Inference requires a validated comparison design that accounts for time dependence, overlapping events and multiple testing.</span></div>
+      <div className="inline-note association-note"><Info size={15} /><span>These are observed changes in publishing, not statistical or causal verdicts. Small baseline counts can produce large percentages. “Low baseline” marks fewer than 20 URLs in the baseline period; it is a display flag, not a significance threshold. Inference requires a validated comparison design that accounts for time dependence, overlapping events and multiple testing.</span></div>
     </section>
   )
 }
@@ -1678,7 +1686,7 @@ function MethodsView({ manifest }: { manifest: Manifest | null }) {
           </section>
 
           <section className="protocol-section" id="geography">
-            <header><span>06</span><div><small>Location rules</small><h2>Three geographies, four media scopes</h2></div></header>
+            <header><span>06</span><div><small>Location rules</small><h2>Geography and media scopes</h2></div></header>
             <p className="protocol-lede">The most important geographic distinction is between where an event happened and where a publishing outlet is based.</p>
             <div className="geography-diagram" aria-label="Relationship between provider-affected countries, event map point and publishing outlet country">
               <article><span className="geo-symbol event"><MapPin size={17} /></span><small>Provider geography</small><strong>Affected countries</strong><p>Used for affected-country and international media scopes.</p></article>
@@ -1694,7 +1702,7 @@ function MethodsView({ manifest }: { manifest: Manifest | null }) {
               <div role="row"><strong role="cell">International</strong><span role="cell">Outlet country is not in the affected-country array.</span><span role="cell">External response, including EU outlets where applicable.</span></div>
               <div role="row"><strong role="cell">Global</strong><span role="cell">Every available mapped publishing market.</span><span role="cell">Total indexed response in the exported data.</span></div>
             </div>
-            <p className="method-caption"><strong>Analysis Lab comparison groups.</strong> To prevent overlap between pooled geographic estimates, the Lab separates affected countries, other EU27 countries and the rest of the world. Global remains an all-market summary. Explore retains the broader EU27 and international scopes above for single-event inspection.</p>
+            <p className="method-caption"><strong>Analysis Lab comparison groups.</strong> To prevent overlap between pooled geographic estimates, the Lab separates affected countries, other EU27 countries and the rest of the world. Global remains an all-market summary. Explore supports these same groups when opening a Lab result, alongside the broader EU27 and international scopes.</p>
             <p className="method-caption"><strong>Boundary note.</strong> Natural Earth provides a display and validation layer, not the event definition. Its default Admin-0 countries reflect de facto cartographic boundaries, which may differ from legal or political claims.</p>
           </section>
 
@@ -1720,9 +1728,9 @@ function MethodsView({ manifest }: { manifest: Manifest | null }) {
               <div className="window-event"><span>Event duration</span><strong>Excluded</strong><small>Start through end date</small></div>
               <div className="window-after"><span>7, 14 or 28 days</span><strong>After mean</strong><small>Days beginning immediately after the end</small></div>
             </div>
-            <p className="method-caption"><strong>Two Lab timings.</strong> Onset response begins on the event start date and captures the immediate reaction. Persistence begins after the event end date and asks whether attention remains elevated. Both use the selected 7-, 14- or 28-day pre-event baseline.</p>
+            <p className="method-caption"><strong>Two comparison timings.</strong> Onset response begins on the event start date and captures the immediate reaction. Persistence begins after the event end date and asks whether attention remains elevated. Both use the selected 7-, 14- or 28-day pre-event baseline.</p>
             <div className="test-output-grid">
-              <article><small>Event effect</small><strong>Post mean relative to its own baseline</strong><p>All and political volume use percentage change. Political share uses percentage-point change.</p></article>
+              <article><small>Event effect</small><strong>Post mean relative to its own baseline</strong><p>All and political volume use percentage change. Political share uses percentage-point change, calculated from the ratio of political to matched URL totals within each period.</p></article>
               <article><small>Lab aggregation</small><strong>Median event response</strong><p>The middle event is the headline result; the interquartile range shows the middle half of event estimates.</p></article>
               <article><small>Single-event comparison</small><strong>Observed change in URLs/day</strong><p>Explore reports before/after means and absolute and percentage changes. Statistical verdicts are withheld until a time-aware inferential design is validated.</p></article>
             </div>

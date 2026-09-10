@@ -46,11 +46,13 @@ function ChartTooltip({
   payload,
   label,
   eventDuration,
+  unit,
 }: {
   active?: boolean
   payload?: TooltipEntry[]
   label?: number
   eventDuration: number
+  unit: string
 }) {
   if (!active || !payload?.length) return null
   return (
@@ -62,7 +64,7 @@ function ChartTooltip({
           <span key={item.name}>
             <i style={{ background: item.color }} />
             {item.name}
-            <b>{item.value}</b>
+            <b>{unit === '%' ? item.value.toFixed(1) : item.value} {unit}</b>
           </span>
         ))}
     </div>
@@ -75,12 +77,14 @@ export default function AttentionChart({
   eventStartLabel,
   eventEndLabel,
   topics,
+  unit = 'URLs',
 }: {
   points: AttentionChartPoint[]
   eventDuration: number
   eventStartLabel: string
   eventEndLabel: string
   topics: TopicDefinition[]
+  unit?: string
 }) {
   const singleDayEvent = eventDuration === 0
   return (
@@ -94,8 +98,8 @@ export default function AttentionChart({
           tick={{ fontSize: 11 }}
           tickFormatter={(value) => (value === 0 ? 'Event' : `${value > 0 ? '+' : ''}${value}d`)}
         />
-        <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-        <Tooltip content={<ChartTooltip eventDuration={eventDuration} />} />
+        <YAxis tick={{ fontSize: 11 }} allowDecimals={false} tickFormatter={(value) => `${value}${unit === '%' ? '%' : ''}`} />
+        <Tooltip content={<ChartTooltip eventDuration={eventDuration} unit={unit} />} />
         <Legend iconType="circle" wrapperStyle={{ fontSize: 11, paddingTop: 10 }} />
         {!singleDayEvent && <ReferenceArea x1={0} x2={eventDuration} fill="#e9c98a" fillOpacity={0.25} />}
         <ReferenceLine

@@ -1,3 +1,4 @@
+import { windowSensitivity } from './analysisEvidence'
 import { useMemo } from 'react'
 import {
   ArrowRight,
@@ -163,13 +164,10 @@ export default function InfoPage({
           </div>
 
           <div className="info-country-panel">
-            <div className="info-country-copy"><span className="eyebrow">Sensitivity to the window</span><h3>Does the pattern hold at 7, 14 and 28 days?</h3><p>Each estimate uses eligible major events with complete affected-market climate counts and excludes overlaps with Orange/Red events. Changing the window also changes the cohort.</p></div>
+            <div className="info-country-copy"><span className="eyebrow">Sensitivity to the window</span><h3>Does the pattern hold at 7, 14 and 28 days?</h3><p>Affected-market climate counts at onset, excluding Orange/Red overlaps. Compare each window’s eligible events with the same events eligible at all three windows.</p></div>
             <div className="info-country-list">{studies.map((study) => <article key={study.studyYear}>
               <strong>{study.studyYear}</strong>
-              {[7, 14, 28].map((window) => {
-                const result = pooledClimateResult(study, window)
-                return <p key={window}>{window} days: {formatPercent(result.value)} · {result.count} events</p>
-              })}
+              {windowSensitivity(study.effects.filter((effect) => effect.scope === 'affected' && effect.topicId === 'climate_change' && effect.timing === 'onset'), [7, 14, 28], 'matched').map((row) => <p key={row.windowDays}><strong>{row.windowDays} days</strong> · all eligible: {formatPercent(row.median)} (n={row.count})<br />Same events: {formatPercent(row.fixedMedian)} (n={row.fixedCount})</p>)}
             </article>)}</div>
           </div>
           <div className="info-caution"><ShieldCheck size={17} /><p><strong>Interpret carefully.</strong> These are small, changing samples and 2026 is partial. Differences across years or windows are not causal effects or an estimated trend. Low baseline URL counts can produce large percentage changes.</p></div>

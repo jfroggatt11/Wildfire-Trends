@@ -1023,3 +1023,16 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+/* Evidence remains readable when estimates include their count denominators. */
+.window-sensitivity { padding: 20px; margin: 18px 0; background: #fff; border: 1px solid var(--border); border-radius: 12px; overflow-x: auto; }
+.window-sensitivity h3 { margin: 0 0 8px; }
+.window-sensitivity p, .country-comparison > .muted-copy { font-size: 12px; line-height: 1.6; }
+.window-sensitivity table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.window-sensitivity th, .window-sensitivity td { padding: 10px; text-align: left; border-bottom: 1px solid #e4e9e5; }
+.ranked-event-table .count-evidence, .wildfire-ranking-table .count-evidence { display: block; white-space: normal; color: #52655b; font-size: 11px; line-height: 1.5; margin-top: 5px; }
+.ranked-event-table > div, .ranked-event-table > button { grid-template-columns: minmax(140px, 1.3fr) 65px 65px minmax(220px, 2fr); }
+.wildfire-ranking-table > div, .wildfire-ranking-table > button { grid-template-columns: minmax(140px, 1.3fr) 75px minmax(200px, 1.7fr) 95px 95px; }
+.before-after-heading { flex-wrap: wrap; gap: 12px; }
+.before-after-grid { grid-template-columns: 1fr; }
+.before-after-heading label { min-width: 120px; }

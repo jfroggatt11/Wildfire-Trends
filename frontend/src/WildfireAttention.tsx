@@ -1,3 +1,5 @@
+import { countEvidence } from './analysisEvidence'
+import type { AnalysisSelection } from './analysisEvidence'
 import { useMemo, useState } from 'react'
 import { ArrowRight, CircleAlert, Flame, Info } from 'lucide-react'
 import {
@@ -37,6 +39,10 @@ export type WildfireAttentionEffect = {
   timing: 'onset' | 'persistence'
   complete: boolean
   overlap: boolean
+  matchedPreMean?: number | null
+  matchedPostMean?: number | null
+  politicalPreMean?: number | null
+  politicalPostMean?: number | null
   matchedChange: number | null
   matchedPercentChange: number | null
   politicalChange: number | null
@@ -228,6 +234,7 @@ function ScatterTooltip({
       <div><dt>Severity benchmark</dt><dd>{formatResponse(row.expectedFromSeverity, measure, scale)}</dd></div>
       <div><dt>Residual from area-only fit</dt><dd>{formatResponse(row.excessFromSeverity, measure, scale)}</dd></div>
     </dl>
+    <p className="count-evidence">{countEvidence(row.effect, measure)}</p>
   </div>
 }
 
@@ -268,7 +275,7 @@ export default function WildfireAttention({
   onExcludeOverlapsChange: (value: boolean) => void
   remoteLoading: boolean
   remoteError: string | null
-  onOpenEvent: (id: string) => void
+  onOpenEvent: (id: string, selection: AnalysisSelection) => void
 }) {
   const [scale, setScale] = useState<WildfireAttentionScale>('absolute')
   const [ranking, setRanking] = useState<'response' | 'excess'>('response')
@@ -365,7 +372,7 @@ export default function WildfireAttention({
           <div className="result-heading"><div><span className="eyebrow">Fire ranking</span><h3>{ranking === 'response' ? 'Largest observed attention increases' : 'Largest residuals from the area-only fit'}</h3></div><label className="wildfire-ranking-select"><span>Rank by</span><select aria-label="Rank wildfires by" value={ranking} onChange={(event) => setRanking(event.target.value as typeof ranking)}><option value="response">Observed response</option><option value="excess">Residual from area-only fit</option></select></label></div>
           <div className="wildfire-ranking-table" role="table" aria-label="Ranked wildfire attention responses">
             <div role="row"><span role="columnheader">Fire</span><span role="columnheader">Reported area</span><span role="columnheader">Response</span><span role="columnheader">Severity benchmark</span><span role="columnheader">Residual from area-only fit</span></div>
-            {rankedRows.map((row) => <button role="row" key={`${row.event.id}:${row.effect.topicId}`} onClick={() => onOpenEvent(row.event.id)}><span role="cell"><strong>{eventLabel(row.event, geographyLabels)}</strong><small className="wildfire-row-topic"><i style={{ background: TOPICS[row.effect.topicId].color }} />{TOPICS[row.effect.topicId].label} · {row.event.alertLevel} · {new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(new Date(row.event.startAt))}</small></span><span role="cell">{formatArea(row.areaHectares)}</span><span role="cell"><b>{formatResponse(row.response, measure, scale)}</b></span><span role="cell">{formatResponse(row.expectedFromSeverity, measure, scale)}</span><span role="cell"><b className={(row.excessFromSeverity ?? 0) >= 0 ? 'positive' : 'negative'}>{formatResponse(row.excessFromSeverity, measure, scale)}</b><ArrowRight size={13} /></span></button>)}
+            {rankedRows.map((row) => <button role="row" key={`${row.event.id}:${row.effect.topicId}`} onClick={() => onOpenEvent(row.event.id, { topic: row.effect.topicId, scope, measure, windowDays, timing: 'onset' })}><span role="cell"><strong>{eventLabel(row.event, geographyLabels)}</strong><small className="wildfire-row-topic"><i style={{ background: TOPICS[row.effect.topicId].color }} />{TOPICS[row.effect.topicId].label} · {row.event.alertLevel} · {new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(new Date(row.event.startAt))}</small></span><span role="cell">{formatArea(row.areaHectares)}</span><span role="cell"><b>{formatResponse(row.response, measure, scale)}</b><small className="count-evidence">{countEvidence(row.effect, measure)}</small></span><span role="cell">{formatResponse(row.expectedFromSeverity, measure, scale)}</span><span role="cell"><b className={(row.excessFromSeverity ?? 0) >= 0 ? 'positive' : 'negative'}>{formatResponse(row.excessFromSeverity, measure, scale)}</b><ArrowRight size={13} /></span></button>)}
           </div>
         </section>
       </>}

@@ -16,6 +16,8 @@ import AttentionTimeline from './AttentionTimeline'
 import WildfireAttention from './WildfireAttention'
 import { fetchEventEffects, isSupabaseEnabled } from './supabase'
 import type { EventEffectObservation } from './supabase'
+import { countEvidence, windowSensitivity } from './analysisEvidence'
+import type { AnalysisSelection } from './analysisEvidence'
 import { fromUtcDay, inclusiveDays, toUtcDay } from './analysisTime'
 
 type HazardType = 'wildfire' | 'flood'
@@ -182,7 +184,7 @@ function eventLabel(event: StudyEvent, labels: Record<string, string>) {
   return country || event.name
 }
 
-function buildTimeline(
+export function buildTimeline(
   study: EventStudyData,
   includedEffects: StudyEffect[],
   topic: TopicId,
@@ -196,10 +198,9 @@ function buildTimeline(
     const effect = effects.get(series.eventId)
     if (series.topicId !== topic || series.scope !== scope || series.timing !== timing || !effect) continue
     const rawValue = ([, matched, political]: StudySeries['points'][number]) => {
-      if (matched == null || political == null) return null
       if (measure === 'matched') return matched
       if (measure === 'political') return political
-      return matched ? (political / matched) * 100 : null
+      return matched && political != null ? (political / matched) * 100 : null
     }
     const baseline = measure === 'matched'
       ? effect.matchedPreMean
@@ -216,9 +217,11 @@ function buildTimeline(
       valuesByDay.set(point[0], bucket)
     }
   }
-  return [...valuesByDay.entries()]
-    .sort(([left], [right]) => left - right)
-    .map(([day, values]) => ({ day, median: median(values), events: values.length }))
+  return Array.from({ length: 57 }, (_, index) => {
+    const day = index - 28
+    const values = valuesByDay.get(day) ?? []
+    return { day, median: median(values), events: values.length }
+  })
 }
 
 function StudyTimeline({ points, measure, timing }: { points: ReturnType<typeof buildTimeline>; measure: LabMeasure; timing: LabTiming }) {
@@ -227,12 +230,17 @@ function StudyTimeline({ points, measure, timing }: { points: ReturnType<typeof 
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={points} margin={{ top: 12, right: 16, bottom: 3, left: 0 }}>
           <CartesianGrid stroke="#dce4df" strokeDasharray="3 5" vertical={false} />
-          <XAxis dataKey="day" tickFormatter={(value) => value === 0 ? (timing === 'onset' ? 'Start' : 'End +1') : `${value > 0 ? '+' : ''}${value}d`} tick={{ fontSize: 9, fill: '#738179' }} />
+          <XAxis dataKey="day" type="number" domain={[-28, 28]} tickFormatter={(value) => value === 0 ? (timing === 'onset' ? 'Start' : 'End +1') : `${value > 0 ? '+' : ''}${value}d`} tick={{ fontSize: 9, fill: '#738179' }} />
           <YAxis width={45} tickFormatter={(value) => `${value > 0 ? '+' : ''}${Math.round(value)}${measure === 'political_share' ? '' : '%'}`} tick={{ fontSize: 9, fill: '#738179' }} />
-          <Tooltip formatter={(value) => [formatEffect(Number(value), measure, 1), 'Median change']} labelFormatter={(day) => Number(day) === 0 ? (timing === 'onset' ? 'Event starts' : 'First day after event end') : `Relative day ${Number(day) > 0 ? '+' : ''}${day}`} />
+          <Tooltip content={({ active, payload, label }) => {
+            if (!active) return null
+            const point = points.find((point) => point.day === Number(label))
+            if (!point) return null
+            return <div className="chart-tooltip"><strong>Relative day {label}</strong><span>{formatEffect(point.median, measure, 1)}</span><span>{point.events} contributing events</span>{!payload?.length && <span>No usable observations</span>}</div>
+          }} />
           <ReferenceLine x={0} stroke="#bd8b3b" strokeDasharray="5 4" />
           <ReferenceLine y={0} stroke="#9eaaa4" />
-          <Line type="monotone" dataKey="median" stroke="#286e59" strokeWidth={2.5} dot={false} connectNulls={false} />
+          <Line type="linear" dataKey="median" stroke="#286e59" strokeWidth={2.5} dot={false} connectNulls={false} />
         </LineChart>
       </ResponsiveContainer>
     </div>
@@ -250,7 +258,7 @@ export default function AnalysisLab({
   geographyLabels: Record<string, string>
   eventGeographies: string[]
   catalogueEvents: StudyEvent[]
-  onOpenEvent: (id: string) => void
+  onOpenEvent: (id: string, selection: AnalysisSelection) => void
 }) {
   const availableYears = useMemo(
     () => [...new Set(studies.map((item) => item.studyYear))].sort((left, right) => left - right),
@@ -313,7 +321,7 @@ export default function AnalysisLab({
     setRemoteLoading(true)
     setRemoteEffects(null)
     setRemoteError(null)
-    fetchEventEffects({
+    Promise.all(study.windows.map((windowDays) => fetchEventEffects({
       start: rangeStart,
       end: rangeEnd,
       scope,
@@ -321,8 +329,8 @@ export default function AnalysisLab({
       timing,
       alerts: COHORT_ALERTS[cohort],
       hazard: hazard === 'all' ? undefined : hazard,
-    })
-      .then((rows) => active && setRemoteEffects(rows as StudyEffect[]))
+    })))
+      .then((rows) => active && setRemoteEffects(rows.flat() as StudyEffect[]))
       .catch(() => {
         if (!active) return
         setRemoteEffects(null)
@@ -330,7 +338,7 @@ export default function AnalysisLab({
       })
       .finally(() => active && setRemoteLoading(false))
     return () => { active = false }
-  }, [cohort, hazard, rangeEnd, rangeStart, scope, study, timing, windowDays])
+  }, [cohort, hazard, rangeEnd, rangeStart, scope, study, timing])
 
   const sourceEffects = useMemo(
     () => (cohort === 'major' ? study?.effects ?? [] : remoteEffects ?? []).filter((effect) => effect.startAt.slice(0, 10) >= rangeStart && effect.startAt.slice(0, 10) <= rangeEnd),
@@ -387,6 +395,9 @@ export default function AnalysisLab({
     return {
       topic: topicId,
       count: rows.length,
+      matchedCount: rows.filter((effect) => effect.matchedPercentChange != null).length,
+      politicalCount: rows.filter((effect) => effect.politicalPercentChange != null).length,
+      shareCount: rows.filter((effect) => effect.politicalShareChange != null).length,
       matched: median(rows.map((effect) => effect.matchedPercentChange).filter((value): value is number => value != null)),
       political: median(rows.map((effect) => effect.politicalPercentChange).filter((value): value is number => value != null)),
       share: median(rows.map((effect) => effect.politicalShareChange).filter((value): value is number => value != null)),
@@ -422,6 +433,8 @@ export default function AnalysisLab({
     .filter((row): row is typeof row & { event: StudyEvent; value: number } => Boolean(row.event) && row.value != null)
     .sort((left, right) => right.value - left.value)
     .slice(0, 10)
+
+  const sensitivity = windowSensitivity(sourceEffects.filter((effect) => effect.scope === scope && effect.topicId === topic && effect.timing === timing && (hazard === 'all' || effect.hazardType === hazard)), study?.windows ?? [7, 14, 28], measure, excludeOverlaps)
 
   const selectHypothesis = (id: typeof HYPOTHESES[number]['id']) => {
     setHypothesis(id)
@@ -512,26 +525,32 @@ export default function AnalysisLab({
                 <article><small>Middle 50% of events</small><strong>{formatEffect(lowerQuartile, measure)} to {formatEffect(upperQuartile, measure)}</strong><span>Event-level interquartile range</span></article>
                 <article><small>Events with an increase</small><strong>{positiveShare == null ? '—' : `${positiveShare.toFixed(0)}%`}</strong><span>Direction only, not significance</span></article>
               </div>
-              {cohort === 'major' ? <><div className="result-chart-heading"><div><strong>Median event-time pattern</strong><small>Daily change from each event’s own {windowDays}-day baseline · day 0 is {timing === 'onset' ? 'event onset' : 'the first day after event end'}</small></div><span><i style={{ background: TOPICS[topic].color }} />{TOPICS[topic].label}</span></div><StudyTimeline points={timeline} measure={measure} timing={timing} /></> : <div className="all-alert-chart-note"><Info size={16} /><div><strong>Detailed timelines remain available for the major-event cohort.</strong><p>The all-alert table serves event-level effects without downloading millions of daily event points. Use Event activity for the full time-series view.</p></div></div>}
+              {cohort === 'major' ? <><div className="result-chart-heading"><div><strong>Median event-time pattern</strong><small>Daily change from each event’s own {windowDays}-day baseline · day 0 is {timing === 'onset' ? 'event onset' : 'the first day after event end'}</small></div><span><i style={{ background: TOPICS[topic].color }} />{TOPICS[topic].label}</span></div><StudyTimeline points={timeline} measure={measure} timing={timing} /><p className="muted-copy">Contributing events vary by day: {Math.min(...timeline.map((point) => point.events))}–{Math.max(...timeline.map((point) => point.events))}. Hover for each day’s sample size. Gaps indicate no usable observations.</p></> : <div className="all-alert-chart-note"><Info size={16} /><div><strong>Detailed timelines remain available for the major-event cohort.</strong><p>The all-alert table serves event-level effects without downloading millions of daily event points. Use Event activity for the full time-series view.</p></div></div>}
             </section>
 
+            <section className="window-sensitivity">
+              <h3>Window sensitivity</h3>
+              <p>Compare all eligible events with the same events eligible at every window. Eligibility includes a usable selected measure and the current overlap rule. These medians do not establish causation.</p>
+              <table><thead><tr><th>Window</th><th>All eligible events</th><th>Same events across windows</th></tr></thead><tbody>{sensitivity.map((row) => <tr key={row.windowDays}><th>{row.windowDays} days</th><td>{formatEffect(row.median, measure, 1)} · n={row.count}</td><td>{formatEffect(row.fixedMedian, measure, 1)} · n={row.fixedCount}</td></tr>)}</tbody></table>
+            </section>
             <section className="topic-result-grid">
-              {topicSummaries.map((summary) => <article key={summary.topic} data-topic={summary.topic}><header><i style={{ background: TOPICS[summary.topic].color }} /><div><strong>{TOPICS[summary.topic].label}</strong><small>{summary.count} events</small></div></header><dl><div><dt>All attention</dt><dd>{formatEffect(summary.matched, 'matched')}</dd></div><div><dt>Political volume</dt><dd>{formatEffect(summary.political, 'political')}</dd></div><div><dt>Political share</dt><dd>{formatEffect(summary.share, 'political_share', 1)}</dd></div></dl></article>)}
+              {topicSummaries.map((summary) => <article key={summary.topic} data-topic={summary.topic}><header><i style={{ background: TOPICS[summary.topic].color }} /><div><strong>{TOPICS[summary.topic].label}</strong><small>{summary.count} events</small></div></header><dl><div><dt>All attention</dt><dd>{formatEffect(summary.matched, 'matched')} <small>n={summary.matchedCount}</small></dd></div><div><dt>Political volume</dt><dd>{formatEffect(summary.political, 'political')} <small>n={summary.politicalCount}</small></dd></div><div><dt>Political share</dt><dd>{formatEffect(summary.share, 'political_share', 1)} <small>n={summary.shareCount}</small></dd></div></dl></article>)}
             </section>
 
             <section className="comparison-grid">
               <article className="hazard-comparison"><div className="result-heading"><div><span className="eyebrow">Event type</span><h3>Floods versus wildfires</h3></div></div>{hazardSummaries.map((row) => <div className="comparison-row" key={row.hazard}><span>{row.hazard === 'flood' ? 'Floods' : 'Wildfires'}<small>{row.count} events</small></span><i><b style={{ width: `${Math.min(100, Math.abs(row.value ?? 0))}%`, marginLeft: (row.value ?? 0) < 0 ? 'auto' : undefined }} /></i><strong>{formatEffect(row.value, measure)}</strong></div>)}</article>
               <article className="country-comparison">
-                <div className="result-heading"><div><span className="eyebrow">Affected geography</span><h3>{countryRankingSort === 'events' ? 'Most frequently affected countries' : 'Largest country responses'}</h3></div><small>Event count and median response</small></div>
+                <div className="result-heading"><div><span className="eyebrow">Affected geography</span><h3>{countryRankingSort === 'events' ? 'Countries with most eligible events' : 'Largest responses for events affecting each country'}</h3></div><small>{SCOPES[scope].label} media · grouped by affected country</small></div>
+                <p className="muted-copy">Each row groups events affecting that country and reports the median response in {SCOPES[scope].label.toLowerCase()} media. It is not a domestic-media estimate. Multi-country events appear in multiple rows; rows are not independent.</p>
                 <div className="country-ranking-controls">
                   <label><span>Minimum eligible events</span><select aria-label="Minimum eligible events" value={countryRankingMinimum} onChange={(event) => setCountryRankingMinimum(Number(event.target.value))}>{COUNTRY_RANKING_THRESHOLDS.map((minimum) => <option key={minimum} value={minimum}>{minimum}+</option>)}</select></label>
-                  <label><span>Sort countries by</span><select aria-label="Sort countries by" value={countryRankingSort} onChange={(event) => setCountryRankingSort(event.target.value as CountryRankingSort)}><option value="events">Number of events</option><option value="response">Absolute response</option></select></label>
+                  <label><span>Sort countries by</span><select aria-label="Sort countries by" value={countryRankingSort} onChange={(event) => setCountryRankingSort(event.target.value as CountryRankingSort)}><option value="events">Number of events</option><option value="response">Magnitude of event response</option></select></label>
                 </div>
                 {countryRows.length ? countryRows.map((row) => <div className="country-row" key={row.country}><span>{geographyLabels[row.country] || row.country}</span><small>{row.count} event{row.count === 1 ? '' : 's'}</small><strong>{formatEffect(row.value, measure)}</strong></div>) : <p className="country-ranking-empty">No country has at least {countryRankingMinimum} eligible events for this specification. Lower the threshold or select the all-alert cohort to inspect repeated activity.</p>}
               </article>
             </section>
 
-            <section className="ranked-events"><div className="result-heading"><div><span className="eyebrow">Event estimates</span><h3>Largest increases in this cohort</h3></div><small>Select an event to inspect its daily evidence</small></div><div className="ranked-event-table" role="table" aria-label="Ranked event effects"><div role="row"><span role="columnheader">Event</span><span role="columnheader">Type</span><span role="columnheader">Start</span><span role="columnheader">Change</span></div>{rankedEvents.map(({ event, value }) => <button role="row" key={event.id} onClick={() => onOpenEvent(event.id)}><span role="cell"><strong>{eventLabel(event, geographyLabels)}</strong><small>{event.alertLevel} alert</small></span><span role="cell">{event.hazardType === 'flood' ? 'Flood' : 'Wildfire'}</span><span role="cell">{new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(event.startAt))}</span><span role="cell"><b>{formatEffect(value, measure, 1)}</b><ArrowRight size={13} /></span></button>)}</div></section>
+            <section className="ranked-events"><div className="result-heading"><div><span className="eyebrow">Event estimates</span><h3>Ten highest responses in this cohort</h3></div><small>Selected upper tail; not representative of all events. Open a row for daily evidence.</small></div><div className="ranked-event-table" role="table" aria-label="Ranked event effects"><div role="row"><span role="columnheader">Event</span><span role="columnheader">Type</span><span role="columnheader">Start</span><span role="columnheader">Change</span></div>{rankedEvents.map(({ event, value, effect }) => <button role="row" key={event.id} onClick={() => onOpenEvent(event.id, { topic, scope, measure, windowDays, timing })}><span role="cell"><strong>{eventLabel(event, geographyLabels)}</strong><small>{event.alertLevel} alert</small></span><span role="cell">{event.hazardType === 'flood' ? 'Flood' : 'Wildfire'}</span><span role="cell">{new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(event.startAt))}</span><span role="cell"><div><b>{formatEffect(value, measure, 1)}</b><small className="count-evidence">{countEvidence(effect, measure)}</small></div><ArrowRight size={13} /></span></button>)}</div></section>
           </>}
         </div>
       </section>
