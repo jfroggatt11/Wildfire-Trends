@@ -11,19 +11,71 @@
 > regression coverage and coordinated serving-data refresh instructions.
 
 
-## GDELT unit of observation
+## Test topics, translation, and verification
+
+Climate change and electric vehicles are the prototype's two test topics. Their
+phrases demonstrate the collection and comparison workflow; they are not final,
+validated definitions of T&E's research interests. New topics require an agreed
+conceptual definition, relevant markets, and reviewed language-specific expressions.
+
+The current Web NGrams pipeline matches original-language article text against
+preconfigured phrases in `config/topics.multilingual.example.yaml`. It does not
+translate articles or generate new translations during collection. The seed covers
+English, Spanish, Portuguese, French, German, Italian, Russian, Arabic, Chinese, and
+Japanese. For example, the climate topic includes English “climate change”, French
+“changement climatique”, and German “Klimawandel”. The alternative DOC API searches
+English expressions over GDELT's machine-translated coverage; this is a different
+measurement path, not a translation step applied to NGrams.
+
+Phrase records specify language, segmentation, and `draft`/`validated` status.
+Non-English seed entries are drafts; the collector can use draft phrases, so this
+status is an audit label rather than an enforced quality gate. English entries are
+marked validated in the configuration, but this does not establish measured
+precision or recall. Literal matching does not automatically recover unlisted
+synonyms, inflections, abbreviations, or local usage. Chinese and Japanese use
+character-based context matching. Ambiguity, mixed-language articles, and uneven
+outlet coverage can also affect comparisons between languages and countries.
+
+The following verification protocol is proposed, not a completed validation result:
+
+1. **Review the definition and phrase lists.** T&E and native speakers agree what
+   counts as relevant, inspect local terminology and exclusions, and document
+   ambiguous cases. Record the reviewer, date, and rationale for each revision.
+2. **Measure precision.** Draw reproducible samples of matched articles across
+   topics, priority languages, markets, ordinary dates, and attention spikes.
+   Reviewers inspect retained phrase context and the article where available, and
+   label topic relevance and political signals separately. Precision is the
+   proportion of classified positives that reviewers judge relevant.
+3. **Measure recall independently.** Review a separate sample of indexed coverage
+   drawn without requiring a topic match, including unmatched articles. Recall is
+   the proportion of all reviewer-identified relevant articles in that sample that
+   the classifier finds. A matched-only sample cannot estimate recall; report sample
+   sizes and uncertainty, and do not infer reliable recall from too few relevant
+   examples. Any enriched sampling needs documented selection and weighting.
+4. **Resolve disagreements and retest.** Have two reviewers independently label a
+   shared subset, record agreement, and adjudicate differences. Revise the lists
+   using a development sample and assess accuracy on a separate held-out sample.
+   Report results by topic and language/market, with explicit gaps where no suitable
+   reviewer or enough evidence is available. Unreviewable articles remain unknown.
+5. **Check attribution and stability.** Audit outlet-country mappings, duplicate
+   handling, per-language coverage, and false positives/negatives for political
+   signals. Agree acceptance criteria before confirmatory analysis, freeze the
+   approved taxonomy, and recollect affected periods consistently after changes.
+   Periodic spot checks should detect terminology and source-coverage drift.
+
+## GDELT DOC API alternative: unit of observation
 
 The canonical observation is one UTC day, conceptual topic, publishing outlet source
 country, and optional original source language. `geography` means the country assigned
 to the outlet by GDELT. It is not the country mentioned in an article, the location of
 an event, or the location of the audience.
 
-GDELT searches English terms across machine-translated coverage in supported
+The GDELT DOC API searches English terms across machine-translated coverage in supported
 languages. This broadens international recall but does not remove translation errors,
 ambiguous terms, changing source coverage, or country-level differences in the number
 and kinds of outlets monitored.
 
-## Topic measurement
+## GDELT DOC API alternative: topic measurement
 
 Enabled expressions within a topic are joined into one GDELT Boolean OR query. This
 means an article matching two expressions in the same topic is counted once by GDELT.
@@ -48,7 +100,7 @@ country series but omits an expected day, the window fails rather than inventing
 value. `--country-batch-size 7` retains explicit country-filtered requests as a
 validation and recovery path.
 
-## Denominators
+## GDELT DOC API alternative: denominators
 
 GDELT's `TimelineVolRaw.norm` is the total number of articles monitored by GDELT
 globally in the interval, even when the query contains `sourcecountry:`. It is stored
@@ -70,7 +122,7 @@ topic. Raw counts remain useful
 for workload, output-volume, and sensitivity analyses, but should not be interpreted
 alone as public interest or compared naively across countries.
 
-## Time and completeness
+## GDELT DOC API alternative: time and completeness
 
 Requested dates are inclusive UTC dates. Windows longer than one week are required so
 GDELT returns daily rather than hourly or 15-minute resolution. The parser requires
@@ -85,7 +137,7 @@ Each successful window is written immediately to shared Parquet. Completeness is
 property of a run, not merely the presence of files. Before analysis, confirm that
 the run state or manifest is `complete` and that all planned windows succeeded.
 
-## Known limitations
+## GDELT DOC API alternative: known limitations
 
 - GDELT's source catalog and monitoring coverage change over time.
 - Small or less-digitized media systems may be underrepresented.
@@ -195,7 +247,7 @@ break collection. Frozen configs, run state, package version, scaling metadata, 
 response envelopes must be retained, and an official API should replace this source
 when access is available.
 
-## GDELT Web NGrams validation source
+## GDELT Web NGrams primary attention source
 
 Web NGrams 3.0 is a URL-level index over original-language article text from January
 2020 onward. The collector reconstructs each configured native-language literal from
@@ -299,6 +351,73 @@ project and a hard per-window `maximum_bytes_billed` cap. Query byte estimates,
 batched topic IDs, and completed job statistics are retained in response envelopes
 and row metadata. Denominator mode is not the default because scanning GAL can
 dominate cost; estimate it independently.
+
+## Planned official Google Trends integration
+
+Search interest is not yet a core outcome. The existing collector uses an unofficial
+interface with request-specific scaling and operational instability. As reported by
+the developer in September 2026, an individual official-API application has received
+no response after around a month. The proposed next step is an application under
+T&E's name describing the research, target markets, and intended refresh schedule;
+access and a response date cannot be assumed.
+
+Google's [official API documentation](https://developers.google.com/search/apis/trends),
+checked on 14 September 2026, describes an access-limited alpha with a rolling
+five-year history, daily through yearly aggregation, and consistently scaled data
+across requests. These features make integration appear manageable using the
+existing storage and run-management workflow. An official connector still needs to
+be implemented and tested with granted credentials, quotas, actual response formats,
+and coverage. Its scaling rules must be recorded separately from the unofficial
+collector's `0..100` series.
+
+Start with a small pilot of T&E's priority countries and reviewed local search
+terms, checking supported query/topic semantics, low-volume or missing observations,
+time resolution, comparability, and repeatability. Then backfill the available
+history and schedule incremental refreshes with completeness checks. Align search
+origin with publishing-outlet geography explicitly: these describe different
+populations, and neither directly measures public opinion.
+
+## Planned non-weather, geopolitical, and energy-market events
+
+Extend the independent event catalogue with a dated register sourced from official
+calendars, announcements, and documented external records. Start with COP meetings,
+EV launches, elections, policy announcements, and policy implementation. Store a
+stable event identifier, category, source URL, announcement/start/end dates, relevant
+countries, and revisions. Keep announcement and implementation dates distinct, and
+record advance notice so anticipated events can have a pre-event attention response.
+Do not select the register's events because they produced a visible attention spike.
+
+Maintain separate geopolitical and energy-market trackers for Strait of Hormuz
+disruptions, conflicts, sanctions, and supply shocks, alongside independently sourced
+oil-price observations. Keep dates of discrete events distinct from continuous
+price series; country exposure should follow a documented rule such as geography or
+pre-event import dependence. Any manually curated event should retain its evidence
+and review status.
+
+For the question “Does oil reaching US$100 per barrel precede more EV discussion?”,
+predefine the benchmark (for example, Brent), price source, spot or futures series,
+USD/barrel unit, observation frequency, and crossing rule before testing. A possible
+rule is the first daily close at or above US$100 after a predefined period below it;
+group repeated crossings into episodes so days within one price surge are not
+treated as independent events. Preserve non-trading-day gaps and distinguish the
+threshold test from a separate analysis of continuous price changes.
+
+Compare EV news, searches, and public posts separately before, during, and after
+each eligible episode, using reviewed topic definitions and complete windows.
+Include matched dates or markets with different predefined exposure where credible,
+and account for seasonality, underlying trends, and concurrent launches, policies,
+or geopolitical events. A global oil shock may leave no truly untreated country;
+the resulting comparison must be labelled accordingly. Retain source-specific
+event attributes rather than imposing a common severity scale across weather,
+politics, and energy markets.
+
+To explore a possible country-A-to-country-B sequence, predefine country pairs,
+time windows, and candidate lags. Test whether earlier attention in A adds predictive
+information about later attention in B beyond B's own history and common event
+timing, using held-out periods. Inspect syndicated coverage and shared language as
+alternative explanations; correct for testing many pairs and lags. Temporal ordering
+alone does not establish that discussion in A caused discussion in B. These
+trackers and analyses are proposed extensions, not currently implemented findings.
 
 ## Source documentation
 

@@ -30,6 +30,8 @@
 .info-method-card li > span { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; color: var(--ink); background: var(--lime); font-size: 8px; font-weight: 900; }
 .info-method-card li p { margin: 1px 0 0; color: #738079; font-size: 9px; line-height: 1.5; }
 .info-method-card li strong { color: #34463e; }
+.info-method-card h3 { margin: 0; color: #34463e; font-family: Georgia, serif; font-size: 21px; font-weight: 500; line-height: 1.2; }
+.info-language-copy p, .info-verification-note { margin: 14px 0 0; color: #64736c; font-size: 11px; line-height: 1.7; }
 
 .info-section { margin-top: 68px; }
 .info-section-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 44px; margin-bottom: 22px; }
@@ -79,12 +81,15 @@
 .info-caution svg { color: #e0b766; }
 .info-caution p { margin: 0; font-size: 7.5px; line-height: 1.55; }
 
-.info-roadmap-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 9px; }
+.info-roadmap-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .info-roadmap-grid article { min-height: 225px; display: flex; flex-direction: column; padding: 20px; border: 1px solid #dce3df; border-radius: 10px; background: var(--paper); }
 .info-roadmap-grid article:nth-child(2) > span { color: #6575b7; background: #ececf5; }
 .info-roadmap-grid article:nth-child(3) > span { color: #b65c3f; background: #f5e9e4; }
 .info-roadmap-grid article:nth-child(4) > span { color: #7a65a5; background: #eeeaf4; }
 .info-roadmap-grid strong { font-size: 11px; line-height: 1.35; }
+.info-roadmap-grid small { margin-top: 0; }
+.info-roadmap-grid p { font-size: 11px; line-height: 1.65; }
+.info-roadmap-grid a { color: var(--green); text-decoration: underline; text-underline-offset: 2px; }
 
 .info-validation { margin-top: 40px; display: grid; grid-template-columns: .75fr 1.25fr auto; align-items: center; gap: 28px; padding: 25px; border: 1px solid #d5ded8; border-radius: 11px; background: #e7eee8; }
 .info-validation > div { display: grid; grid-template-columns: 38px 1fr; align-items: center; gap: 10px; }
