@@ -1,5 +1,10 @@
 # Data dictionary
 
+The current MVP reads `gdelt_ngrams` counts. DOC API (`gdelt`) and unofficial
+Google Trends records use the same broad storage model but different measurement
+semantics; they are not interchangeable outcomes. See the
+[methodology](methodology.md#current-measurement-and-serving-paths).
+
 ## Canonical topic trends
 
 Path:
@@ -11,15 +16,15 @@ Path:
 | `date` | date | Provider observation date. GDELT is daily; Google resolution is recorded in metadata. |
 | `source` | string | Provider identifier: `gdelt`, `gdelt_ngrams`, or `google_trends_unofficial`. |
 | `topic_id` | string | Stable configured conceptual topic id. |
-| `query_id` | string | `topic_combined` for canonical topic trends. |
-| `query_expression` | string | Exact combined expression sent with provider filters. |
-| `geography` | string | Requested GDELT publishing-outlet source country id. |
+| `query_id` | string | `topic_combined` for combined GDELT topic trends; Google retains the individual query id. |
+| `query_expression` | string | Recorded provider-specific query expression or topic phrase definition; Google uses one literal term. |
+| `geography` | string | Publishing-outlet country for GDELT; search-origin country for Google. |
 | `language` | string/null | Requested original source language; null means all supported languages. |
-| `matched_count` | integer/null | Distinct matching articles; null in native country-share mode. |
+| `matched_count` | integer/null | Distinct matched URLs for NGrams; provider article count in DOC raw mode; null in DOC native-share and Google modes. |
 | `global_monitored_count` | integer/null | All articles GDELT monitored globally that day (`norm`). |
 | `country_monitored_count` | integer/null | All articles monitored for the requested source country/language that day. |
 | `global_attention_share` | float/null | `matched_count / global_monitored_count`. |
-| `country_attention_share` | float/null | Native GDELT country percentage divided by 100, or the equivalent raw-count ratio. |
+| `country_attention_share` | float/null | DOC native country percentage / 100, DOC country raw-count ratio, or optional NGram/GAL ratio; these are not equivalent measurements. |
 | `attention_index` | float/null | Google Trends request-normalized interest index in `0..100`; null for GDELT. |
 | `collected_at` | UTC timestamp | Retrieval time for this provider response. |
 | `metadata_json` | JSON string | Query details, series label, geography label, query scope, response series count, and normalization scopes. |
@@ -43,6 +48,11 @@ runs record `bigquery_collection_mode=multi_topic_batch` and
 `bigquery_batch_topic_ids`; these are operational metadata and do not alter canonical
 topic-level identity.
 
+Known limitation: NGram taxonomy revisions update canonical rows in place. A
+missing incoming field can retain a previous non-null value, even when the phrase
+definition changes. Frozen run records provide provenance, but not immutable
+analysis versions. See the [architecture briefing](ARCHITECTURE_BRIEFING_2026-09-15.md#7-provenance-does-not-yet-provide-immutable-dataset-versions).
+
 ## Country coverage baselines
 
 Path:
@@ -60,7 +70,7 @@ Path:
 | `collected_at` | UTC timestamp | Baseline retrieval time. |
 | `metadata_json` | JSON string | Provider query details and display label. |
 
-Country baselines are auxiliary observations. Writing a baseline automatically
+DOC API country baselines are auxiliary observations. Writing a baseline automatically
 updates matching topic partitions with `country_monitored_count` and
 `country_attention_share`, including topic rows collected by an earlier run.
 

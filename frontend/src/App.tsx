@@ -1492,41 +1492,34 @@ function MethodsView({ manifest }: { manifest: Manifest | null }) {
     },
     {
       number: '06',
-      title: 'Permutation test reference',
-      organisation: 'SciPy documentation',
-      note: 'Exact and randomised independent-sample permutation-test mechanics.',
-      href: 'https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.permutation_test.html',
-    },
-    {
-      number: '07',
       title: 'Natural Earth Admin-1 states and provinces',
       organisation: 'Natural Earth, version 5.1.1',
       note: 'First-order administrative polygons used to label the region containing each event point.',
       href: 'https://www.naturalearthdata.com/downloads/10m-cultural-vectors/10m-admin-1-states-provinces/',
     },
     {
-      number: '08',
+      number: '07',
       title: 'GDELT infrastructure outage notice',
       organisation: 'Kalev Hannes Leetaru / GDELT, June 2025',
       note: 'Provider confirmation of multiple GDELT infrastructure outages during the observed June 2025 coverage collapse.',
       href: 'https://www.linkedin.com/posts/kalevleetaru_we-are-aware-of-multiple-gdelt-infrastructure-activity-7340435180601393154-_SDg',
     },
     {
-      number: '09',
+      number: '08',
       title: 'MODIS vegetation-index user guide',
       organisation: 'NASA Land Processes DAAC',
       note: 'NDVI/EVI definitions, monthly CMG compositing, scaling and quality metadata.',
       href: 'https://lpdaac.usgs.gov/documents/103/MOD13_User_Guide_V6.pdf',
     },
     {
-      number: '10',
+      number: '09',
       title: 'Earthdata cloud OPeNDAP access',
       organisation: 'NASA Earthdata',
       note: 'Variable-only NetCDF4 access used to stream monthly MOD13C2 vegetation grids without retaining source archives.',
       href: 'https://www.earthdata.nasa.gov/engage/open-data-services-software/earthdata-developer-portal/opendap/user-guide',
     },
     {
-      number: '11',
+      number: '10',
       title: 'AppEEARS API documentation',
       organisation: 'NASA Land Processes DAAC',
       note: 'Area-sample tasks, versioned product layers and reproducible bundle downloads.',
@@ -1589,14 +1582,14 @@ function MethodsView({ manifest }: { manifest: Manifest | null }) {
               <ArrowRight size={17} />
               <div className="pipeline-join"><Layers3 size={18} /><small>Defined join</small><strong>Scope + date window</strong><span>No event inference from news</span></div>
               <ArrowRight size={17} />
-              <div className="pipeline-result"><BarChart3 size={18} /><small>Output</small><strong>Change in URLs/day</strong><span>With an uncertainty test</span></div>
+              <div className="pipeline-result"><BarChart3 size={18} /><small>Output</small><strong>Change in URLs/day</strong><span>Descriptive comparison</span></div>
             </div>
             <p className="method-caption"><strong>Why independent streams?</strong> Defining events from the same coverage being explained would favour events that already received more news attention.</p>
           </section>
 
           <section className="protocol-section" id="topics">
             <header><span>02</span><div><small>Outcome definitions</small><h2>Topic taxonomy</h2></div></header>
-            <p className="protocol-lede">The current MVP measures two deliberately distinct concepts. Exact phrases inside a topic are alternatives; a URL matching several phrases is still counted once for that topic. A URL may count once in each topic.</p>
+            <p className="protocol-lede">The current MVP uses climate change and electric vehicles as test topics, with initial phrase lists awaiting measurement validation. Exact phrases inside a topic are alternatives; a URL matching several phrases is still counted once for that topic. A URL may count once in each topic.</p>
             <div className="topic-method-grid">
               {topicTranslations.map((topic) => (
                 <article className="topic-method-card" key={topic.id} data-topic={topic.id}>
@@ -1618,7 +1611,7 @@ function MethodsView({ manifest }: { manifest: Manifest | null }) {
               <div><span className="status-chip held">Held back</span><strong>Clean transport</strong><p>Low-carbon mobility, transport decarbonisation, electrification, zero-emission movement and modal shift.</p></div>
               <p>These dictionaries remain in project configuration for later validation, but are excluded from the two-topic MVP so exploratory results do not outrun taxonomy review.</p>
             </div>
-            <div className="method-callout"><Info size={17} /><p><strong>Translation status.</strong> English seeds are reviewed and marked validated. Spanish, Portuguese, French, German, Italian, Russian, Arabic, Chinese and Japanese terms remain draft until native-speaker review for local usage, inflection and conceptual equivalence. Chinese and Japanese are matched as character sequences.</p></div>
+            <div className="method-callout"><Info size={17} /><p><strong>Translation status.</strong> English seeds are marked validated in configuration; that label does not establish measured precision or recall. Spanish, Portuguese, French, German, Italian, Russian, Arabic, Chinese and Japanese terms remain draft until native-speaker review for local usage, inflection and conceptual equivalence. Chinese and Japanese are matched as character sequences.</p></div>
           </section>
 
           <section className="protocol-section" id="political">
@@ -1778,8 +1771,8 @@ function MethodsView({ manifest }: { manifest: Manifest | null }) {
           <section className="protocol-section" id="limitations">
             <header><span>11</span><div><small>Research boundaries</small><h2>Limitations and validation priorities</h2></div></header>
             <div className="limits-grid">
-              <div><strong>The MVP does not claim</strong><ul><li>that an event caused a change in coverage;</li><li>that URL count equals audience attention;</li><li>that outlet country equals article subject or audience;</li><li>that political classification captures stance or ideology;</li><li>that provider alert levels are comparable physical intensities;</li><li>that every listed article is about the selected event.</li></ul></div>
-              <div><strong>Validation before external research use</strong><ol><li>Native-speaker review and precision/recall samples for every language.</li><li>Manual audit of political false positives and false negatives.</li><li>Refresh and quantify domain-to-country mapping coverage.</li><li>Validate event points and multi-country records against provider pages.</li><li>Pre-register hypotheses and correct for multiple comparisons.</li><li>Add denominators, matched controls and robustness specifications.</li></ol></div>
+              <div><strong>The MVP does not claim</strong><ul><li>that an event caused a change in coverage;</li><li>that URL count equals audience attention;</li><li>that outlet country equals article subject or audience;</li><li>that political classification captures stance or ideology;</li><li>that provider alert levels are comparable physical intensities;</li><li>that every counted article is about the selected event.</li></ul></div>
+              <div><strong>Validation before external research use</strong><ol><li>Native-speaker review by topic and language: inspect matched articles for precision and an independent sample including unmatched articles for recall; resolve disagreements and retest revised phrases on a separate sample.</li><li>Manual audit of political false positives and false negatives.</li><li>Refresh and quantify domain-to-country mapping coverage.</li><li>Validate event points and multi-country records against provider pages.</li><li>Pre-register hypotheses and correct for multiple comparisons.</li><li>Add denominators, matched controls and robustness specifications.</li></ol></div>
             </div>
             <div className="reproducibility-strip"><Database size={17} /><p><strong>Reproducibility record.</strong> Each research export should retain the retrieval date, package version, frozen topic, political and country configurations, run manifest, query metadata and underlying provider citations. Do not combine date ranges collected under different phrase dictionaries without checking their metadata.</p></div>
           </section>

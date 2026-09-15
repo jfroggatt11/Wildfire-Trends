@@ -13,18 +13,24 @@
 
 `climate-attention` is the initial data-collection layer for research on how major
 events affect media and search attention around climate change and clean transport.
-This version collects canonical daily GDELT media-attention trends, optional
-article-level samples, and an explicitly unofficial Google Trends search-interest
-index. It also collects an independent global event layer from NASA FIRMS and
-GDACS, and includes a research frontend with an optional Supabase serving layer.
-Causal event-study estimation remains future work.
+The current MVP uses **GDELT Web NGrams distinct-URL counts** collected through
+BigQuery as its primary news outcome. It matches configured phrases in original-language
+text. Climate change and electric vehicles are test topics whose phrase lists still
+require measurement validation. GDELT DOC API country shares and raw counts remain
+alternative collection and validation paths; the unofficial Google Trends collector
+is experimental and is not an outcome in the current event studies.
 
-GDELT `TimelineSourceCountry` aggregates are the canonical comparable trend input;
-optional `TimelineVolRaw` requests add exact counts for selected validation panels.
-Article-list records remain useful for auditing spikes and future classification, but
-their 250-result API limit makes them unsuitable as the authoritative count.
-The BigQuery-backed Web NGrams mode provides a scalable, distinct-URL comparison
-series and is being validated before it replaces any canonical API measure.
+GDACS supplies the named event catalogue; NASA observations provide separate physical
+context. Canonical research records, article match evidence, cached responses and run
+manifests live in local Parquet and companion files. Python builds derived analyses;
+the React/TypeScript frontend reads static exports and Supabase aggregate tables.
+**Supabase is required for the full current interface**, including daily attention.
+The static major-event studies are not a complete offline fallback. Collection and
+analysis can run locally without Supabase. Causal inference and prediction remain
+future work.
+
+See the [architecture briefing](docs/ARCHITECTURE_BRIEFING_2026-09-15.md) for the data
+flow, architectural trade-offs, open issues and T&E handover questions.
 
 ## Frontend MVP
 
@@ -50,7 +56,9 @@ shows a descriptive severity-only residual. The residual is an in-sample benchma
 not a forecast or causal estimate. Climate-change and electric-vehicle responses
 can share one plot, with topic-coloured points connected within each wildfire.
 
-Export the current Parquet datasets to compact browser assets, then run the app:
+After collecting the local datasets and populating the Supabase serving tables,
+export the Parquet datasets to compact browser assets, then run the app. The export
+requires the browser-safe Supabase URL and publishable key in the root `.env`:
 
 ```bash
 .venv/bin/python scripts/export_frontend_data.py
@@ -140,8 +148,8 @@ climate-attention build-event-study \
 
 The canonical flat effect table contains event, topic, mutually exclusive media
 group, window, timing, completeness, overlap and pre/post measures. The compact
-static file contains the primary major-event cohort and acts as a deployment
-fallback.
+static file supplies the primary major-event cohort. Daily attention and all-alert
+analyses still require Supabase; this file is not a complete deployment fallback.
 
 Build the all-alert Analysis Lab warehouse and load its three derived tables into
 Supabase:
@@ -187,9 +195,10 @@ climate-attention repair-known-outages --data-dir data
 Then rebuild the frontend and Analysis Lab exports and resync Supabase. The repair is
 idempotent; it never converts missing dates to zero.
 
-At the current 2025 scale the derived warehouse is small enough for Supabase and a
-static frontend. A separate Render service is not required; it would become useful
-only for scheduled multi-year recomputation or heavier statistical models.
+The current 2025–2026 derived warehouse is served by Supabase and a static frontend.
+There is no custom application server or repository-managed production scheduler.
+Scheduled collection and heavier recomputation would need a managed job runner; they
+do not require moving the website or adopting a particular hosting provider.
 
 Load the two MVP topics' daily aggregate counts into Supabase:
 
@@ -206,12 +215,23 @@ The command idempotently upserts daily country-topic counts, including the disti
 political union and component counts. Complete GAL metadata, URLs, descriptions and
 phrase-level match evidence remain in canonical local Parquet for validation.
 `SUPABASE_DB_URL` is server-side only. The frontend uses only
-`VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`, protected by read-only row
-level security. Set `VITE_USE_SUPABASE=true` after the daily table is populated.
+`VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`. The supplied row-level
+security policies permit anonymous reads of aggregates and deny browser writes;
+they do not make these records private. Populate daily attention and both years of
+derived tables before using the full interface.
 The frontend export script also writes these browser-safe values to
 `frontend/src/supabase-config.json`, allowing Netlify Git builds to work when the
 project role cannot manage hosted environment variables. Never place
-`SUPABASE_DB_URL` in that file.
+`SUPABASE_DB_URL` in that file. The exporter writes `enabled: true`; runtime access
+is enabled if either this generated flag or `VITE_USE_SUPABASE=true` enables it.
+Setting the environment flag to false alone does not override an enabled generated
+config. No staff login or organisation-specific access policy is implemented.
+
+Collection, analysis/export, Supabase sync and website deployment are separate steps.
+A Netlify build does not recollect data or synchronize database tables. Follow the
+[release procedure](docs/operations.md#release-the-current-mvp) to keep static studies
+and remote observations consistent. There is no shared dataset-version check or
+atomic release across those serving paths.
 
 Run the frontend unit and browser regression suites with:
 
@@ -270,7 +290,7 @@ terms, language filters, or topic-level geography fields. Use a separate query e
 for each Google term. Country labels are resolved to ISO country codes; an explicit
 `google_geo: IT` value can override resolution in the country YAML.
 
-## Collecting five-year daily trends
+## Alternative DOC API: collecting daily trends
 
 The trend command combines all enabled query alternatives within a topic into one
 GDELT OR expression. An article matching both `"climate change"` and
@@ -310,8 +330,9 @@ country_attention_share, attention_index, collected_at, metadata_json
 In the default mode, `country_attention_share` is GDELT's native percentage of the
 selected country's monitored coverage matching the topic, converted from percent to
 a fraction. `matched_count` and the denominator fields are null because this API mode
-does not expose them. This normalized share is the preferred measure for comparisons
-through time or between countries.
+does not expose them. This is a DOC API share, not the current MVP outcome. Its comparability still
+depends on source coverage and validation; do not substitute it for NGram counts
+without checking the different matching and attribution methods.
 
 Raw counts remain available as an optional companion collection:
 
@@ -393,9 +414,10 @@ climate-attention estimate-ngrams \
 For original-language global matching, use
 `config/topics.multilingual.example.yaml`. Its `ngram_phrases` groups associate each
 literal with a GDELT language code and either `space` or `character` segmentation.
-The bundled English terms are validated against the canonical queries; the nine
-translated language groups are research seeds marked `draft` and need native-speaker
-review before inferential use. Omitting `--countries` requests all 197 configured
+The bundled English terms mirror the DOC query seeds and are marked `validated`
+in configuration; that label does not establish measured precision or recall. The
+nine translated language groups are research seeds marked `draft` and need
+native-speaker review before inferential use. Omitting `--countries` requests all 197 configured
 countries. All selected themes, phrases, languages, and countries share one BigQuery
 scan per date window; the result is still separated into canonical topic-country-day
 rows.
@@ -531,8 +553,9 @@ This is not semantically identical to the DOC API. NGrams search original-langua
 article text while the DOC API searches GDELT's English machine translations. The
 domain-country table is also a 2015 snapshot. Every row records whether the requested
 country has mapped domains, its mapped-domain count, and daily per-language matched
-counts. Treat the NGrams output as a candidate measure until the matched-panel
-comparison is satisfactory:
+counts. NGrams already supplies the MVP outcome, but its measurement accuracy is
+not established by that choice. Use matched-panel comparisons to investigate
+differences between the two collection paths:
 
 ```bash
 climate-attention compare-sources \
@@ -550,7 +573,7 @@ By default the comparison relates the API's `country_attention_share` to the NGr
 zero-day counts, and Pearson correlation for each topic-country series. Use explicit
 `--left-metric` and `--right-metric` options for other valid comparisons.
 
-A whole-world run is intentionally slow. Live testing showed that GDELT's available
+A whole-world DOC API run is intentionally slow. Live testing showed that GDELT's available
 capacity is variable: requests may be rejected even more than a minute apart, while
 later retries can succeed. The conservative default is 65 seconds plus exponential
 backoff. With four themes and five annual windows, the default global country plan
@@ -786,7 +809,7 @@ See [methodology](docs/methodology.md), the
 ## Rebuilding aggregates
 
 The command below rebuilds the legacy article-derived daily sample counts; it does
-not overwrite canonical timeline trends:
+not overwrite the primary NGram counts or alternative DOC API trends:
 
 ```bash
 climate-attention aggregate --data-dir data

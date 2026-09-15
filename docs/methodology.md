@@ -11,6 +11,20 @@
 > regression coverage and coordinated serving-data refresh instructions.
 
 
+## Current measurement and serving paths
+
+The MVP outcome is Web NGrams distinct matched URLs per topic, publishing-outlet
+country and UTC day. Country news denominators are optional and not validated for
+routine use. DOC API shares below describe an alternative collector, not the
+current analysis outcome. Google Trends remains experimental.
+
+Python computes the event-study exports from local Parquet. The browser combines
+static major-event studies with Supabase daily attention and all-alert aggregates.
+Supabase is required for the full current interface. Before/after changes and
+lead/lag correlations are descriptive; the interface does not report permutation
+p-values or statistical significance verdicts. See the
+[architecture briefing](ARCHITECTURE_BRIEFING_2026-09-15.md) for operational limits.
+
 ## Test topics, translation, and verification
 
 Climate change and electric vehicles are the prototype's two test topics. Their
@@ -65,7 +79,7 @@ The following verification protocol is proposed, not a completed validation resu
 
 ## GDELT DOC API alternative: unit of observation
 
-The canonical observation is one UTC day, conceptual topic, publishing outlet source
+The DOC API observation is one UTC day, conceptual topic, publishing outlet source
 country, and optional original source language. `geography` means the country assigned
 to the outlet by GDELT. It is not the country mentioned in an article, the location of
 an event, or the location of the audience.
@@ -116,11 +130,10 @@ country_attention_share = matched_count / country_monitored_count
 ```
 
 A zero or unavailable raw denominator produces a null calculated share rather than
-zero. The native country share remains the preferred attention-intensity measure
-because it asks what fraction of the monitored press from that country discussed the
-topic. Raw counts remain useful
-for workload, output-volume, and sensitivity analyses, but should not be interpreted
-alone as public interest or compared naively across countries.
+zero. The native country share describes the fraction of monitored press from that
+country discussing the topic in the DOC API path. It is not the primary MVP outcome.
+Both shares and counts require source-coverage validation; counts alone should not
+be interpreted as public interest or compared naively across countries.
 
 ## GDELT DOC API alternative: time and completeness
 
@@ -154,14 +167,14 @@ the run state or manifest is `complete` and that all planned windows succeeded.
   be resumed; large world-scale backfills may need GDELT bulk datasets.
 
 Article-list collection is optional and intended for auditing spikes or later content
-classification. It is not needed to produce the canonical daily attention series.
+classification. It is not needed to produce the DOC API daily attention series.
 
 ## Independent event measurement
 
 The primary event treatment is external to the attention outcome. NASA FIRMS
 science-quality VIIRS S-NPP detections provide the physical daily wildfire series,
-while GDACS provides a global catalogue of major wildfires, floods, and tropical
-cyclones. GDELT extreme-weather queries may later be used as a secondary event-news
+while GDACS provides a catalogue that can include wildfires, floods, and tropical
+cyclones. The current frontend and event-study analysis use only wildfires and floods. GDELT extreme-weather queries may later be used as a secondary event-news
 salience measure, but not as the sole treatment definition: selecting events from the
 same news stream being explained would mechanically favour well-covered events.
 
@@ -344,7 +357,11 @@ The canonical NGram topic-country-day row is replaced when the same date is
 recollected with a newer phrase taxonomy. Phrase records in row metadata identify the
 active definition, while frozen run manifests and raw response envelopes preserve
 the earlier definition. Do not combine partially upgraded date ranges without
-checking that their configured-language and phrase metadata agree.
+checking that their configured-language and phrase metadata agree. Canonical rows
+are mutable, not immutable versions of each research definition. A known merge edge
+case can retain an earlier non-null derived value when a revised NGram collection
+omits it; see the [open issue](ARCHITECTURE_BRIEFING_2026-09-15.md#7-provenance-does-not-yet-provide-immutable-dataset-versions).
+This was reproduced synthetically, not established as an error in the stored results.
 
 All BigQuery jobs use parameterized SQL, a non-billable dry run, an explicit billing
 project and a hard per-window `maximum_bytes_billed` cap. Query byte estimates,

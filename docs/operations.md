@@ -1,6 +1,27 @@
 # Operations guide
 
-## Start with a pilot
+## Current operating model
+
+The primary MVP news collector is `collect-ngrams` through BigQuery. `collect-trends`
+is the alternative GDELT DOC API path. Research data and run records are local;
+Supabase serves derived aggregates and is required for the full website experience.
+Collection, recomputation, synchronization and deployment are separate operations.
+No production scheduler, backup/restore procedure or shared release-version gate is
+implemented in this repository. Do not run concurrent writers against the same
+Parquet partitions; atomic file replacement does not provide concurrency locking.
+
+## Start with a Web NGrams pilot
+
+Validate `config/topics.multilingual.example.yaml` and the country configuration,
+then audit country mapping with `audit-ngram-countries`. Use `estimate-ngrams` for
+one test topic, a few countries and a short date range, with an explicit billing
+project. Review the byte estimate, then run `collect-ngrams` with identical inputs
+and a suitable `--maximum-gb-billed` cap. The
+[BigQuery workflow below](#matched-api-and-bigquery-overnight-validation) and
+[README commands](../README.md#collecting-gdelt-web-ngrams-through-bigquery) show the
+arguments. Review draft phrases and retained match evidence before expanding.
+
+## Alternative DOC API pilot
 
 Validate configuration, then run one topic and a few countries over at least eight
 days. A 30-day example is:
@@ -57,11 +78,12 @@ climate-attention runs retry <run-id> \
 
 Retries use the frozen configs and skip successful windows. Do not start several
 collectors against the public GDELT API in parallel. For thousands of requests,
-prefer a selected-country design or the BigQuery NGrams comparison adapter.
+prefer a selected-country DOC API design or the primary BigQuery NGrams adapter.
 GDELT's June 2026 guidance asks researchers to use its downloadable non-consumptive
 NGrams data while the legacy search infrastructure is migrated. The implemented
-adapter is not interchangeable with the DOC timeline API; its country attribution
-and original-language matching must first be validated.
+NGrams adapter is already used by the MVP, but is not interchangeable with the DOC
+timeline API. Its country attribution and original-language matching still require
+validation.
 
 ## Matched API and BigQuery overnight validation
 
@@ -180,6 +202,36 @@ cd frontend && npm test && npm run build
 The browser asset is an aggregate export and may be deployed. Temporary MOD13C2
 subsets and source AppEEARS files remain local working data.
 
+## Release the current MVP
+
+After collection, verify completeness and freeze the selected topic/country/political
+configurations for the release. Keep writers stopped while deriving and exporting
+the snapshot. Use the existing database credentials in the execution environment;
+never put the privileged connection string in frontend files.
+
+From the repository root, refresh daily attention and rebuild/sync both years:
+
+```bash
+.venv/bin/climate-attention sync-supabase --data-dir data --apply-migration
+.venv/bin/climate-attention sync-analysis-supabase --data-dir data --year 2025 --apply-migration
+.venv/bin/climate-attention sync-analysis-supabase --data-dir data --year 2026
+.venv/bin/python scripts/export_frontend_data.py
+```
+
+`sync-analysis-supabase` builds the year's warehouse by default. Use `--skip-build`
+only when its year-specific derived files were rebuilt from this same snapshot.
+Check row counts, coverage dates, unsupported mappings, outage gaps and representative
+values across local exports and remote tables. The
+[September 10 verification](IMPROVEMENTS_PHASE1.md) records the previous comparison;
+it is not an automatic check of later releases.
+
+Then run the frontend checks in `frontend/` and deploy the validated assets through
+the established hosting workflow. A build or deployment alone does not update
+Supabase. Database syncs and static publication are separate operations, with no
+single cross-table/static transaction or version gate; coordinate timing to avoid
+presenting mixed snapshots. Migrations grant anonymous read access to serving
+aggregates, not staff-only access.
+
 ## Verify completeness
 
 ```bash
@@ -199,7 +251,7 @@ PyArrow is installed with the package:
 import pyarrow.parquet as pq
 
 table = pq.read_table(
-    "data/trends/source=gdelt/topic_id=clean_energy/"
+    "data/trends/source=gdelt_ngrams/topic_id=climate_change/"
     "geography=italy/language=all/daily.parquet"
 )
 frame = table.to_pandas()
@@ -211,10 +263,13 @@ analysis = frame[[
 ]]
 ```
 
-In the default mode, check that `country_attention_share` is populated;
-`matched_count` and `country_monitored_count` are expected to be null. In raw mode,
-null country denominators mean the corresponding baseline has not been collected or
-its denominator was zero.
+For primary NGram data, `matched_count` is the outcome; country denominator/share
+fields are normally null unless denominator collection was requested. Check
+`metadata_json` for mapping support and taxonomy consistency before analysis.
+
+For the alternative DOC API, read a `source=gdelt` partition instead. Native
+country-share mode populates `country_attention_share` without raw counts; raw mode
+needs a separately collected country baseline for its calculated share.
 
 For Google data, load the matching `source=google_trends_unofficial` partition and
 select `date`, `attention_index`, and `metadata_json`. Compare changes only within a
