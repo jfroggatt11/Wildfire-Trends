@@ -32,6 +32,11 @@ future work.
 See the [architecture briefing](docs/ARCHITECTURE_BRIEFING_2026-09-15.md) for the data
 flow, architectural trade-offs, open issues and T&E handover questions.
 
+The agreed next phase is the UK-focused pilot described in the [UK pilot plan](docs/UK_PILOT_PLAN.md):
+expanded climate, cost-of-living and clean-transport topics; news, search and social
+attention; article-level denominators and classifications; UK counties/local
+authorities; and weather, prices, disruption and other event inputs.
+
 ## Frontend MVP
 
 `frontend/` contains the Netlify-ready Climate Attention Atlas: a React and

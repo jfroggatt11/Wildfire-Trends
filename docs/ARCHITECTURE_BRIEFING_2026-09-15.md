@@ -4,7 +4,7 @@ Prepared 15 September 2026 for the call on 16 September 2026. This is a dated
 repository review, not a verification of live hosting, billing or external backups.
 
 The Atlas is a working research prototype with a reusable collection pipeline.
-The next phase needs organisational ownership, coordinated data updates,
+The agreed UK pilot will be owned by **T&E**, with coordinated data updates,
 measurement validation and a more general topic/event model.
 
 ## Opening explanation
@@ -172,10 +172,11 @@ Historical review and improvement reports retain their dated findings and test
 counts as an audit trail. The architectural gaps above remain open unless explicitly
 identified as documentation corrections.
 
-## Decisions to seek from T&E
+## Decisions agreed or to confirm with T&E
 
-- **Ownership:** which accounts should own hosting, database, BigQuery billing,
-  credentials, the research archive and Google Trends access?
+- **Ownership:** T&E will own the repository. Confirm which T&E accounts should own
+  hosting, database, BigQuery billing, credentials, the research archive and Google
+  Trends access.
 - **Access:** should aggregates be public or restricted to staff?
 - **Pilot scope:** which topics, languages, countries and non-weather event types
   should be supported first?
