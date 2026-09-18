@@ -1,0 +1,120 @@
+schema_version: 1
+
+# Initial English-language seed taxonomy for the UK pilot. These phrases exist to
+# estimate and prototype the collection workload. They require T&E review and
+# precision/recall validation before research use.
+topics:
+  climate_change:
+    label: Climate change
+    enabled: true
+    description: Explicit discussion of anthropogenic climate change.
+    queries:
+      - '"climate change"'
+      - '"global warming"'
+      - '"climate crisis"'
+    ngram_phrases:
+      en:
+        translation_status: draft
+        phrases:
+          - climate change
+          - global warming
+          - climate crisis
+
+  cost_of_living:
+    label: Cost of living
+    enabled: true
+    description: Household costs, bills and prominent price pressures.
+    queries:
+      - '"cost of living"'
+      - '"cost-of-living crisis"'
+      - '"living costs"'
+      - '"household bills"'
+      - '"energy bills"'
+      - '"food prices"'
+      - '"fuel prices"'
+      - '"petrol prices"'
+      - '"diesel prices"'
+      - '"grocery prices"'
+      - '"rent increases"'
+      - '"mortgage rates"'
+    ngram_phrases:
+      en:
+        translation_status: draft
+        phrases:
+          - cost of living
+          - cost-of-living crisis
+          - living costs
+          - household bills
+          - energy bills
+          - food prices
+          - fuel prices
+          - petrol prices
+          - diesel prices
+          - grocery prices
+          - rent increases
+          - mortgage rates
+
+  clean_transport:
+    label: Clean transport
+    enabled: true
+    description: Explicit discussion of low-carbon and sustainable transport.
+    queries:
+      - '"clean transport"'
+      - '"sustainable transport"'
+      - '"transport decarbonisation"'
+      - '"transport decarbonization"'
+      - '"transport emissions"'
+      - '"clean mobility"'
+      - '"sustainable mobility"'
+      - '"low-carbon transport"'
+      - '"low emission transport"'
+      - '"zero emission transport"'
+      - '"transport electrification"'
+      - '"active travel"'
+      - '"modal shift"'
+    ngram_phrases:
+      en:
+        translation_status: draft
+        phrases:
+          - clean transport
+          - sustainable transport
+          - transport decarbonisation
+          - transport decarbonization
+          - transport emissions
+          - clean mobility
+          - sustainable mobility
+          - low-carbon transport
+          - low carbon transport
+          - low-emission transport
+          - low emission transport
+          - zero-emission transport
+          - zero emission transport
+          - transport electrification
+          - active travel
+          - modal shift
+
+  electric_vehicles:
+    label: Electric vehicles
+    enabled: true
+    description: Explicit references to electric cars and vehicles.
+    queries:
+      - '"electric vehicle"'
+      - '"electric vehicles"'
+      - '"electric car"'
+      - '"electric cars"'
+      - '"battery electric vehicle"'
+      - '"battery electric vehicles"'
+      - '"zero emission vehicle"'
+      - '"zero emission vehicles"'
+    ngram_phrases:
+      en:
+        translation_status: draft
+        phrases:
+          - electric vehicle
+          - electric vehicles
+          - electric car
+          - electric cars
+          - battery electric vehicle
+          - battery electric vehicles
+          - zero emission vehicle
+          - zero emission vehicles

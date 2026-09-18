@@ -1,0 +1,38 @@
+schema_version: 1
+
+# The current article-retention query requires a political-signal configuration.
+# These UK-only seeds also preserve the existing political-attention capability.
+signals:
+  political_actor:
+    label: Political actor
+    description: References to elected institutions, office-holders, or parties.
+    phrases:
+      en:
+        translation_status: draft
+        phrases: [government, minister, parliament, prime minister, political party]
+
+  government_action:
+    label: Government action
+    description: Policy, law, regulation, public spending, targets, bans, or official decisions.
+    phrases:
+      en:
+        translation_status: draft
+        phrases: [government policy, climate policy, new law, legislation, regulation, government subsidy, emissions target, government ban]
+
+  party_politics:
+    label: Party politics
+    description: Electoral competition and named major UK parties.
+    phrases:
+      en:
+        translation_status: draft
+        phrases: [governing party, opposition party, election campaign, Labour Party, Conservative Party, Liberal Democrats, Green Party, Reform UK]
+
+official_domains:
+  unitedkingdom:
+    - gov.uk
+    - parliament.uk
+    - labour.org.uk
+    - conservatives.com
+    - libdems.org.uk
+    - greenparty.org.uk
+    - reformparty.uk
