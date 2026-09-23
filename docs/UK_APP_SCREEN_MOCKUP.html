@@ -1,0 +1,556 @@
+<div id="uk-atlas-mockup">
+  <style>
+    #uk-atlas-mockup {
+      --atlas-ink: #17342e;
+      --atlas-muted: #6c7f78;
+      --atlas-line: #d9e4df;
+      --atlas-paper: #f7faf8;
+      --atlas-panel: #ffffff;
+      --atlas-green: #1d7458;
+      --atlas-lime: #b8df70;
+      --atlas-blue: #4d84b7;
+      --atlas-orange: #d9904b;
+      --atlas-purple: #7b6ab0;
+      width: 100%;
+      max-width: 1024px;
+      margin: 0 auto;
+      color: var(--atlas-ink);
+      background: var(--atlas-paper);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 13px;
+      line-height: 1.4;
+      border: 1px solid var(--atlas-line);
+      box-shadow: 0 18px 50px rgba(23, 52, 46, .12);
+    }
+    #uk-atlas-mockup * { box-sizing: border-box; }
+    #uk-atlas-mockup button, #uk-atlas-mockup select {
+      font: inherit;
+      color: inherit;
+    }
+    #uk-atlas-mockup button {
+      cursor: pointer;
+      border: 0;
+      background: transparent;
+    }
+    #uk-atlas-mockup .atlas-topbar {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      min-height: 58px;
+      padding: 0 24px;
+      border-bottom: 1px solid var(--atlas-line);
+      background: var(--atlas-panel);
+    }
+    #uk-atlas-mockup .atlas-brand {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin-right: auto;
+      font-weight: 700;
+      letter-spacing: -.02em;
+    }
+    #uk-atlas-mockup .atlas-brand-mark {
+      display: grid;
+      width: 25px;
+      height: 25px;
+      place-items: center;
+      color: var(--atlas-ink);
+      background: var(--atlas-lime);
+      border-radius: 7px;
+      font-weight: 800;
+    }
+    #uk-atlas-mockup .atlas-nav {
+      display: flex;
+      align-self: stretch;
+      gap: 4px;
+    }
+    #uk-atlas-mockup .atlas-nav button {
+      padding: 0 11px;
+      border-bottom: 2px solid transparent;
+      color: var(--atlas-muted);
+      font-size: 12px;
+    }
+    #uk-atlas-mockup .atlas-nav button[aria-selected="true"] {
+      border-color: var(--atlas-green);
+      color: var(--atlas-ink);
+      font-weight: 700;
+    }
+    #uk-atlas-mockup .atlas-status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--atlas-muted);
+      font-size: 11px;
+      white-space: nowrap;
+    }
+    #uk-atlas-mockup .atlas-status i {
+      width: 7px;
+      height: 7px;
+      background: var(--atlas-green);
+      border-radius: 50%;
+    }
+    #uk-atlas-mockup .atlas-content { padding: 25px; }
+    #uk-atlas-mockup .atlas-heading {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      margin-bottom: 19px;
+    }
+    #uk-atlas-mockup h1 {
+      margin: 0;
+      font-size: 24px;
+      letter-spacing: -.04em;
+    }
+    #uk-atlas-mockup .atlas-subtitle {
+      margin: 4px 0 0;
+      color: var(--atlas-muted);
+      font-size: 12px;
+    }
+    #uk-atlas-mockup .atlas-actions {
+      display: flex;
+      gap: 7px;
+      margin-left: auto;
+    }
+    #uk-atlas-mockup .atlas-action {
+      padding: 7px 10px;
+      border: 1px solid var(--atlas-line);
+      background: var(--atlas-panel);
+      border-radius: 6px;
+      font-size: 11px;
+    }
+    #uk-atlas-mockup .atlas-action.atlas-primary {
+      border-color: var(--atlas-green);
+      color: white;
+      background: var(--atlas-green);
+    }
+    #uk-atlas-mockup .atlas-controls {
+      display: grid;
+      gap: 10px;
+      padding: 13px;
+      border: 1px solid var(--atlas-line);
+      background: var(--atlas-panel);
+      border-radius: 9px;
+    }
+    #uk-atlas-mockup .atlas-control-row {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 7px;
+    }
+    #uk-atlas-mockup .atlas-control-label {
+      width: 62px;
+      color: var(--atlas-muted);
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+    #uk-atlas-mockup .atlas-chip, #uk-atlas-mockup .atlas-select {
+      min-height: 29px;
+      padding: 5px 9px;
+      border: 1px solid var(--atlas-line);
+      background: var(--atlas-panel);
+      border-radius: 5px;
+      font-size: 11px;
+    }
+    #uk-atlas-mockup .atlas-chip.active {
+      border-color: rgba(29, 116, 88, .35);
+      color: var(--atlas-green);
+      background: #edf7f1;
+      font-weight: 700;
+    }
+    #uk-atlas-mockup .atlas-measures {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 9px;
+      margin: 16px 0;
+    }
+    #uk-atlas-mockup .atlas-builder {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin: 12px 0;
+    }
+    #uk-atlas-mockup .atlas-axis {
+      padding: 11px;
+      border: 1px solid var(--atlas-line);
+      border-left: 3px solid var(--atlas-green);
+      background: var(--atlas-panel);
+      border-radius: 7px;
+    }
+    #uk-atlas-mockup .atlas-axis.right { border-left-color: var(--atlas-orange); }
+    #uk-atlas-mockup .atlas-axis-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 7px;
+      color: var(--atlas-muted);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+    #uk-atlas-mockup .atlas-series {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 5px 0;
+      border-top: 1px solid #e8efeb;
+      font-size: 11px;
+    }
+    #uk-atlas-mockup .atlas-series i { width: 8px; height: 8px; border-radius: 50%; }
+    #uk-atlas-mockup .atlas-series small { margin-left: auto; color: var(--atlas-muted); }
+    #uk-atlas-mockup .atlas-add {
+      padding: 5px 0 0;
+      color: var(--atlas-green);
+      text-align: left;
+      font-size: 11px;
+    }
+    #uk-atlas-mockup .atlas-events {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 7px;
+      margin: 12px 0;
+    }
+    #uk-atlas-mockup .atlas-events-label {
+      color: var(--atlas-muted);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+    #uk-atlas-mockup .atlas-event-chip {
+      padding: 5px 8px;
+      border: 1px solid #e8cfb0;
+      color: #855b31;
+      background: #fff8ee;
+      border-radius: 5px;
+      font-size: 10px;
+    }
+    #uk-atlas-mockup .atlas-measure {
+      padding: 11px;
+      border: 1px solid var(--atlas-line);
+      background: var(--atlas-panel);
+      border-radius: 7px;
+      text-align: left;
+    }
+    #uk-atlas-mockup .atlas-measure strong {
+      display: block;
+      margin-top: 4px;
+      font-size: 17px;
+      letter-spacing: -.03em;
+    }
+    #uk-atlas-mockup .atlas-measure span {
+      color: var(--atlas-muted);
+      font-size: 10px;
+    }
+    #uk-atlas-mockup .atlas-measure b {
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      margin-right: 5px;
+      border-radius: 50%;
+    }
+    #uk-atlas-mockup .atlas-chart-shell {
+      padding: 16px 17px 12px;
+      border: 1px solid var(--atlas-line);
+      background: var(--atlas-panel);
+      border-radius: 9px;
+    }
+    #uk-atlas-mockup .atlas-chart-title {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 6px;
+      color: var(--atlas-muted);
+      font-size: 11px;
+    }
+    #uk-atlas-mockup svg { display: block; width: 100%; height: auto; }
+    #uk-atlas-mockup .atlas-chart-caption {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      margin-top: 7px;
+      color: var(--atlas-muted);
+      font-size: 10px;
+    }
+    #uk-atlas-mockup .atlas-legend-dot {
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      margin-right: 4px;
+      border-radius: 50%;
+    }
+    #uk-atlas-mockup .atlas-evidence {
+      display: grid;
+      grid-template-columns: 1.1fr .9fr;
+      gap: 12px;
+      margin-top: 12px;
+    }
+    #uk-atlas-mockup .atlas-evidence-card {
+      padding: 14px;
+      border: 1px solid var(--atlas-line);
+      background: var(--atlas-panel);
+      border-radius: 9px;
+    }
+    #uk-atlas-mockup .atlas-eyebrow {
+      color: var(--atlas-green);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    #uk-atlas-mockup .atlas-evidence-card h2 {
+      margin: 4px 0 6px;
+      font-size: 15px;
+    }
+    #uk-atlas-mockup .atlas-evidence-card p {
+      margin: 0;
+      color: var(--atlas-muted);
+      font-size: 11px;
+    }
+    #uk-atlas-mockup .atlas-article-list {
+      display: grid;
+      gap: 8px;
+      margin-top: 11px;
+    }
+    #uk-atlas-mockup .atlas-article {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      padding-top: 8px;
+      border-top: 1px solid #e8efeb;
+      font-size: 11px;
+    }
+    #uk-atlas-mockup .atlas-article small { color: var(--atlas-muted); white-space: nowrap; }
+    #uk-atlas-mockup .atlas-map-layout {
+      display: grid;
+      grid-template-columns: 185px minmax(0, 1fr) 190px;
+      gap: 12px;
+    }
+    #uk-atlas-mockup .atlas-map-panel, #uk-atlas-mockup .atlas-map-detail {
+      padding: 14px;
+      border: 1px solid var(--atlas-line);
+      background: var(--atlas-panel);
+      border-radius: 9px;
+    }
+    #uk-atlas-mockup .atlas-map-panel h2, #uk-atlas-mockup .atlas-map-detail h2 {
+      margin: 0 0 13px;
+      font-size: 14px;
+    }
+    #uk-atlas-mockup .atlas-layer-group { margin-top: 16px; }
+    #uk-atlas-mockup .atlas-layer-group:first-of-type { margin-top: 0; }
+    #uk-atlas-mockup .atlas-layer-group strong {
+      display: block;
+      margin-bottom: 7px;
+      color: var(--atlas-muted);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+    #uk-atlas-mockup .atlas-layer {
+      display: flex;
+      gap: 7px;
+      align-items: center;
+      width: 100%;
+      padding: 6px 0;
+      text-align: left;
+      font-size: 11px;
+    }
+    #uk-atlas-mockup .atlas-layer span {
+      width: 9px;
+      height: 9px;
+      border: 1px solid var(--atlas-muted);
+      border-radius: 2px;
+    }
+    #uk-atlas-mockup .atlas-layer.active { color: var(--atlas-green); font-weight: 700; }
+    #uk-atlas-mockup .atlas-map-canvas {
+      min-height: 380px;
+      display: grid;
+      place-items: center;
+      border: 1px solid #cbded4;
+      background: #edf5f0;
+      border-radius: 8px;
+    }
+    #uk-atlas-mockup .atlas-map-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 34px);
+      gap: 5px;
+      transform: rotate(-8deg);
+    }
+    #uk-atlas-mockup .atlas-map-grid i {
+      display: block;
+      height: 34px;
+      border: 1px solid #b8d2c3;
+      background: #d9ebde;
+      border-radius: 5px;
+    }
+    #uk-atlas-mockup .atlas-map-grid i:nth-child(3n) { background: #a8d0bb; }
+    #uk-atlas-mockup .atlas-map-grid i:nth-child(5n) { background: #f0d29b; }
+    #uk-atlas-mockup .atlas-map-label {
+      position: absolute;
+      margin-top: 260px;
+      color: var(--atlas-muted);
+      font-size: 10px;
+    }
+    #uk-atlas-mockup .atlas-map-detail p {
+      margin: 0 0 12px;
+      color: var(--atlas-muted);
+      font-size: 11px;
+    }
+    #uk-atlas-mockup .atlas-detail-value {
+      display: block;
+      margin: 4px 0 14px;
+      font-size: 24px;
+      letter-spacing: -.04em;
+    }
+    #uk-atlas-mockup .atlas-detail-link {
+      width: 100%;
+      padding: 8px 0;
+      border-top: 1px solid var(--atlas-line);
+      color: var(--atlas-green);
+      text-align: left;
+      font-size: 11px;
+    }
+    #uk-atlas-mockup .atlas-map-footer {
+      display: flex;
+      gap: 14px;
+      margin-top: 12px;
+      padding: 10px 13px;
+      border: 1px solid var(--atlas-line);
+      color: var(--atlas-muted);
+      background: var(--atlas-panel);
+      border-radius: 7px;
+      font-size: 10px;
+    }
+    #uk-atlas-mockup .atlas-map-time {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+      padding: 10px 13px;
+      border: 1px solid var(--atlas-line);
+      background: var(--atlas-panel);
+      border-radius: 7px;
+    }
+    #uk-atlas-mockup .atlas-play {
+      padding: 6px 9px;
+      border: 1px solid var(--atlas-green);
+      color: white;
+      background: var(--atlas-green);
+      border-radius: 5px;
+      font-size: 11px;
+    }
+    #uk-atlas-mockup .atlas-time-track {
+      flex: 1 1 270px;
+      height: 5px;
+      min-width: 170px;
+      background: #dfeae3;
+      border-radius: 5px;
+    }
+    #uk-atlas-mockup .atlas-time-track i {
+      display: block;
+      width: 67%;
+      height: 100%;
+      background: var(--atlas-green);
+      border-radius: 5px;
+    }
+    #uk-atlas-mockup .atlas-date-label { font-size: 11px; font-weight: 700; }
+    #uk-atlas-mockup [hidden] { display: none !important; }
+    @media (max-width: 760px) {
+      #uk-atlas-mockup .atlas-topbar { flex-wrap: wrap; gap: 8px; padding: 12px 16px 0; }
+      #uk-atlas-mockup .atlas-brand { width: 100%; }
+      #uk-atlas-mockup .atlas-nav { order: 3; width: 100%; overflow-x: auto; }
+      #uk-atlas-mockup .atlas-nav button { padding: 10px 8px; }
+      #uk-atlas-mockup .atlas-content { padding: 17px 14px; }
+      #uk-atlas-mockup .atlas-heading { display: block; }
+      #uk-atlas-mockup .atlas-actions { margin-top: 12px; }
+      #uk-atlas-mockup .atlas-measures { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      #uk-atlas-mockup .atlas-builder { grid-template-columns: 1fr; }
+      #uk-atlas-mockup .atlas-evidence, #uk-atlas-mockup .atlas-map-layout { grid-template-columns: 1fr; }
+      #uk-atlas-mockup .atlas-map-panel { order: 2; }
+      #uk-atlas-mockup .atlas-map-detail { order: 3; }
+      #uk-atlas-mockup .atlas-map-canvas { min-height: 290px; }
+    }
+  </style>
+  <header class="atlas-topbar">
+    <div class="atlas-brand"><span class="atlas-brand-mark">A</span><span>UK Attention Atlas</span></div>
+    <nav class="atlas-nav" aria-label="Mockup navigation">
+      <button type="button" data-atlas-view="timeline" aria-selected="true">Timeline</button>
+      <button type="button" data-atlas-view="map" aria-selected="false">UK map</button>
+      <button type="button" aria-selected="false">Saved views</button>
+      <button type="button" aria-selected="false">Data</button>
+      <button type="button" aria-selected="false">Methods</button>
+    </nav>
+    <div class="atlas-status"><i></i> Release uk-2026-09</div>
+  </header>
+  <main class="atlas-content">
+    <section data-atlas-panel="timeline">
+      <div class="atlas-heading">
+        <div><h1>Attention timeline</h1><p class="atlas-subtitle">Compare attention and context across the UK</p></div>
+        <div class="atlas-actions"><button class="atlas-action" type="button">Save view</button><button class="atlas-action" type="button">Share</button><button class="atlas-action atlas-primary" type="button">Export</button></div>
+      </div>
+      <div class="atlas-controls">
+        <div class="atlas-control-row"><span class="atlas-control-label">Topics</span><button class="atlas-chip active" type="button">Climate change ×</button><button class="atlas-chip active" type="button">Clean transport ×</button><button class="atlas-chip" type="button">+ Add topic</button></div>
+        <div class="atlas-control-row"><span class="atlas-control-label">Compare</span><button class="atlas-chip active" type="button">News</button><button class="atlas-chip" type="button">Search</button><button class="atlas-chip" type="button">Social</button><select class="atlas-select" aria-label="Geography"><option>United Kingdom</option><option>England</option><option>Greater London</option></select><select class="atlas-select" aria-label="Granularity"><option>Daily</option><option>Weekly</option><option>Monthly</option></select></div>
+      </div>
+      <div class="atlas-builder" aria-label="Chart series builder">
+        <div class="atlas-axis"><div class="atlas-axis-head"><span>Left Y axis · Attention share (%)</span><button type="button">Edit</button></div><div class="atlas-series"><i style="background: var(--atlas-green)"></i><span>Climate change · UK news share</span><small>•••</small></div><div class="atlas-series"><i style="background: var(--atlas-blue)"></i><span>EVs · UK news share</span><small>•••</small></div><button class="atlas-add" type="button">+ Add series</button></div>
+        <div class="atlas-axis right"><div class="atlas-axis-head"><span>Right Y axis · Petrol price (p/litre)</span><button type="button">Edit</button></div><div class="atlas-series"><i style="background: var(--atlas-orange)"></i><span>Petrol · weekly average</span><small>•••</small></div><button class="atlas-add" type="button">+ Add series</button></div>
+      </div>
+      <div class="atlas-events"><span class="atlas-events-label">X-axis events</span><button class="atlas-event-chip" type="button">Heatwaves · UK</button><button class="atlas-event-chip" type="button">Fuel price shocks</button><button class="atlas-event-chip" type="button">+ Add event filter</button><button class="atlas-chip" type="button">+ Custom event</button></div>
+      <div class="atlas-measures">
+        <button class="atlas-measure" type="button"><span><b style="background: var(--atlas-green)"></b>Chart title</span><strong>Climate and prices</strong></button>
+        <button class="atlas-measure" type="button"><span><b style="background: var(--atlas-blue)"></b>Appearance</span><strong>Customize</strong></button>
+        <button class="atlas-measure" type="button"><span><b style="background: var(--atlas-purple)"></b>Metric builder</span><strong>3 metrics</strong></button>
+        <button class="atlas-measure" type="button"><span><b style="background: var(--atlas-orange)"></b>Coverage</span><strong>7 of 7 days</strong></button>
+      </div>
+      <div class="atlas-chart-shell">
+        <div class="atlas-chart-title"><span>Share of captured GDELT UK news</span><span>2022–2026 · daily</span></div>
+        <svg viewBox="0 0 900 285" role="img" aria-label="Attention timeline with two topic lines and event markers">
+          <g stroke="#e4ece7" stroke-width="1"><line x1="52" y1="35" x2="875" y2="35"/><line x1="52" y1="90" x2="875" y2="90"/><line x1="52" y1="145" x2="875" y2="145"/><line x1="52" y1="200" x2="875" y2="200"/><line x1="52" y1="245" x2="875" y2="245"/></g>
+          <g fill="#82938c" font-size="11"><text x="15" y="39">2.0%</text><text x="15" y="94">1.5%</text><text x="15" y="149">1.0%</text><text x="15" y="204">0.5%</text><text x="25" y="249">0</text><text x="55" y="270">2022</text><text x="252" y="270">2023</text><text x="452" y="270">2024</text><text x="650" y="270">2025</text><text x="835" y="270">2026</text></g>
+          <g stroke="#d9904b" stroke-width="1.5" stroke-dasharray="4 4"><line x1="427" y1="25" x2="427" y2="247"/><line x1="675" y1="25" x2="675" y2="247"/></g>
+          <g fill="#d9904b" font-size="10"><text x="404" y="19">heatwave</text><text x="655" y="19">fuel price</text></g>
+          <path d="M52 214 C95 208 120 225 152 201 S217 186 246 204 S290 190 326 165 S364 157 397 179 S432 150 460 185 S502 210 531 164 S569 156 604 173 S636 191 670 139 S707 107 744 146 S794 179 823 133 S850 111 875 126" fill="none" stroke="#1d7458" stroke-width="3"/>
+          <path d="M52 230 C93 228 124 235 153 221 S209 215 242 224 S291 205 322 212 S367 228 397 221 S432 229 464 211 S505 207 535 220 S576 225 604 203 S639 214 675 202 S717 195 750 206 S799 220 830 194 S855 188 875 179" fill="none" stroke="#4d84b7" stroke-width="3"/>
+          <circle cx="675" cy="139" r="5" fill="#fff" stroke="#1d7458" stroke-width="3"/>
+        </svg>
+        <div class="atlas-chart-caption"><span><i class="atlas-legend-dot" style="background: var(--atlas-green)"></i>Climate change</span><span><i class="atlas-legend-dot" style="background: var(--atlas-blue)"></i>EVs</span><span><i class="atlas-legend-dot" style="background: var(--atlas-orange)"></i>Petrol price · right axis</span><span>Gaps remain visible; missing days are not zeros</span></div>
+      </div>
+      <div class="atlas-evidence">
+        <article class="atlas-evidence-card"><span class="atlas-eyebrow">Selected period · 18–24 July 2025</span><h2>Climate change attention rose to 1.47%</h2><p>36 matching URLs from 8,410 captured UK articles. The period is complete for 7 of 7 days and uses the current topic configuration.</p></article>
+        <article class="atlas-evidence-card"><span class="atlas-eyebrow">Article evidence</span><div class="atlas-article-list"><div class="atlas-article"><span>Heat and the climate connection</span><small>Guardian · 18 Jul</small></div><div class="atlas-article"><span>What the temperature means for cities</span><small>BBC · 20 Jul</small></div><div class="atlas-article"><span>UK heat alert expanded</span><small>Local source · 22 Jul</small></div></div></article>
+      </div>
+    </section>
+    <section data-atlas-panel="map" hidden>
+      <div class="atlas-heading"><div><h1>UK map</h1><p class="atlas-subtitle">Place, event and attention patterns</p></div><div class="atlas-actions"><button class="atlas-action" type="button">Save view</button><button class="atlas-action" type="button">Share</button><button class="atlas-action atlas-primary" type="button">Export</button></div></div>
+      <div class="atlas-map-layout">
+        <aside class="atlas-map-panel"><h2>Layers</h2><div class="atlas-layer-group"><strong>Attention</strong><button class="atlas-layer active" type="button"><span style="background: var(--atlas-green)"></span>Climate change</button><button class="atlas-layer" type="button"><span></span>Clean transport</button><button class="atlas-layer" type="button"><span></span>Cost of living</button></div><div class="atlas-layer-group"><strong>Physical</strong><button class="atlas-layer" type="button"><span></span>Temperature</button><button class="atlas-layer" type="button"><span></span>NDVI / grass</button><button class="atlas-layer" type="button"><span></span>Flood footprint</button></div><div class="atlas-layer-group"><strong>Events</strong><button class="atlas-layer" type="button"><span></span>Wildfire</button><button class="atlas-layer" type="button"><span></span>Policy</button><button class="atlas-layer" type="button"><span></span>Transport</button></div></aside>
+        <div class="atlas-map-canvas" aria-label="UK map placeholder showing ONS geography"><div class="atlas-map-grid"><i style="opacity:0.45"></i><i style="opacity:0.5800000000000001"></i><i style="opacity:0.71"></i><i style="opacity:0.8400000000000001"></i><i style="opacity:0.47000000000000003"></i><i style="opacity:0.6"></i><i style="opacity:0.73"></i><i style="opacity:0.86"></i><i style="opacity:0.49"></i><i style="opacity:0.62"></i><i style="opacity:0.75"></i><i style="opacity:0.88"></i><i style="opacity:0.51"></i><i style="opacity:0.64"></i><i style="opacity:0.77"></i><i style="opacity:0.9"></i><i style="opacity:0.53"></i><i style="opacity:0.66"></i><i style="opacity:0.79"></i><i style="opacity:0.9199999999999999"></i><i style="opacity:0.55"></i><i style="opacity:0.68"></i><i style="opacity:0.81"></i><i style="opacity:0.94"></i><i style="opacity:0.5700000000000001"></i><i style="opacity:0.7"></i><i style="opacity:0.8300000000000001"></i><i style="opacity:0.46"></i><i style="opacity:0.5900000000000001"></i><i style="opacity:0.72"></i><i style="opacity:0.8500000000000001"></i><i style="opacity:0.48"></i><i style="opacity:0.61"></i><i style="opacity:0.74"></i><i style="opacity:0.87"></i></div><span class="atlas-map-label">ONS counties / local authorities · layer preview</span></div>
+        <aside class="atlas-map-detail"><span class="atlas-eyebrow">Selected place</span><h2>Greater London</h2><p>18–24 July 2025</p><span class="atlas-detail-value">1.24%</span><p>Climate change share of captured local and national coverage associated with this selection.</p><button class="atlas-detail-link" type="button">Open in timeline →</button><button class="atlas-detail-link" type="button">Open articles →</button><button class="atlas-detail-link" type="button">View source coverage →</button></aside>
+      </div>
+      <div class="atlas-map-time" aria-label="Map date controls"><button class="atlas-play" type="button" data-atlas-play>▶ Play</button><button class="atlas-action" type="button">‹</button><div class="atlas-time-track" aria-label="Map date timeline"><i></i></div><button class="atlas-action" type="button">›</button><span class="atlas-date-label">18 Jul 2025</span><select class="atlas-select" aria-label="Map step"><option>Day</option><option>Week</option><option>Month</option></select><select class="atlas-select" aria-label="Map playback speed"><option>1×</option><option>2×</option><option>4×</option></select></div>
+      <div class="atlas-map-footer"><span>Map meaning: outlet location · article-mentioned place · event location</span><span>Current layer: GDELT news share · daily · refreshed 23 Sep 2026</span></div>
+    </section>
+  </main>
+  <script>
+    (() => {
+      const root = document.getElementById('uk-atlas-mockup');
+      const tabs = [...root.querySelectorAll('[data-atlas-view]')];
+      const panels = [...root.querySelectorAll('[data-atlas-panel]')];
+      tabs.forEach(tab => tab.addEventListener('click', () => {
+        const view = tab.dataset.atlasView;
+        tabs.forEach(item => item.setAttribute('aria-selected', String(item === tab)));
+        panels.forEach(panel => { panel.hidden = panel.dataset.atlasPanel !== view; });
+      }));
+      const play = root.querySelector('[data-atlas-play]');
+      if (play) play.addEventListener('click', () => {
+        const isPlaying = play.dataset.playing === 'true';
+        play.dataset.playing = String(!isPlaying);
+        play.textContent = isPlaying ? '▶ Play' : 'Ⅱ Pause';
+      });
+    })();
+  </script>
+</div>
