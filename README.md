@@ -37,6 +37,9 @@ expanded climate, cost-of-living and clean-transport topics; news, search and so
 attention; article-level denominators and classifications; UK counties/local
 authorities; and weather, prices, disruption and other event inputs.
 
+The [UK data-layer audit](docs/UK_DATA_LAYER_AUDIT_2026-09-23.md) records public
+source availability, MVP reuse, access requirements and the recommended setup order.
+
 ## Frontend MVP
 
 `frontend/` contains the Netlify-ready Climate Attention Atlas: a React and
