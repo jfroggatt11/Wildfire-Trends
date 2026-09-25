@@ -89,6 +89,10 @@ Google Trends uses the same API but country-language configurations differ. Fuel
 
 Weather observations, flood monitoring, rail disruption, policy/parliament records, elections/events and administrative local units are not one transferable source. Store a common canonical schema, retain the provider-specific fields, and publish coverage and comparability notes per country.
 
+### Translation and verification
+
+Translating the UK phrase list word for word will miss common local wording and can create false matches. German compounds and inflections, and French synonyms and accented forms, need separate query sets for news, search and social data. A native speaker or subject specialist should review each set, then label samples of matched **and missed** articles in each language to estimate precision and recall. Version the query lists and repeat the check when they change. The UK also needs a Welsh-language coverage check before calling its news measure fully UK-wide. This is a **moderate validation effort** for Germany and France, even though the underlying GDELT and Trends providers are shared.
+
 ## Recommended delivery sequence
 
 1. **Build the shared backbone once:** GDELT, Trends access, Bluesky panel format, FIRMS, MODIS/VIIRS, GDACS, provenance and common country polygons.
